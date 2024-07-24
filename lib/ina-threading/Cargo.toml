@@ -2,7 +2,7 @@
 name = "ina-threading"
 description = "Provides concurrency solutions for 1N4."
 authors = ["Jaxydog"]
-categories = ["concurrency"]
+categories = ["asynchronous", "concurrency"]
 keywords = ["channels", "threads"]
 
 version = "0.1.0"
