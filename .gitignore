@@ -1,0 +1,6 @@
+/bin
+/log
+/dat
+/target
+
+.env
