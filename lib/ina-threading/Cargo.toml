@@ -1,0 +1,23 @@
+[package]
+name = "ina-threading"
+description = "Provides concurrency solutions for 1N4."
+authors = ["Jaxydog"]
+categories = ["concurrency"]
+keywords = ["channels", "threads"]
+
+version = "0.1.0"
+
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+
+[dependencies]
+thiserror = "1.0"
+tokio = { version = "1.39", features = ["sync", "time"] }

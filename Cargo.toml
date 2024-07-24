@@ -14,7 +14,7 @@ publish.workspace = true
 repository.workspace = true
 
 [workspace]
-members = []
+members = ["lib/ina-*"]
 resolver = "2"
 
 package.edition = "2021"
