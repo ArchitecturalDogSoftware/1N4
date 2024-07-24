@@ -52,3 +52,4 @@ dotenv = ["dep:dotenvy"]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 dotenvy = { version = "0.15", optional = true }
+ina-logging = { version = "*", path = "./lib/ina-logging/" }
