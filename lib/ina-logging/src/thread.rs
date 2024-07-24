@@ -56,6 +56,17 @@ pub fn start(settings: Settings) -> Result<(), Request<'static>> {
     Ok(())
 }
 
+/// Closes the logging thread.
+///
+/// # Panics
+///
+/// Panics if the logging thread is not initialized.
+pub fn close() {
+    assert!(THREAD.sync_api().has(), "the thread is not initialized");
+
+    THREAD.sync_api().drop();
+}
+
 /// Requests that the logging thread outputs the given log.
 ///
 /// # Panics
@@ -131,11 +142,11 @@ pub fn blocking_flush() -> Result<(), Request<'static>> {
 /// This function will return an error if the thread fails to run.
 fn run(settings: Settings, mut receiver: Receiver<Request<'static>>) -> Result<()> {
     let mut logger = Logger::<'static>::new(settings)?;
-    let mut timeout = tokio::time::interval(logger.timeout());
-
     let runtime = tokio::runtime::Builder::new_current_thread().enable_time().build()?;
 
     runtime.block_on(async {
+        let mut timeout = tokio::time::interval(logger.timeout());
+
         loop {
             tokio::select! {
                 _ = timeout.tick() => logger.flush()?,

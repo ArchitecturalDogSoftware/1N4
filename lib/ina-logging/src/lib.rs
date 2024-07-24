@@ -57,7 +57,7 @@ pub enum Error<S = Infallible> {
 #[derive(Clone, Debug, PartialEq, Eq, Args)]
 pub struct Settings {
     /// Sets the logger's color preferences.
-    #[arg(short = 'c', long = "color", default_value = "ColorChoice::Auto")]
+    #[arg(short = 'c', long = "color", default_value = "auto")]
     pub color: ColorChoice,
 
     /// Disables terminal output.
@@ -245,7 +245,7 @@ impl<'lv> Level<'lv> {
     /// The error log level.
     pub const ERROR: Self = Self::new("error", AnsiColors::BrightRed, true);
     /// The informational log level.
-    pub const INFO: Self = Self::new("info", AnsiColors::BrightMagenta, false);
+    pub const INFO: Self = Self::new("info", AnsiColors::BrightBlue, false);
     /// The warning log level.
     pub const WARN: Self = Self::new("warn", AnsiColors::BrightYellow, true);
 
