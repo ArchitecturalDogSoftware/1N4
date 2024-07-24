@@ -4,9 +4,9 @@
 
 1N4, pronounched 'ee-nah' (/inä/), is a Discord bot made for a private Minecraft SMP.
 
-It provides moderation capabilities and various useful features, while also including built-in lore through the official bot.
+It provides moderation capabilities and various useful features, while also including built-in lore through the official bot. None of the bot's lore will be provided through this repository for the sake of secrecy. Spoilers are no fun!
 
-1N4 probably isn't for you, as it is highly specialized for what we need.
+1N4 probably isn't for you, as it is highly specialized for what our server needs as a group.
 
 ## Usage
 
