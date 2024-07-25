@@ -26,6 +26,7 @@ use std::time::Duration;
 
 use clap::{Args, ColorChoice};
 use owo_colors::{AnsiColors, OwoColorize, Stream};
+use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Iso8601;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -54,28 +55,34 @@ pub enum Error<S = Infallible> {
 
 /// The logger's settings.
 #[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq, Args)]
+#[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
 pub struct Settings {
     /// Sets the logger's color preferences.
     #[arg(short = 'c', long = "color", default_value = "auto")]
+    #[serde(with = "color_choice")]
     pub color: ColorChoice,
 
     /// Disables terminal output.
     #[arg(short = 'q', long = "quiet")]
+    #[serde(rename = "quiet")]
     pub no_term_output: bool,
     /// Disables file output.
     #[arg(short = 'e', long = "ephemeral")]
+    #[serde(rename = "ephemeral")]
     pub no_file_output: bool,
 
     /// The directory within which to output log files.
-    #[arg(short = 'd', long = "directory", default_value = "./log/")]
+    #[arg(long = "log-directory", default_value = "./log/")]
+    #[serde(rename = "directory")]
     pub file_directory: Box<Path>,
 
     /// The logger's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(long = "queue-capacity", default_value = "8")]
+    #[arg(long = "log-queue-capacity", default_value = "8")]
+    #[serde(rename = "queue-capacity")]
     pub queue_capacity: NonZeroUsize,
     /// The logger's output queue timeout in milliseconds.
-    #[arg(long = "queue-timeout", default_value = "20")]
+    #[arg(long = "log-queue-timeout", default_value = "20")]
+    #[serde(rename = "queue-timeout")]
     pub queue_timeout: NonZeroU64,
 }
 
@@ -317,5 +324,52 @@ impl<'lv> Entry<'lv> {
         }
 
         EntryDisplay(self, stream)
+    }
+}
+
+mod color_choice {
+    use clap::ColorChoice;
+    use serde::de::{Unexpected, Visitor};
+    use serde::{Deserializer, Serializer};
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn serialize<S>(value: &ColorChoice, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(match value {
+            ColorChoice::Auto => "auto",
+            ColorChoice::Always => "always",
+            ColorChoice::Never => "never",
+        })
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ColorChoice, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ChoiceVisitor;
+
+        impl Visitor<'_> for ChoiceVisitor {
+            type Value = ColorChoice;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a color choice")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    "auto" => Ok(ColorChoice::Auto),
+                    "always" => Ok(ColorChoice::Always),
+                    "never" => Ok(ColorChoice::Never),
+                    _ => Err(E::invalid_value(Unexpected::Str(v), &self)),
+                }
+            }
+        }
+
+        deserializer.deserialize_str(ChoiceVisitor)
     }
 }
