@@ -83,7 +83,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool>
 ///
 /// This function will return an error if the event could not be handled.
 pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool> {
-    info!(async "shard #{shard_id} connected to gateway").await?;
+    info!(async "shard #{} connected to gateway", shard_id.number()).await?;
 
     let client = api.client.interaction(event.application.id);
 
