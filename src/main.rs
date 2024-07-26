@@ -18,14 +18,17 @@
 
 use anyhow::Result;
 use clap::Parser;
-use ina_logging::{debug, info, Settings};
+use ina_logging::info;
 
 /// The application's command-line arguments.
 #[derive(Clone, Debug, PartialEq, Eq, Parser)]
 pub struct Arguments {
+    /// The localization thread's settings.
+    #[command(flatten)]
+    pub lang_settings: ina_localization::Settings,
     /// The logging thread's settings.
     #[command(flatten)]
-    pub log_settings: Settings,
+    pub log_settings: ina_logging::Settings,
 }
 
 /// The application's main entrypoint.
@@ -38,9 +41,13 @@ pub fn main() -> Result<()> {
 
     ina_logging::thread::blocking_start(arguments.log_settings)?;
 
-    debug!("does this work in release?")?;
-    info!("it sure does!")?;
+    info!("initialized logging thread")?;
 
+    ina_localization::thread::blocking_start(arguments.lang_settings)?;
+
+    info!("initialized localization thread")?;
+
+    ina_localization::thread::blocking_close();
     ina_logging::thread::blocking_close();
 
     Ok(())

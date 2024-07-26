@@ -56,6 +56,7 @@ pub enum Error<S = Infallible> {
 /// The logger's settings.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
+#[group(id = "LogSettings")]
 pub struct Settings {
     /// Sets the logger's color preferences.
     #[arg(short = 'c', long = "color", default_value = "auto")]
@@ -72,12 +73,12 @@ pub struct Settings {
     pub no_file_output: bool,
 
     /// The directory within which to output log files.
-    #[arg(long = "log-directory", default_value = "./log/")]
+    #[arg(id = "LOG_DIRECTORY", long = "log-directory", default_value = "./log/")]
     #[serde(rename = "directory")]
     pub file_directory: Box<Path>,
 
     /// The logger's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(long = "log-queue-capacity", default_value = "8")]
+    #[arg(id = "LOG_QUEUE_CAPACITY", long = "log-queue-capacity", default_value = "8")]
     #[serde(rename = "queue-capacity")]
     pub queue_capacity: NonZeroUsize,
     /// The logger's output queue timeout in milliseconds.

@@ -67,6 +67,7 @@ pub enum Error<S = Infallible> {
 /// The logger's settings.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
+#[group(id = "lang-settings")]
 pub struct Settings {
     /// The localizer's default locale.
     #[arg(short = 'l', long = "default-locale", default_value = "en-US")]
@@ -74,7 +75,7 @@ pub struct Settings {
     pub default_locale: Locale,
 
     /// The directory within which to read language files.
-    #[arg(long = "lang-directory", default_value = "./res/lang/")]
+    #[arg(id = "LANG_DIRECTORY", long = "lang-directory", default_value = "./res/lang/")]
     #[serde(rename = "directory")]
     pub file_directory: Box<Path>,
 
@@ -84,7 +85,7 @@ pub struct Settings {
     pub miss_behavior: MissBehavior,
 
     /// The localizing thread's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(long = "lang-queue-capacity", default_value = "8")]
+    #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value = "8")]
     #[serde(rename = "queue-capacity")]
     pub queue_capacity: NonZeroUsize,
 }

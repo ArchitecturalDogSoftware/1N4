@@ -197,6 +197,7 @@ dependencies = [
  "anyhow",
  "clap",
  "dotenvy",
+ "ina-localization",
  "ina-logging",
 ]
 
