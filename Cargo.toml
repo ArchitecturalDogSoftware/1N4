@@ -26,6 +26,7 @@ package.repository = "https://github.com/Jaxydog/1N4"
 clippy.cargo = "warn"
 clippy.expect_used = "warn"
 clippy.module_name_repetitions = { level = "allow", priority = 1 }
+clippy.multiple_crate_versions = { level = "allow", priority = 1 }
 clippy.nursery = "warn"
 clippy.panic = "warn"
 clippy.pedantic = "warn"

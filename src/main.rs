@@ -39,19 +39,47 @@ pub struct Arguments {
 pub fn main() -> Result<()> {
     let arguments = Arguments::parse();
 
-    ina_logging::thread::blocking_start(arguments.log_settings)?;
+    ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
 
     info!("initialized logging thread")?;
 
-    ina_localization::thread::blocking_start(arguments.lang_settings)?;
+    #[cfg(feature = "dotenv")]
+    {
+        dotenvy::dotenv()?;
 
-    info!("initialized localization thread")?;
+        info!("loaded environment variables")?;
+    }
 
-    ina_localization::thread::blocking_close();
+    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
 
-    info!("exited application")?;
+    runtime.block_on(self::async_main(arguments))?;
+
+    info!("closing logging thread")?;
 
     ina_logging::thread::blocking_close();
+
+    Ok(())
+}
+
+/// The application's main function.
+///
+/// # Errors
+///
+/// This function will return an error if the program's execution fails.
+pub async fn async_main(arguments: Arguments) -> Result<()> {
+    info!(async "entering asynchronous runtime").await?;
+
+    ina_localization::thread::start(arguments.lang_settings).await?;
+
+    info!(async "initialized localization thread").await?;
+
+    // TODO: Main program execution.
+
+    info!(async "exiting asynchronous runtime").await?;
+
+    ina_localization::thread::close().await;
+
+    info!(async "closed localization thread").await?;
 
     Ok(())
 }
