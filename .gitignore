@@ -1,6 +1,6 @@
 /bin
 /log
-/dat
+/res/data
 /target
 
 .env
