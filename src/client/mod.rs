@@ -93,6 +93,14 @@ pub struct StatusDefinition {
     pub link: Option<Box<str>>,
 }
 
+impl Default for StatusDefinition {
+    fn default() -> Self {
+        let status = if cfg!(debug_assertions) { Status::Idle } else { Status::Online };
+
+        Self { status, activity: None, content: None, link: None }
+    }
+}
+
 /// The bot's instance.
 #[derive(Debug)]
 pub struct Instance {
@@ -145,17 +153,16 @@ impl Instance {
     ///
     /// This function will return an error if the [`Config`] could not be created.
     pub fn new_config(token: String, status: Option<&StatusList>) -> Result<Config> {
-        let mut builder = ConfigBuilder::new(token, self::INTENTS);
-
-        if let Some(status) = status {
+        let payload = if let Some(status) = status {
             let list = if cfg!(debug_assertions) { &status.testing } else { &status.release };
             let index = thread_rng().gen_range(0 .. list.len());
-            let payload = Self::get_status(&list[index])?;
 
-            builder = builder.presence(payload);
-        }
+            Self::get_status(&list[index])?
+        } else {
+            Self::get_status(&StatusDefinition::default())?
+        };
 
-        Ok(builder.build())
+        Ok(ConfigBuilder::new(token, self::INTENTS).presence(payload).build())
     }
 
     /// Creates a new list of shards.

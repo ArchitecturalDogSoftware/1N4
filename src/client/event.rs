@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use ina_logging::{info, warn};
+use ina_logging::{debug, info, warn};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::gateway::payload::incoming::Ready;
 
@@ -29,15 +29,41 @@ use super::api::Api;
 pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool> {
     api.cache.update(&event);
 
+    let id = shard_id.number();
     let result: Result<bool> = match event {
         Event::Ready(event) => self::on_ready(api, *event, shard_id).await,
-        Event::GatewayReconnect => {
-            info!(async "shard #{shard_id} reconnecting to gateway").await?;
+        Event::Resumed => {
+            info!(async "shard #{id} successfully resumed").await?;
 
             Ok(false)
         }
-        Event::Resumed => {
-            info!(async "shard #{shard_id} successfully resumed").await?;
+        Event::GatewayHeartbeat(event) => {
+            debug!(async "shard #{id} received heartbeat (seq. {event})").await?;
+
+            Ok(false)
+        }
+        Event::GatewayHeartbeatAck => {
+            debug!(async "shard #{id} received heartbeat acknowledgement").await?;
+
+            Ok(false)
+        }
+        Event::GatewayHello(event) => {
+            info!(async "shard #{id} connecting to gateway ({}ms)", event.heartbeat_interval).await?;
+
+            Ok(false)
+        }
+        Event::GatewayClose(None) => {
+            warn!(async "shard #{id} disconnected from gateway").await?;
+
+            Ok(false)
+        }
+        Event::GatewayClose(Some(frame)) => {
+            warn!(async "shard #{id} disconnected from gateway: {}", frame.reason).await?;
+
+            Ok(false)
+        }
+        Event::GatewayReconnect => {
+            info!(async "shard #{id} reconnecting to gateway").await?;
 
             Ok(false)
         }
