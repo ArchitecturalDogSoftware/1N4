@@ -48,6 +48,9 @@ pub fn main() -> Result<()> {
     info!("initialized localization thread")?;
 
     ina_localization::thread::blocking_close();
+
+    info!("exited application")?;
+
     ina_logging::thread::blocking_close();
 
     Ok(())
