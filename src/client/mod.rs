@@ -64,7 +64,7 @@ pub struct Settings {
     #[arg(short = 's', long = "shards")]
     pub shards: Option<NonZeroU32>,
     /// The interval at which to reshard in hours.
-    #[arg(short = 'r', long = "reshard-interval")]
+    #[arg(short = 'r', long = "reshard-interval", default_value = "8")]
     pub reshard_interval: u64,
 }
 
