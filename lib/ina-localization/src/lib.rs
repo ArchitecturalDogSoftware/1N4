@@ -67,7 +67,7 @@ pub enum Error<S = Infallible> {
 /// The logger's settings.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
-#[group(id = "lang-settings")]
+#[group(id = "LangSettings")]
 pub struct Settings {
     /// The localizer's default locale.
     #[arg(short = 'l', long = "default-locale", default_value = "en-US")]

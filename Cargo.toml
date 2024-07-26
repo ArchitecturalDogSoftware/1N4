@@ -60,8 +60,11 @@ rand = { version = "0.8", features = ["nightly"] }
 serde = { version = "1.0", features = ["derive"] }
 time = { version = "0.3", features = ["local-offset", "serde"] }
 tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1"
+toml = { version = "0.8", features = ["preserve_order"] }
 twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight" }
 twilight-gateway = { git = "https://github.com/twilight-rs/twilight" }
 twilight-http = { git = "https://github.com/twilight-rs/twilight" }
+twilight-mention = { git = "https://github.com/twilight-rs/twilight" }
 twilight-model = { git = "https://github.com/twilight-rs/twilight" }
 twilight-util = { git = "https://github.com/twilight-rs/twilight", features = ["full"] }

@@ -18,11 +18,20 @@
 
 use anyhow::Result;
 use clap::Parser;
-use ina_logging::info;
+use client::Instance;
+use ina_logging::{error, info};
+
+/// The bot's client implementation.
+pub mod client;
+/// Provides commonly used definitions.
+pub mod utility;
 
 /// The application's command-line arguments.
 #[derive(Clone, Debug, PartialEq, Eq, Parser)]
 pub struct Arguments {
+    /// The bot's settings.
+    #[command(flatten)]
+    pub bot_settings: client::Settings,
     /// The localization thread's settings.
     #[command(flatten)]
     pub lang_settings: ina_localization::Settings,
@@ -73,13 +82,29 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
 
     info!(async "initialized localization thread").await?;
 
-    // TODO: Main program execution.
+    let instance = Instance::new(arguments.bot_settings).await?;
 
-    info!(async "exiting asynchronous runtime").await?;
+    info!(async "initialized client instance").await?;
+
+    tokio::pin! {
+        let process = instance.run();
+        let terminate = tokio::signal::ctrl_c();
+    }
+
+    info!(async "starting client process").await?;
+
+    #[allow(clippy::redundant_pub_crate)] // False-positive?
+    tokio::select! {
+        _ = process => info!(async "received termination signal").await,
+        result = terminate => match result {
+            Ok(()) => info!(async "stopping client process").await,
+            Err(error) => error!(async "unhandled error encountered: {error}").await,
+        },
+    }?;
 
     ina_localization::thread::close().await;
 
     info!(async "closed localization thread").await?;
 
-    Ok(())
+    info!(async "exiting asynchronous runtime").await.map_err(Into::into)
 }

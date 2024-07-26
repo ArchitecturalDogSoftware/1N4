@@ -50,14 +50,14 @@ impl Locale {
     }
 
     /// Returns the language code of this [`Locale`].
-    pub fn language(&self) -> String {
+    #[must_use] pub fn language(&self) -> String {
         let Self([l1, l2, ..]) = self;
 
         format!("{l1}{l2}")
     }
 
     /// Returns the territory code of this [`Locale`].
-    pub fn territory(&self) -> String {
+    #[must_use] pub fn territory(&self) -> String {
         let Self([.., t1, t2]) = self;
 
         format!("{t1}{t2}")
