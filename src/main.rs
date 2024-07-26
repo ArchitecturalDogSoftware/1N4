@@ -23,6 +23,8 @@ use ina_logging::{error, info};
 
 /// The bot's client implementation.
 pub mod client;
+/// The bot's commands and command registry.
+pub mod command;
 /// Provides commonly used definitions.
 pub mod utility;
 
