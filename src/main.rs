@@ -36,12 +36,12 @@ pub struct Arguments {
 pub fn main() -> Result<()> {
     let arguments = Arguments::parse();
 
-    ina_logging::thread::start(arguments.log_settings)?;
+    ina_logging::thread::blocking_start(arguments.log_settings)?;
 
     debug!("does this work in release?")?;
     info!("it sure does!")?;
 
-    ina_logging::thread::close();
+    ina_logging::thread::blocking_close();
 
     Ok(())
 }

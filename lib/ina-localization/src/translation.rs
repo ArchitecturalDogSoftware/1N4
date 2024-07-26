@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Display;
+use std::ops::Deref;
 
 use serde::Serialize;
 
@@ -22,16 +23,22 @@ use crate::locale::Locale;
 
 /// An owned translation key.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize)]
-pub enum OwnedTranslation {
+pub enum OwnedTranslation<T>
+where
+    T: Deref<Target = str>,
+{
     /// The key is present in the initial map.
-    Present(Box<str>),
+    Present(T),
     /// The key is present in an inherited map.
-    Inherit(Locale, Box<str>),
+    Inherit(Locale, T),
     /// The key is missing and was returned.
-    Missing(Box<str>, Box<str>),
+    Missing(T, T),
 }
 
-impl OwnedTranslation {
+impl<T> OwnedTranslation<T>
+where
+    T: Deref<Target = str>,
+{
     /// Returns whether this [`Translation`] is [`Translation::Present`].
     #[must_use]
     pub const fn is_present(&self) -> bool {
@@ -86,7 +93,7 @@ impl OwnedTranslation {
 
     /// Returns a borrow of this [`OwnedTranslation`].
     #[must_use]
-    pub const fn as_borrowed(&self) -> Translation {
+    pub fn as_borrowed(&self) -> Translation {
         match self {
             Self::Present(v) => Translation::Present(v),
             Self::Inherit(l, v) => Translation::Inherit(*l, v),
@@ -95,11 +102,14 @@ impl OwnedTranslation {
     }
 }
 
-impl Display for OwnedTranslation {
+impl<T> Display for OwnedTranslation<T>
+where
+    T: Deref<Target = str>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Present(v) | Self::Inherit(_, v) => write!(f, "{v}"),
-            Self::Missing(c, k) => write!(f, "{c}::{k}"),
+            Self::Present(v) | Self::Inherit(_, v) => write!(f, "{}", &Deref::deref(v)),
+            Self::Missing(c, k) => write!(f, "{}::{}", &Deref::deref(c), &Deref::deref(k)),
         }
     }
 }
@@ -170,7 +180,10 @@ impl<'lc: 'ag, 'ag> Translation<'lc, 'ag> {
 
     /// Returns an owned version of this [`Translation`].
     #[must_use]
-    pub fn as_owned(&self) -> OwnedTranslation {
+    pub fn as_owned<'tr, T>(&'tr self) -> OwnedTranslation<T>
+    where
+        T: Deref<Target = str> + From<&'tr str>,
+    {
         match self {
             Self::Present(v) => OwnedTranslation::Present((*v).into()),
             Self::Inherit(l, v) => OwnedTranslation::Inherit(*l, (*v).into()),

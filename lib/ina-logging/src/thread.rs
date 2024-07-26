@@ -30,28 +30,60 @@ pub type LoggingThread<'lv> = JoinStatic<Consumer<Request<'lv>, Result<()>>, Res
 /// A request sent to the logging thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Request<'lv> {
-    /// Queues a log to be output during the next flush.
-    Queue(Entry<'lv>),
     /// Flushes the inner queue of the [`Logger`].
     Flush,
+    /// Queues a log to be output during the next flush.
+    Queue(Entry<'lv>),
 }
 
 /// Starts the logging thread.
 ///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the thread has already been initialized.
+///
 /// # Errors
 ///
-/// This function will return an error if the logging thread is already initialized, or if it fails to start.
+/// This function will return an error if the logging thread fails to start.
 #[allow(clippy::missing_panics_doc)] // This doesn't actually panic during the function call.
-pub fn start(settings: Settings) -> Result<(), Request<'static>> {
+pub async fn start(settings: Settings) -> Result<(), Request<'static>> {
+    assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
+
+    let capacity = settings.queue_capacity.get();
+    let handle = Join::clean_up_handle(Consumer::spawn("logging", |r| run(settings, r), capacity)?, |handle| {
+        #[allow(clippy::expect_used)]
+        handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread");
+    });
+
+    THREAD.async_api().set(handle).await;
+
+    Ok(())
+}
+
+/// Starts the logging thread.
+///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the thread has already been initialized or if this is called in an asynchronous context.
+///
+/// # Errors
+///
+/// This function will return an error if the logging thread fails to start.
+#[allow(clippy::missing_panics_doc)] // This doesn't actually panic during the function call.
+pub fn blocking_start(settings: Settings) -> Result<(), Request<'static>> {
     assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
+    let handle = Join::clean_up_handle(Consumer::spawn("logging", |r| run(settings, r), capacity)?, |handle| {
+        #[allow(clippy::expect_used)]
+        handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread");
+    });
 
-    #[allow(clippy::expect_used)]
-    THREAD.sync_api().set(Join::clean_up_handle(
-        Consumer::spawn("logging", |receiver| run(settings, receiver), capacity)?,
-        |handle| handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread"),
-    ));
+    THREAD.sync_api().set(handle);
 
     Ok(())
 }
@@ -61,7 +93,20 @@ pub fn start(settings: Settings) -> Result<(), Request<'static>> {
 /// # Panics
 ///
 /// Panics if the logging thread is not initialized.
-pub fn close() {
+pub async fn close() {
+    assert!(THREAD.async_api().has().await, "the thread is not initialized");
+
+    THREAD.async_api().drop().await;
+}
+
+/// Closes the logging thread.
+///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the logging thread is not initialized or if this is called in an asynchronous context.
+pub fn blocking_close() {
     assert!(THREAD.sync_api().has(), "the thread is not initialized");
 
     THREAD.sync_api().drop();

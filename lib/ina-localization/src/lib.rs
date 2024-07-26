@@ -18,16 +18,20 @@
 
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::num::NonZeroUsize;
 use std::path::Path;
 
 use clap::{Args, ValueEnum};
-use locale::Locale;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
-use translation::Translation;
+
+pub use crate::locale::*;
+pub use crate::translation::*;
 
 /// Provides definitions for locales.
 mod locale;
+/// Contains the localizer's thread implementation.
+pub mod thread;
 /// Provides definitions for translations.
 mod translation;
 
@@ -37,27 +41,27 @@ pub type Result<T, S = Infallible> = std::result::Result<T, Error<S>>;
 /// An error that may occur when using this library.
 #[derive(Debug, thiserror::Error)]
 pub enum Error<S = Infallible> {
-    /// An IO error.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    /// A threading error.
-    #[error(transparent)]
-    Threading(#[from] ina_threading::Error<S>),
-    /// A sending error.
-    #[error(transparent)]
-    Send(#[from] SendError<S>),
     /// A TOML deserializing error.
     #[error(transparent)]
     FromToml(#[from] toml::de::Error),
     /// An invalid locale was given.
     #[error("an invalid locale was provided")]
     InvalidLocale,
-    /// A translation was missing.
-    #[error("an requested translation was missing")]
-    MissingTranslation,
+    /// An IO error.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
     /// A locale was missing.
     #[error("an requested locale was missing")]
     MissingLocale,
+    /// A translation was missing.
+    #[error("an requested translation was missing")]
+    MissingTranslation,
+    /// A sending error.
+    #[error(transparent)]
+    Send(#[from] SendError<S>),
+    /// A threading error.
+    #[error(transparent)]
+    Threading(#[from] ina_threading::Error<S>),
 }
 
 /// The logger's settings.
@@ -78,6 +82,11 @@ pub struct Settings {
     #[arg(long = "lang-miss-behavior", default_value = "key")]
     #[serde(rename = "miss-behavior")]
     pub miss_behavior: MissBehavior,
+
+    /// The localizing thread's output queue capacity. If set to '1', no buffering will be done.
+    #[arg(long = "lang-queue-capacity", default_value = "8")]
+    #[serde(rename = "queue-capacity")]
+    pub queue_capacity: NonZeroUsize,
 }
 
 /// The behavior to follow when the localizer is unable to translate a key.
@@ -129,6 +138,11 @@ impl Localizer {
     #[must_use]
     pub fn has_locale(&self, locale: Locale) -> bool {
         self.locales.contains_key(&locale)
+    }
+
+    /// Clears all loaded locales.
+    pub fn clear_locales(&mut self) {
+        self.locales.clear();
     }
 
     /// Attempts to load the given locale.
@@ -184,6 +198,24 @@ impl Localizer {
         }
 
         Ok(count)
+    }
+
+    /// Returns a translation for the given key.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the key is not found and the provided mode specifies to return an error..
+    pub fn get<'lc: 'ag, 'ag>(
+        &'lc self,
+        locale: Locale,
+        category: &'ag str,
+        key: &'ag str,
+    ) -> Result<Translation<'lc, 'ag>> {
+        let Some(translations) = self.locales.get(&locale) else {
+            return self.settings.miss_behavior.call(category, key);
+        };
+
+        translations.get_inherited(self.settings.miss_behavior, &self.locales, category, key)
     }
 }
 

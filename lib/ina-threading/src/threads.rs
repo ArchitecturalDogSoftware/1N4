@@ -15,8 +15,9 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -375,6 +376,56 @@ where
             };
         }
     }
+
+    /// Invokes the thread, returning the reponse of the method when available.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (usize, S)> {
+        const DURATION: Duration = Duration::from_millis(5);
+
+        let sequence = *self.sequence.blocking_read();
+
+        *self.sequence.blocking_write() = sequence.wrapping_add(1);
+
+        self.as_sender().blocking_send((sequence, input))?;
+
+        let mut interval = Instant::now();
+
+        loop {
+            let now = Instant::now();
+
+            if now < interval {
+                let difference = interval - now;
+
+                std::thread::sleep(difference);
+            }
+
+            interval = now + DURATION;
+
+            let mut produced = self.produced.blocking_write();
+
+            if let Some(result) = produced.remove(&sequence) {
+                return Ok(result);
+            }
+
+            drop(produced);
+
+            match self.as_receiver_mut().try_recv() {
+                Ok((seq, result)) if seq == sequence => return Ok(result),
+                Ok((seq, result)) => self.produced.blocking_write().insert(seq, result),
+                Err(TryRecvError::Empty) => continue,
+                Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
+            };
+        }
+    }
 }
 
 impl<S, R> HandleHolder<()> for Invoker<S, R>
@@ -426,6 +477,142 @@ where
 
 impl<S, R> ProducingThread<(usize, R)> for Invoker<S, R>
 where
+    S: Send + 'static,
+    R: Send + 'static,
+{
+    #[inline]
+    fn as_receiver(&self) -> &Receiver<(usize, R)> {
+        self.inner.as_receiver()
+    }
+
+    #[inline]
+    fn as_receiver_mut(&mut self) -> &mut Receiver<(usize, R)> {
+        self.inner.as_receiver_mut()
+    }
+
+    #[inline]
+    fn into_receiver(self) -> Receiver<(usize, R)> {
+        self.inner.into_receiver()
+    }
+}
+
+/// A thread that consumes and produces values like a function.
+#[derive(Debug)]
+pub struct StatefulInvoker<T, S, R>
+where
+    T: Send + Sync + 'static,
+    S: Send + 'static,
+    R: Send + 'static,
+{
+    /// The inner invoker thread.
+    inner: Invoker<(Arc<RwLock<T>>, S), R>,
+    /// The constant state.
+    state: Arc<RwLock<T>>,
+}
+
+impl<T, S, R> StatefulInvoker<T, S, R>
+where
+    T: Send + Sync + 'static,
+    S: Send + 'static,
+    R: Send + Sync + 'static,
+{
+    /// Spawns a new thread with the given name and task.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[allow(clippy::type_complexity)]
+    pub fn spawn<N, F>(name: N, state: T, call: F, size: usize) -> Result<Self, (usize, (Arc<RwLock<T>>, S))>
+    where
+        N: AsRef<str>,
+        F: Fn(Arc<RwLock<T>>, S) -> R + Send + 'static,
+    {
+        let state = Arc::new(RwLock::new(state));
+
+        Ok(Self { inner: Invoker::spawn(name, move |(s, i)| call(s, i), size)?, state })
+    }
+
+    /// Invokes the thread, returning the reponse of the method when available.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    #[allow(clippy::type_complexity)]
+    #[inline]
+    pub async fn invoke(&mut self, input: S) -> Result<R, (usize, (Arc<RwLock<T>>, S))> {
+        self.inner.invoke((Arc::clone(&self.state), input)).await
+    }
+
+    /// Invokes the thread, returning the reponse of the method when available.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    #[allow(clippy::type_complexity)]
+    #[inline]
+    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (usize, (Arc<RwLock<T>>, S))> {
+        self.inner.blocking_invoke((Arc::clone(&self.state), input))
+    }
+}
+
+impl<T, S, R> HandleHolder<()> for StatefulInvoker<T, S, R>
+where
+    T: Send + Sync + 'static,
+    S: Send + 'static,
+    R: Send + 'static,
+{
+    #[inline]
+    fn as_handle(&self) -> &JoinHandle<()> {
+        self.inner.as_handle()
+    }
+
+    #[inline]
+    fn as_handle_mut(&mut self) -> &mut JoinHandle<()> {
+        self.inner.as_handle_mut()
+    }
+
+    #[inline]
+    fn into_handle(self) -> JoinHandle<()> {
+        self.inner.into_handle()
+    }
+}
+
+impl<T, S, R> ConsumingThread<(usize, (Arc<RwLock<T>>, S))> for StatefulInvoker<T, S, R>
+where
+    T: Send + Sync + 'static,
+    S: Send + 'static,
+    R: Send + 'static,
+{
+    #[inline]
+    fn as_sender(&self) -> &Sender<(usize, (Arc<RwLock<T>>, S))> {
+        self.inner.as_sender()
+    }
+
+    #[inline]
+    fn as_sender_mut(&mut self) -> &mut Sender<(usize, (Arc<RwLock<T>>, S))> {
+        self.inner.as_sender_mut()
+    }
+
+    #[inline]
+    fn into_sender(self) -> Sender<(usize, (Arc<RwLock<T>>, S))> {
+        self.inner.into_sender()
+    }
+
+    #[inline]
+    fn clone_sender(&self) -> Sender<(usize, (Arc<RwLock<T>>, S))> {
+        self.inner.clone_sender()
+    }
+}
+
+impl<T, S, R> ProducingThread<(usize, R)> for StatefulInvoker<T, S, R>
+where
+    T: Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
