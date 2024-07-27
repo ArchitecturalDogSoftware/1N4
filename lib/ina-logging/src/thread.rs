@@ -222,7 +222,9 @@ macro_rules! debug {
         }
         #[cfg(not(debug_assertions))]
         {
-            ::std::future::ready($crate::Result::<(), $crate::thread::Request<'static>>::Ok(())).await
+            // Prevents unused variable warnings.
+            ::std::mem::drop(::std::format_args!($($args)+));
+            ::std::future::ready($crate::Result::<(), $crate::thread::Request<'static>>::Ok(()))
         }
     }};
     ($($args:tt)+) => {{
@@ -232,6 +234,8 @@ macro_rules! debug {
         }
         #[cfg(not(debug_assertions))]
         {
+            // Prevents unused variable warnings.
+            ::std::mem::drop(::std::format_args!($($args)+));
             $crate::Result::<(), $crate::thread::Request<'static>>::Ok(())
         }
     }};
