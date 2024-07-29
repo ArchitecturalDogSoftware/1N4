@@ -59,10 +59,10 @@ where
     List(Box<[Locale]>),
     /// The localized text.
     #[allow(clippy::type_complexity)]
-    Localize(Result<OwnedTranslation<T>, (usize, (Arc<RwLock<Localizer>>, Request))>),
+    Localize(Result<OwnedTranslation<T>, (Option<usize>, (Arc<RwLock<Localizer>>, Request))>),
     /// The number of loaded locales.
     #[allow(clippy::type_complexity)]
-    Load(Result<usize, (usize, (Arc<RwLock<Localizer>>, Request))>),
+    Load(Result<usize, (Option<usize>, (Arc<RwLock<Localizer>>, Request))>),
 }
 
 /// A translation key.
@@ -114,7 +114,7 @@ where
 ///
 /// This function will return an error if the thread fails to spawn.
 #[allow(clippy::type_complexity)]
-pub async fn start(settings: Settings) -> Result<(), (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub async fn start(settings: Settings) -> Result<(), (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     assert!(!THREAD.async_api().has().await);
 
     let capacity = settings.queue_capacity.get();
@@ -137,7 +137,7 @@ pub async fn start(settings: Settings) -> Result<(), (usize, (Arc<RwLock<Localiz
 ///
 /// This function will return an error if the thread fails to spawn.
 #[allow(clippy::type_complexity)]
-pub fn blocking_start(settings: Settings) -> Result<(), (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub fn blocking_start(settings: Settings) -> Result<(), (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     assert!(!THREAD.sync_api().has());
 
     let capacity = settings.queue_capacity.get();
@@ -182,7 +182,7 @@ pub fn blocking_close() {
 ///
 /// This function will return an error if the message could not be sent.
 #[allow(clippy::panic, clippy::type_complexity)]
-pub async fn clear() -> Result<(), (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub async fn clear() -> Result<(), (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.async_api().get_mut().await.invoke(Request::Clear).await?;
     let Response::Clear = response else { panic!("unexpected response") };
 
@@ -201,7 +201,7 @@ pub async fn clear() -> Result<(), (usize, (Arc<RwLock<Localizer>>, Request))> {
 ///
 /// This function will return an error if the message could not be sent.
 #[allow(clippy::panic, clippy::type_complexity)]
-pub fn blocking_clear() -> Result<(), (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub fn blocking_clear() -> Result<(), (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.sync_api().get_mut().blocking_invoke(Request::Clear)?;
     let Response::Clear = response else { panic!("unexpected response") };
 
@@ -218,7 +218,7 @@ pub fn blocking_clear() -> Result<(), (usize, (Arc<RwLock<Localizer>>, Request))
 ///
 /// This function will return an error if the message could not be sent.
 #[allow(clippy::panic, clippy::type_complexity)]
-pub async fn list() -> Result<Box<[Locale]>, (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub async fn list() -> Result<Box<[Locale]>, (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.async_api().get_mut().await.invoke(Request::List).await?;
     let Response::List(locales) = response else { panic!("unexpected response") };
 
@@ -237,7 +237,7 @@ pub async fn list() -> Result<Box<[Locale]>, (usize, (Arc<RwLock<Localizer>>, Re
 ///
 /// This function will return an error if the message could not be sent.
 #[allow(clippy::panic, clippy::type_complexity)]
-pub fn blocking_list() -> Result<Box<[Locale]>, (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub fn blocking_list() -> Result<Box<[Locale]>, (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.sync_api().get_mut().blocking_invoke(Request::List)?;
     let Response::List(locales) = response else { panic!("unexpected response") };
 
@@ -257,7 +257,7 @@ pub fn blocking_list() -> Result<Box<[Locale]>, (usize, (Arc<RwLock<Localizer>>,
 pub async fn localize(
     locale: Option<Locale>,
     key: TranslationKey,
-) -> Result<OwnedTranslation<Inner>, (usize, (Arc<RwLock<Localizer>>, Request))> {
+) -> Result<OwnedTranslation<Inner>, (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.async_api().get_mut().await.invoke(Request::Localize(locale, key)).await?;
     let Response::Localize(translation) = response else { panic!("unexpected response") };
 
@@ -279,7 +279,7 @@ pub async fn localize(
 pub fn blocking_localize(
     locale: Option<Locale>,
     key: TranslationKey,
-) -> Result<OwnedTranslation<Inner>, (usize, (Arc<RwLock<Localizer>>, Request))> {
+) -> Result<OwnedTranslation<Inner>, (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.sync_api().get_mut().blocking_invoke(Request::Localize(locale, key))?;
     let Response::Localize(translation) = response else { panic!("unexpected response") };
 
@@ -296,7 +296,7 @@ pub fn blocking_localize(
 ///
 /// This function will return an error if the message could not be sent.
 #[allow(clippy::panic, clippy::type_complexity)]
-pub async fn load(locale: Option<Locale>) -> Result<usize, (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub async fn load(locale: Option<Locale>) -> Result<usize, (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.async_api().get_mut().await.invoke(Request::Load(locale)).await?;
     let Response::Load(count) = response else { panic!("unexpected response") };
 
@@ -315,7 +315,7 @@ pub async fn load(locale: Option<Locale>) -> Result<usize, (usize, (Arc<RwLock<L
 ///
 /// This function will return an error if the message could not be sent.
 #[allow(clippy::panic, clippy::type_complexity)]
-pub fn blocking_load(locale: Option<Locale>) -> Result<usize, (usize, (Arc<RwLock<Localizer>>, Request))> {
+pub fn blocking_load(locale: Option<Locale>) -> Result<usize, (Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     let response = THREAD.sync_api().get_mut().blocking_invoke(Request::Load(locale))?;
     let Response::Load(count) = response else { panic!("unexpected response") };
 
@@ -361,7 +361,7 @@ where
     }
 }
 
-impl From<Error<Infallible>> for Error<(usize, (Arc<RwLock<Localizer>>, Request))> {
+impl From<Error<Infallible>> for Error<(Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
     fn from(value: Error<Infallible>) -> Self {
         match value {
             Error::FromToml(error) => Self::FromToml(error),

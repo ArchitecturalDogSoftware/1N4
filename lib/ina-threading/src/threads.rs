@@ -303,7 +303,8 @@ where
     R: Send + 'static,
 {
     /// The inner exchanger thread.
-    inner: Exchanger<(usize, S), (usize, R), ()>,
+    #[allow(clippy::type_complexity)]
+    inner: Exchanger<(Option<usize>, S), (Option<usize>, R), ()>,
     /// A map of missed results.
     produced: RwLock<BTreeMap<usize, R>>,
     /// A sequence counter for each input.
@@ -320,17 +321,20 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self, (usize, S)>
+    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self, (Option<usize>, S)>
     where
         N: AsRef<str>,
         F: Fn(S) -> R + Send + 'static,
     {
-        let call = move |sender: Sender<(usize, R)>, mut receiver: Receiver<(usize, S)>| {
+        let call = move |sender: Sender<(Option<usize>, R)>, mut receiver: Receiver<(Option<usize>, S)>| {
             loop {
                 let Some((sequence, input)) = receiver.blocking_recv() else {
                     break;
                 };
-                if sender.blocking_send((sequence, call(input))).is_err() {
+
+                let response = call(input);
+
+                if sequence.is_some() && sender.blocking_send((sequence, response)).is_err() {
                     break;
                 }
             }
@@ -348,12 +352,12 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    pub async fn invoke(&mut self, input: S) -> Result<R, (usize, S)> {
+    pub async fn invoke(&mut self, input: S) -> Result<R, (Option<usize>, S)> {
         let sequence = *self.sequence.read().await;
 
         *self.sequence.write().await = sequence.wrapping_add(1);
 
-        self.as_sender().send((sequence, input)).await?;
+        self.as_sender().send((Some(sequence), input)).await?;
 
         let mut interval = tokio::time::interval(Duration::from_millis(5));
 
@@ -369,8 +373,9 @@ where
             drop(produced);
 
             match self.as_receiver_mut().try_recv() {
-                Ok((seq, result)) if seq == sequence => return Ok(result),
-                Ok((seq, result)) => self.produced.write().await.insert(seq, result),
+                Ok((Some(seq), result)) if seq == sequence => return Ok(result),
+                Ok((Some(seq), result)) => self.produced.write().await.insert(seq, result),
+                Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
                 Err(TryRecvError::Empty) => continue,
                 Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
             };
@@ -388,14 +393,14 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (usize, S)> {
+    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (Option<usize>, S)> {
         const DURATION: Duration = Duration::from_millis(5);
 
         let sequence = *self.sequence.blocking_read();
 
         *self.sequence.blocking_write() = sequence.wrapping_add(1);
 
-        self.as_sender().blocking_send((sequence, input))?;
+        self.as_sender().blocking_send((Some(sequence), input))?;
 
         let mut interval = Instant::now();
 
@@ -419,12 +424,37 @@ where
             drop(produced);
 
             match self.as_receiver_mut().try_recv() {
-                Ok((seq, result)) if seq == sequence => return Ok(result),
-                Ok((seq, result)) => self.produced.blocking_write().insert(seq, result),
+                Ok((Some(seq), result)) if seq == sequence => return Ok(result),
+                Ok((Some(seq), result)) => self.produced.blocking_write().insert(seq, result),
+                Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
                 Err(TryRecvError::Empty) => continue,
                 Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
             };
         }
+    }
+
+    /// Invokes the thread, ignoring the reponse of the method.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, S)> {
+        self.as_sender().send((None, input)).await.map_err(Into::into)
+    }
+
+    /// Invokes the thread, ignoring the reponse of the method.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, S)> {
+        self.as_sender().blocking_send((None, input)).map_err(Into::into)
     }
 }
 
@@ -449,49 +479,49 @@ where
     }
 }
 
-impl<S, R> ConsumingThread<(usize, S)> for Invoker<S, R>
+impl<S, R> ConsumingThread<(Option<usize>, S)> for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
     #[inline]
-    fn as_sender(&self) -> &Sender<(usize, S)> {
+    fn as_sender(&self) -> &Sender<(Option<usize>, S)> {
         self.inner.as_sender()
     }
 
     #[inline]
-    fn as_sender_mut(&mut self) -> &mut Sender<(usize, S)> {
+    fn as_sender_mut(&mut self) -> &mut Sender<(Option<usize>, S)> {
         self.inner.as_sender_mut()
     }
 
     #[inline]
-    fn into_sender(self) -> Sender<(usize, S)> {
+    fn into_sender(self) -> Sender<(Option<usize>, S)> {
         self.inner.into_sender()
     }
 
     #[inline]
-    fn clone_sender(&self) -> Sender<(usize, S)> {
+    fn clone_sender(&self) -> Sender<(Option<usize>, S)> {
         self.inner.clone_sender()
     }
 }
 
-impl<S, R> ProducingThread<(usize, R)> for Invoker<S, R>
+impl<S, R> ProducingThread<(Option<usize>, R)> for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
     #[inline]
-    fn as_receiver(&self) -> &Receiver<(usize, R)> {
+    fn as_receiver(&self) -> &Receiver<(Option<usize>, R)> {
         self.inner.as_receiver()
     }
 
     #[inline]
-    fn as_receiver_mut(&mut self) -> &mut Receiver<(usize, R)> {
+    fn as_receiver_mut(&mut self) -> &mut Receiver<(Option<usize>, R)> {
         self.inner.as_receiver_mut()
     }
 
     #[inline]
-    fn into_receiver(self) -> Receiver<(usize, R)> {
+    fn into_receiver(self) -> Receiver<(Option<usize>, R)> {
         self.inner.into_receiver()
     }
 }
@@ -522,7 +552,7 @@ where
     ///
     /// This function will return an error if the thread fails to spawn.
     #[allow(clippy::type_complexity)]
-    pub fn spawn<N, F>(name: N, state: T, call: F, size: usize) -> Result<Self, (usize, (Arc<RwLock<T>>, S))>
+    pub fn spawn<N, F>(name: N, state: T, call: F, size: usize) -> Result<Self, (Option<usize>, (Arc<RwLock<T>>, S))>
     where
         N: AsRef<str>,
         F: Fn(Arc<RwLock<T>>, S) -> R + Send + 'static,
@@ -539,7 +569,7 @@ where
     /// This function will return an error if the thread is disconnected.
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub async fn invoke(&mut self, input: S) -> Result<R, (usize, (Arc<RwLock<T>>, S))> {
+    pub async fn invoke(&mut self, input: S) -> Result<R, (Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.invoke((Arc::clone(&self.state), input)).await
     }
 
@@ -556,8 +586,36 @@ where
     /// This function will return an error if the thread is disconnected.
     #[allow(clippy::type_complexity)]
     #[inline]
-    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (usize, (Arc<RwLock<T>>, S))> {
+    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.blocking_invoke((Arc::clone(&self.state), input))
+    }
+
+    /// Invokes the thread, ignoring the reponse of the method.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    #[allow(clippy::type_complexity)]
+    #[inline]
+    pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, (Arc<RwLock<T>>, S))> {
+        self.inner.invoke_and_forget((Arc::clone(&self.state), input)).await
+    }
+
+    /// Invokes the thread, ignoring the reponse of the method.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread is disconnected.
+    #[allow(clippy::type_complexity)]
+    #[inline]
+    pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, (Arc<RwLock<T>>, S))> {
+        self.inner.blocking_invoke_and_forget((Arc::clone(&self.state), input))
     }
 }
 
@@ -583,51 +641,51 @@ where
     }
 }
 
-impl<T, S, R> ConsumingThread<(usize, (Arc<RwLock<T>>, S))> for StatefulInvoker<T, S, R>
+impl<T, S, R> ConsumingThread<(Option<usize>, (Arc<RwLock<T>>, S))> for StatefulInvoker<T, S, R>
 where
     T: Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
     #[inline]
-    fn as_sender(&self) -> &Sender<(usize, (Arc<RwLock<T>>, S))> {
+    fn as_sender(&self) -> &Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.as_sender()
     }
 
     #[inline]
-    fn as_sender_mut(&mut self) -> &mut Sender<(usize, (Arc<RwLock<T>>, S))> {
+    fn as_sender_mut(&mut self) -> &mut Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.as_sender_mut()
     }
 
     #[inline]
-    fn into_sender(self) -> Sender<(usize, (Arc<RwLock<T>>, S))> {
+    fn into_sender(self) -> Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.into_sender()
     }
 
     #[inline]
-    fn clone_sender(&self) -> Sender<(usize, (Arc<RwLock<T>>, S))> {
+    fn clone_sender(&self) -> Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.clone_sender()
     }
 }
 
-impl<T, S, R> ProducingThread<(usize, R)> for StatefulInvoker<T, S, R>
+impl<T, S, R> ProducingThread<(Option<usize>, R)> for StatefulInvoker<T, S, R>
 where
     T: Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
     #[inline]
-    fn as_receiver(&self) -> &Receiver<(usize, R)> {
+    fn as_receiver(&self) -> &Receiver<(Option<usize>, R)> {
         self.inner.as_receiver()
     }
 
     #[inline]
-    fn as_receiver_mut(&mut self) -> &mut Receiver<(usize, R)> {
+    fn as_receiver_mut(&mut self) -> &mut Receiver<(Option<usize>, R)> {
         self.inner.as_receiver_mut()
     }
 
     #[inline]
-    fn into_receiver(self) -> Receiver<(usize, R)> {
+    fn into_receiver(self) -> Receiver<(Option<usize>, R)> {
         self.inner.into_receiver()
     }
 }
