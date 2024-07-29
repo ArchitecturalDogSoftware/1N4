@@ -18,8 +18,6 @@
 
 use std::convert::Infallible;
 use std::fmt::Display;
-use std::fs::File;
-use std::io::{StderrLock, StdoutLock, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::Path;
 use std::time::Duration;
@@ -31,6 +29,8 @@ use time::format_description::well_known::Iso8601;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use time::OffsetDateTime;
+use tokio::fs::File;
+use tokio::io::{AsyncWriteExt, Stderr, Stdout};
 use tokio::sync::mpsc::error::SendError;
 
 /// Contains the logger's thread implementation.
@@ -96,9 +96,9 @@ pub struct Logger<'lg> {
     queue: Vec<Entry<'lg>>,
 
     /// A write lock for stdout.
-    out: Option<StdoutLock<'lg>>,
+    out: Option<Stdout>,
     /// A write lock for stderr.
-    err: Option<StderrLock<'lg>>,
+    err: Option<Stderr>,
     /// A write lock for the output file.
     file: Option<File>,
 }
@@ -116,11 +116,11 @@ impl<'lg> Logger<'lg> {
     /// # Errors
     ///
     /// This function will return an error if the logger failed to create its file.
-    pub fn new(settings: Settings) -> Result<Self> {
+    pub async fn new(settings: Settings) -> Result<Self> {
         let queue = Vec::with_capacity(settings.queue_capacity.get());
-        let out = (!settings.no_term_output).then(|| std::io::stdout().lock());
-        let err = (!settings.no_term_output).then(|| std::io::stderr().lock());
-        let file = (!settings.no_file_output).then(|| Self::new_file(&settings.file_directory)).transpose()?;
+        let out = if settings.no_term_output { None } else { Some(tokio::io::stdout()) };
+        let err = if settings.no_term_output { None } else { Some(tokio::io::stderr()) };
+        let file = if settings.no_file_output { None } else { Some(Self::new_file(&settings.file_directory).await?) };
 
         Ok(Self { settings, queue, out, err, file })
     }
@@ -130,14 +130,14 @@ impl<'lg> Logger<'lg> {
     /// # Errors
     ///
     /// This function will return an error if the file could not be created.
-    pub(crate) fn new_file(directory: &Path) -> Result<File> {
+    pub(crate) async fn new_file(directory: &Path) -> Result<File> {
         let time = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
         let name = time.format(Self::FILE_NAME_FORMAT).unwrap_or_else(|_| unreachable!());
         let path = directory.join(name).with_extension("log");
 
-        std::fs::create_dir_all(directory)?;
+        tokio::fs::create_dir_all(directory).await?;
 
-        File::options().create(true).append(true).open(path).map_err(Into::into)
+        File::options().create(true).append(true).open(path).await.map_err(Into::into)
     }
 
     /// Returns whether this [`Logger`] is enabled.
@@ -195,14 +195,14 @@ impl<'lg> Logger<'lg> {
     /// # Errors
     ///
     /// This function will return an error if the logger could not be flushed.
-    pub fn queue(&mut self, entry: Entry<'lg>) -> Result<()> {
+    pub async fn queue(&mut self, entry: Entry<'lg>) -> Result<()> {
         if self.is_disabled() {
             return Ok(());
         }
 
         self.queue.push(entry);
 
-        if self.is_full() { self.flush() } else { Ok(()) }
+        if self.is_full() { self.flush().await } else { Ok(()) }
     }
 
     /// Flushes the inner queue of this [`Logger`].
@@ -210,24 +210,36 @@ impl<'lg> Logger<'lg> {
     /// # Errors
     ///
     /// This function will return an error if the queue could not be flushed.
-    pub fn flush(&mut self) -> Result<()> {
+    pub async fn flush(&mut self) -> Result<()> {
         /// Writes the given display into a possibly [`None`] writer.
         #[inline]
-        fn writeln(writer: Option<&mut impl Write>, display: impl Display) -> Result<()> {
-            writer.map(|w| writeln!(w, "{display}")).transpose().map(|_| ()).map_err(Into::into)
+        async fn writeln<A, D>(writer: Option<&mut A>, display: D) -> Result<()>
+        where
+            A: AsyncWriteExt + Send + Unpin,
+            D: Display + Send,
+        {
+            if let Some(writer) = writer {
+                let content = display.to_string();
+
+                writer.write_all(content.as_bytes()).await?;
+                writer.write_all(b"\n").await?;
+                writer.flush().await?;
+            }
+
+            Ok(())
         }
 
         for entry in self.queue.drain(..) {
             if !self.settings.no_term_output {
                 if entry.level.error {
-                    writeln(self.err.as_mut(), entry.as_display(Some(Stream::Stderr)))?;
+                    writeln(self.err.as_mut(), entry.as_display(Some(Stream::Stderr))).await?;
                 } else {
-                    writeln(self.out.as_mut(), entry.as_display(Some(Stream::Stdout)))?;
+                    writeln(self.out.as_mut(), entry.as_display(Some(Stream::Stdout))).await?;
                 }
             }
 
             if !self.settings.no_file_output {
-                writeln(self.file.as_mut(), entry.as_display(None))?;
+                writeln(self.file.as_mut(), entry.as_display(None)).await?;
             }
         }
 

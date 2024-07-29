@@ -52,7 +52,8 @@ pub async fn start(settings: Settings) -> Result<(), Request<'static>> {
     assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
-    let handle = Join::clean_up_handle(Consumer::spawn("logging", |r| run(settings, r), capacity)?, |handle| {
+    let thread = Consumer::spawn_with_runtime("logging", |r| run(settings, r), capacity);
+    let handle = Join::clean_up_handle(thread?, |handle| {
         #[allow(clippy::expect_used)]
         handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread");
     });
@@ -78,7 +79,8 @@ pub fn blocking_start(settings: Settings) -> Result<(), Request<'static>> {
     assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
-    let handle = Join::clean_up_handle(Consumer::spawn("logging", |r| run(settings, r), capacity)?, |handle| {
+    let thread = Consumer::spawn_with_runtime("logging", |r| run(settings, r), capacity);
+    let handle = Join::clean_up_handle(thread?, |handle| {
         #[allow(clippy::expect_used)]
         handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread");
     });
@@ -185,24 +187,20 @@ pub fn blocking_flush() -> Result<(), Request<'static>> {
 /// # Errors
 ///
 /// This function will return an error if the thread fails to run.
-fn run(settings: Settings, mut receiver: Receiver<Request<'static>>) -> Result<()> {
-    let mut logger = Logger::<'static>::new(settings)?;
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_time().build()?;
+async fn run(settings: Settings, mut receiver: Receiver<Request<'static>>) -> Result<()> {
+    let mut logger = Logger::<'static>::new(settings).await?;
+    let mut timeout = tokio::time::interval(logger.timeout());
 
-    runtime.block_on(async {
-        let mut timeout = tokio::time::interval(logger.timeout());
-
-        loop {
-            tokio::select! {
-                _ = timeout.tick() => logger.flush()?,
-                result = receiver.recv() => match result {
-                    Some(Request::Queue(entry)) => logger.queue(entry)?,
-                    Some(Request::Flush) => logger.flush()?,
-                    None => return Ok(()),
-                }
+    loop {
+        tokio::select! {
+            _ = timeout.tick() => logger.flush().await?,
+            result = receiver.recv() => match result {
+                Some(Request::Queue(entry)) => logger.queue(entry).await?,
+                Some(Request::Flush) => logger.flush().await?,
+                None => return Ok(()),
             }
         }
-    })
+    }
 }
 
 /// Outputs a debug log.
