@@ -97,8 +97,8 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
 
     #[allow(clippy::redundant_pub_crate)] // False-positive?
     tokio::select! {
-        _ = process => info!(async "received termination signal").await,
-        result = terminate => match result {
+        _ = terminate => info!(async "received termination signal").await,
+        result = process => match result {
             Ok(()) => info!(async "stopping client process").await,
             Err(error) => error!(async "unhandled error encountered: {error}").await,
         },
