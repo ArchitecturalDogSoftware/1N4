@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::collections::BTreeMap;
+use std::future::Future;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -57,6 +58,28 @@ where
         let thread = Thread::spawn(name, || call(receiver))?;
 
         Ok(Self { sender, thread })
+    }
+
+    /// Spawns a new thread with the given name and asynchronous task.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[allow(clippy::missing_panics_doc)] // this doesn't actually *panic*, it just causes the thread to fail.
+    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, S>
+    where
+        N: AsRef<str>,
+        F: FnOnce(Receiver<S>) -> O + Send + 'static,
+        O: Future<Output = T> + Send,
+    {
+        let call = |receiver: Receiver<S>| {
+            #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
+            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+
+            runtime.block_on(async move { call(receiver).await })
+        };
+
+        Self::spawn(name, call, size)
     }
 }
 
@@ -140,6 +163,28 @@ where
 
         Ok(Self { receiver, thread })
     }
+
+    /// Spawns a new thread with the given name and asynchronous task.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[allow(clippy::missing_panics_doc)] // this doesn't actually *panic*, it just causes the thread to fail.
+    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self>
+    where
+        N: AsRef<str>,
+        F: FnOnce(Sender<R>) -> O + Send + 'static,
+        O: Future<Output = T> + Send,
+    {
+        let call = |receiver: Sender<R>| {
+            #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
+            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+
+            runtime.block_on(async move { call(receiver).await })
+        };
+
+        Self::spawn(name, call, size)
+    }
 }
 
 impl<R, T> HandleHolder<T> for Producer<R, T>
@@ -221,6 +266,28 @@ where
         let thread = Thread::spawn(name, || call(thread_sender, thread_receiver))?;
 
         Ok(Self { sender: local_sender, receiver: local_receiver, thread })
+    }
+
+    /// Spawns a new thread with the given name and asynchronous task.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[allow(clippy::missing_panics_doc)] // this doesn't actually *panic*, it just causes the thread to fail.
+    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, S>
+    where
+        N: AsRef<str>,
+        F: FnOnce(Sender<R>, Receiver<S>) -> O + Send + 'static,
+        O: Future<Output = T> + Send,
+    {
+        let call = |sender: Sender<R>, receiver: Receiver<S>| {
+            #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
+            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+
+            runtime.block_on(async move { call(sender, receiver).await })
+        };
+
+        Self::spawn(name, call, size)
     }
 }
 
@@ -338,6 +405,41 @@ where
                     break;
                 }
             }
+        };
+
+        Ok(Self {
+            inner: Exchanger::spawn(name, call, size)?,
+            produced: RwLock::default(),
+            sequence: RwLock::default(),
+        })
+    }
+
+    /// Spawns a new thread with the given name and asynchronous task.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[allow(clippy::missing_panics_doc)] // this doesn't actually *panic*, it just causes the thread to fail.
+    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, (Option<usize>, S)>
+    where
+        N: AsRef<str>,
+        F: Fn(S) -> O + Send + 'static,
+        O: Future<Output = R> + Send,
+    {
+        let call = move |sender: Sender<(Option<usize>, R)>, mut receiver: Receiver<(Option<usize>, S)>| {
+            #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
+            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+
+            runtime.block_on(async move {
+                loop {
+                    let Some((sequence, input)) = receiver.recv().await else { break };
+                    let response = call(input).await;
+
+                    if sequence.is_some() && sender.send((sequence, response)).await.is_err() {
+                        break;
+                    }
+                }
+            });
         };
 
         Ok(Self {
@@ -560,6 +662,28 @@ where
         let state = Arc::new(RwLock::new(state));
 
         Ok(Self { inner: Invoker::spawn(name, move |(s, i)| call(s, i), size)?, state })
+    }
+
+    /// Spawns a new thread with the given name and asynchronous task.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[allow(clippy::missing_panics_doc, clippy::type_complexity)] // this doesn't actually *panic*, it just causes the thread to fail.
+    pub fn spawn_with_runtime<N, F, O>(
+        name: N,
+        state: T,
+        call: F,
+        size: usize,
+    ) -> Result<Self, (Option<usize>, (Arc<RwLock<T>>, S))>
+    where
+        N: AsRef<str>,
+        F: Fn(Arc<RwLock<T>>, S) -> O + Send + 'static,
+        O: Future<Output = R> + Send,
+    {
+        let state = Arc::new(RwLock::new(state));
+
+        Ok(Self { inner: Invoker::spawn_with_runtime(name, move |(s, i)| call(s, i), size)?, state })
     }
 
     /// Invokes the thread, returning the reponse of the method when available.
