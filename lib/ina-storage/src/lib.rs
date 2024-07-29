@@ -20,11 +20,13 @@ use std::convert::Infallible;
 use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
+use std::sync::Arc;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
-use system::DataSystem;
+use system::{DataReader, DataSystem, DataWriter};
 use tokio::sync::mpsc::error::SendError;
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// Defines data storage formats.
 pub mod format;
@@ -32,6 +34,22 @@ pub mod format;
 pub mod stored;
 /// Defines data storage systems.
 pub mod system;
+
+/// The global instance of the storage interface.
+///
+/// TODO: Look into making this run on a separate thread.
+static STORAGE: RwLock<Option<Storage>> = RwLock::const_new(None);
+
+/// Initializes the storage instance.
+///
+/// # Panics
+///
+/// Panics if the storage instance has already been initialized.
+pub async fn initialize(settings: Settings) {
+    assert!(STORAGE.read().await.is_none(), "the instance has already been initialized");
+
+    *STORAGE.write().await = Some(Storage { settings });
+}
 
 /// An error that may occur when using this library.
 #[derive(Debug, thiserror::Error)]
@@ -72,6 +90,114 @@ pub struct Settings {
 pub struct Storage {
     /// The storage instance's setrtings.
     settings: Settings,
+}
+
+impl DataSystem for Storage {
+    #[allow(clippy::expect_used)]
+    #[inline]
+    fn blocking_get() -> impl Deref<Target = Self> {
+        RwLockReadGuard::map(STORAGE.blocking_read(), |v| v.as_ref().expect("the instance has not been initialized"))
+    }
+
+    #[allow(clippy::expect_used)]
+    #[inline]
+    async fn get() -> impl Deref<Target = Self> {
+        RwLockReadGuard::map(STORAGE.read().await, |v| v.as_ref().expect("the instance has not been initialized"))
+    }
+
+    #[allow(clippy::expect_used)]
+    #[inline]
+    fn blocking_get_mut() -> impl DerefMut<Target = Self> {
+        RwLockWriteGuard::map(STORAGE.blocking_write(), |v| v.as_mut().expect("the instance has not been initialized"))
+    }
+
+    #[allow(clippy::expect_used)]
+    #[inline]
+    async fn get_mut() -> impl DerefMut<Target = Self> {
+        RwLockWriteGuard::map(STORAGE.write().await, |v| v.as_mut().expect("the instance has not been initialized"))
+    }
+}
+
+impl DataReader for Storage {
+    type Error = anyhow::Error;
+
+    fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.blocking_get().blocking_exists(&path).map_err(Into::into)
+    }
+
+    async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.get().await.exists(&path).await.map_err(Into::into)
+    }
+
+    fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.blocking_get().blocking_size(&path).map_err(Into::into)
+    }
+
+    async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.get().await.size(&path).await.map_err(Into::into)
+    }
+
+    fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.blocking_get().blocking_read(&path).map_err(Into::into)
+    }
+
+    async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.get().await.read(&path).await.map_err(Into::into)
+    }
+}
+
+impl DataWriter for Storage {
+    type Error = anyhow::Error;
+
+    fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.blocking_get_mut().blocking_write(&path, bytes).map_err(Into::into)
+    }
+
+    async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.get_mut().await.write(&path, bytes).await.map_err(Into::into)
+    }
+
+    fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
+        let from = self.settings.file_directory.join(from);
+        let into = self.settings.file_directory.join(into);
+
+        self.settings.system.blocking_get_mut().blocking_rename(&from, &into).map_err(Into::into)
+    }
+
+    async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
+        let from = self.settings.file_directory.join(from);
+        let into = self.settings.file_directory.join(into);
+
+        self.settings.system.get_mut().await.rename(&from, &into).await.map_err(Into::into)
+    }
+
+    fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.blocking_get_mut().blocking_delete(&path).map_err(Into::into)
+    }
+
+    async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
+        let path = self.settings.file_directory.join(path);
+
+        self.settings.system.get_mut().await.delete(&path).await.map_err(Into::into)
+    }
 }
 
 /// The preference for the storage backend system.

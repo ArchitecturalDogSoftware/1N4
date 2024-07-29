@@ -52,7 +52,7 @@ pub trait DataSystem: DataReader + DataWriter + 'static {
 /// A value that reads data bytes.
 pub trait DataReader {
     /// The error that can be returned during reading.
-    type Error: std::error::Error;
+    type Error: Into<anyhow::Error>;
 
     /// Returns whether the path exists within this reader.
     ///
@@ -118,7 +118,7 @@ pub trait DataReader {
 /// A value that writes data bytes.
 pub trait DataWriter {
     /// The error that can be returned during writing.
-    type Error: std::error::Error;
+    type Error: Into<anyhow::Error>;
 
     /// Writes bytes into the given path.
     ///

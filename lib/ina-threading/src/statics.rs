@@ -126,6 +126,7 @@ where
 
 /// An asynchronous API for a static thread.
 #[repr(transparent)]
+#[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug)]
 pub struct AsyncStaticApi<'s, T>
 where
@@ -191,6 +192,7 @@ where
 
 /// A synchronous API for a static thread.
 #[repr(transparent)]
+#[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug)]
 pub struct SyncStaticApi<'s, T> {
     inner: &'s RwLock<Option<T>>,

@@ -17,17 +17,26 @@
 use std::marker::PhantomData;
 use std::path::Path;
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::format::DataFormat;
+use crate::format::{DataDecode, DataEncode, DataFormat};
+use crate::system::{DataReader, DataSystem, DataWriter};
+use crate::Storage;
 
 /// A value that is storable within the storage system.
-pub trait Stored: Serialize + for<'de> Deserialize<'de> {
-    /// Returns a new instance of this value's expected data format.
-    fn data_format(&self) -> impl DataFormat;
+pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {
+    /// The arguments required to construct a new path for this type.
+    type PathArguments: Send;
+
+    /// Returns a new instance of this type's expected data format.
+    fn data_format() -> impl DataFormat + Send;
+
+    /// Returns the expected storage path for this type.
+    fn data_path_for(arguments: Self::PathArguments) -> impl AsRef<Path> + Send;
 
     /// Returns the expected storage path for this value.
-    fn data_path(&self) -> impl AsRef<Path>;
+    fn data_path(&self) -> impl AsRef<Path> + Send;
 
     /// Returns an asynchronous API for this stored value type.
     #[inline]
@@ -55,6 +64,7 @@ pub trait Stored: Serialize + for<'de> Deserialize<'de> {
 }
 
 /// An asynchronous API for a stored value type.
+#[repr(transparent)]
 #[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct AsyncApi<T: Stored>(PhantomData<T>);
@@ -65,16 +75,168 @@ impl<T: Stored> AsyncApi<T> {
     pub const fn with(self, value: &T) -> AsyncHolderApi<T> {
         AsyncHolderApi(value)
     }
+
+    /// Returns whether data is stored for the value represented by the given path arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub async fn exists(self, arguments: T::PathArguments) -> Result<bool> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+
+        Storage::get().await.exists(&path).await
+    }
+
+    /// Returns the size of the stored data for the value represented by the given path arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub async fn size(self, arguments: T::PathArguments) -> Result<u64> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+
+        Storage::get().await.size(&path).await
+    }
+
+    /// Returns the stored value represented by the given path arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub async fn read(self, arguments: T::PathArguments) -> Result<T> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+        let bytes = Storage::get().await.read(&path).await?;
+
+        T::data_format().decode(&bytes).map_err(Into::into)
+    }
+
+    /// Writes the given value into the storage system at the path represented by the given path arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub async fn write(self, arguments: T::PathArguments, value: &T) -> Result<()> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+        let bytes = format.encode(value)?;
+
+        Storage::get_mut().await.write(&path, &bytes).await
+    }
+
+    /// Renames the value represented by the given path arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub async fn rename(self, from: T::PathArguments, into: T::PathArguments) -> Result<()> {
+        let format = T::data_format();
+        let from = T::data_path_for(from).as_ref().with_extension(format.extension());
+        let into = T::data_path_for(into).as_ref().with_extension(format.extension());
+
+        Storage::get_mut().await.rename(&from, &into).await
+    }
+
+    /// Deletes the value represented by the given path arguments.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub async fn delete(self, arguments: T::PathArguments) -> Result<()> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+
+        Storage::get_mut().await.delete(&path).await
+    }
 }
 
 /// An asynchronous API for a held stored value.
+#[repr(transparent)]
 #[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct AsyncHolderApi<'sv, T: Stored>(&'sv T);
 
-impl<'sv, T: Stored> AsyncHolderApi<'sv, T> {}
+impl<'sv, T: Stored> AsyncHolderApi<'sv, T> {
+    /// Returns whether data is stored for this value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub async fn exists(self) -> Result<bool> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+
+        Storage::get().await.exists(&path).await
+    }
+
+    /// Returns the size of the stored data for this value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub async fn size(self) -> Result<u64> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+
+        Storage::get().await.size(&path).await
+    }
+
+    /// Returns the value as saved within the storage system.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub async fn read(self) -> Result<T> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+        let bytes = Storage::get().await.read(&path).await?;
+
+        T::data_format().decode(&bytes).map_err(Into::into)
+    }
+
+    /// Writes this value into the storage system.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub async fn write(self) -> Result<()> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+        let bytes = format.encode(self.0)?;
+
+        Storage::get_mut().await.write(&path, &bytes).await
+    }
+
+    /// Renames this value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub async fn rename(self, into: T::PathArguments) -> Result<()> {
+        let format = T::data_format();
+        let from = self.0.data_path().as_ref().with_extension(format.extension());
+        let into = T::data_path_for(into).as_ref().with_extension(format.extension());
+
+        Storage::get_mut().await.rename(&from, &into).await
+    }
+
+    /// Deletes this value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub async fn delete(self) -> Result<()> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+
+        Storage::get_mut().await.delete(&path).await
+    }
+}
 
 /// A synchronous API for a stored value type.
+#[repr(transparent)]
 #[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SyncApi<T: Stored>(PhantomData<T>);
@@ -85,11 +247,234 @@ impl<T: Stored> SyncApi<T> {
     pub const fn with(self, value: &T) -> SyncHolderApi<T> {
         SyncHolderApi(value)
     }
+
+    /// Returns whether data is stored for the value represented by the given path arguments.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub fn exists(self, arguments: T::PathArguments) -> Result<bool> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+
+        Storage::blocking_get().blocking_exists(&path)
+    }
+
+    /// Returns the size of the stored data for the value represented by the given path arguments.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub fn size(self, arguments: T::PathArguments) -> Result<u64> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+
+        Storage::blocking_get().blocking_size(&path)
+    }
+
+    /// Returns the stored value represented by the given path arguments.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub fn read(self, arguments: T::PathArguments) -> Result<T> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+        let bytes = Storage::blocking_get().blocking_read(&path)?;
+
+        T::data_format().decode(&bytes).map_err(Into::into)
+    }
+
+    /// Writes the given value into the storage system at the path represented by the given path arguments.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub fn write(self, arguments: T::PathArguments, value: &T) -> Result<()> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+        let bytes = format.encode(value)?;
+
+        Storage::blocking_get_mut().blocking_write(&path, &bytes)
+    }
+
+    /// Renames the value represented by the given path arguments.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub fn rename(self, from: T::PathArguments, into: T::PathArguments) -> Result<()> {
+        let format = T::data_format();
+        let from = T::data_path_for(from).as_ref().with_extension(format.extension());
+        let into = T::data_path_for(into).as_ref().with_extension(format.extension());
+
+        Storage::blocking_get_mut().blocking_rename(&from, &into)
+    }
+
+    /// Deletes the value represented by the given path arguments.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub fn delete(self, arguments: T::PathArguments) -> Result<()> {
+        let format = T::data_format();
+        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
+
+        Storage::blocking_get_mut().blocking_delete(&path)
+    }
 }
 
 /// A synchronous API for a held stored value.
+#[repr(transparent)]
 #[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SyncHolderApi<'sv, T: Stored>(&'sv T);
 
-impl<'sv, T: Stored> SyncHolderApi<'sv, T> {}
+impl<'sv, T: Stored> SyncHolderApi<'sv, T> {
+    /// Returns whether data is stored for this value.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub fn exists(self) -> Result<bool> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+
+        Storage::blocking_get().blocking_exists(&path)
+    }
+
+    /// Returns the size of the stored data for this value.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub fn size(self) -> Result<u64> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+
+        Storage::blocking_get().blocking_size(&path)
+    }
+
+    /// Returns the value as saved within the storage system.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be read.
+    pub fn read(self) -> Result<T> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+        let bytes = Storage::blocking_get().blocking_read(&path)?;
+
+        T::data_format().decode(&bytes).map_err(Into::into)
+    }
+
+    /// Writes this value into the storage system.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub fn write(self) -> Result<()> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+        let bytes = format.encode(self.0)?;
+
+        Storage::blocking_get_mut().blocking_write(&path, &bytes)
+    }
+
+    /// Renames this value.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub fn rename(self, into: T::PathArguments) -> Result<()> {
+        let format = T::data_format();
+        let from = self.0.data_path().as_ref().with_extension(format.extension());
+        let into = T::data_path_for(into).as_ref().with_extension(format.extension());
+
+        Storage::blocking_get_mut().blocking_rename(&from, &into)
+    }
+
+    /// Deletes this value.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called in an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the path cannot be written to.
+    pub fn delete(self) -> Result<()> {
+        let format = T::data_format();
+        let path = self.0.data_path().as_ref().with_extension(format.extension());
+
+        Storage::blocking_get_mut().blocking_delete(&path)
+    }
+}

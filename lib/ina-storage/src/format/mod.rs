@@ -55,7 +55,7 @@ pub trait DataFormat: DataDecode + DataEncode {
 /// A value that encodes generic data.
 pub trait DataEncode {
     /// The error that can be returned during encoding.
-    type Error: std::fmt::Debug + std::error::Error;
+    type Error: std::fmt::Debug + std::error::Error + Send + Sync + 'static;
 
     /// Encodes the given value into a byte array.
     ///
@@ -68,7 +68,7 @@ pub trait DataEncode {
 /// A value that decodes generic data.
 pub trait DataDecode {
     /// The error that can be returned during decoding.
-    type Error: std::fmt::Debug + std::error::Error;
+    type Error: std::fmt::Debug + std::error::Error + Send + Sync + 'static;
 
     /// Decodes the given byte array into a value.
     ///
