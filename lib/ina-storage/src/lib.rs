@@ -67,6 +67,13 @@ pub struct Settings {
     pub queue_capacity: NonZeroUsize,
 }
 
+/// A storage instance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Storage {
+    /// The storage instance's setrtings.
+    settings: Settings,
+}
+
 /// The preference for the storage backend system.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
@@ -118,11 +125,4 @@ impl System {
             Self::Filesystem => crate::system::file::FileSystem::get_mut().await,
         }
     }
-}
-
-/// A storage instance.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Storage {
-    /// The storage instance's setrtings.
-    settings: Settings,
 }
