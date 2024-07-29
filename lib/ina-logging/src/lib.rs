@@ -219,10 +219,7 @@ impl<'lg> Logger<'lg> {
             D: Display + Send,
         {
             if let Some(writer) = writer {
-                let content = display.to_string();
-
-                writer.write_all(content.as_bytes()).await?;
-                writer.write_all(b"\n").await?;
+                writer.write_all((format!("{display}\n")).as_bytes()).await?;
                 writer.flush().await?;
             }
 
