@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+use tokio::runtime::Builder;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::RwLock;
@@ -74,7 +75,7 @@ where
     {
         let call = |receiver: Receiver<S>| {
             #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
-            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move { call(receiver).await })
         };
@@ -178,7 +179,7 @@ where
     {
         let call = |receiver: Sender<R>| {
             #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
-            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move { call(receiver).await })
         };
@@ -282,7 +283,7 @@ where
     {
         let call = |sender: Sender<R>, receiver: Receiver<S>| {
             #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
-            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move { call(sender, receiver).await })
         };
@@ -428,7 +429,7 @@ where
     {
         let call = move |sender: Sender<(Option<usize>, R)>, mut receiver: Receiver<(Option<usize>, S)>| {
             #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
-            let runtime = tokio::runtime::Builder::new_current_thread().build().expect("failed to spawn runtime");
+            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move {
                 loop {
