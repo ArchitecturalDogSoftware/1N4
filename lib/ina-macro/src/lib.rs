@@ -22,6 +22,18 @@ use proc_macro::TokenStream;
 mod stored;
 
 /// Implements the [`Stored`](<ina_storage::stored::Stored>) trait for the deriving type.
+///
+/// # Examples
+///
+/// ```
+/// #[derive(Stored)]
+/// #[data_format(ina_storage::format::MessagePack)]
+/// #[data_path(fmt = "dir/{}", args = [&'static str], with = [name])]
+/// struct DataStructure {
+///     name: &'static str,
+///     value: u64,
+/// }
+/// ```
 #[inline]
 #[proc_macro_derive(Stored, attributes(data_path, data_format))]
 pub fn stored(input: TokenStream) -> TokenStream {

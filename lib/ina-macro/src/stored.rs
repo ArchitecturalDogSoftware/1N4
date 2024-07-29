@@ -17,9 +17,7 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::ParseStream;
-use syn::{
-    bracketed, custom_keyword, parse_macro_input, Attribute, DeriveInput, Error, Ident, LitStr, Result, Token, Type,
-};
+use syn::{bracketed, parse_macro_input, Attribute, DeriveInput, Error, Ident, LitStr, Result, Token, Type};
 
 /// The `data_format` attribute.
 #[repr(transparent)]
