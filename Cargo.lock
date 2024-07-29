@@ -580,6 +580,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ina-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "ina-storage"
 version = "0.1.0"
 dependencies = [
