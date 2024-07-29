@@ -151,14 +151,14 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if it fails to read the translation file.
-    pub fn load_locale(&mut self, locale: Locale) -> Result<()> {
+    pub async fn load_locale(&mut self, locale: Locale) -> Result<()> {
         let path = self.settings.file_directory.join(locale.to_string()).with_extension("toml");
 
-        if !std::fs::exists(&path)? {
+        if !tokio::fs::try_exists(&path).await? {
             return Err(Error::MissingLocale);
         }
 
-        let data = std::fs::read_to_string(path)?;
+        let data = tokio::fs::read_to_string(path).await?;
         let translations = toml::from_str(&data)?;
 
         self.locales.insert(locale, translations);
@@ -171,18 +171,18 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if the localizer fails to load a locale.
-    pub fn load_directory(&mut self) -> Result<usize> {
+    pub async fn load_directory(&mut self) -> Result<usize> {
         let path = &(*self.settings.file_directory);
 
-        if !std::fs::exists(path)? {
+        if !tokio::fs::try_exists(path).await? {
             return Err(Error::MissingLocale);
         }
 
         let mut count: usize = 0;
+        let mut iterator = tokio::fs::read_dir(path).await?;
 
-        for result in std::fs::read_dir(path)? {
-            let entry = result?;
-            let metadata = entry.metadata()?;
+        while let Some(entry) = iterator.next_entry().await? {
+            let metadata = entry.metadata().await?;
 
             if metadata.is_file() {
                 continue;
@@ -192,7 +192,7 @@ impl Localizer {
             let Some(name) = path.file_stem() else { continue };
 
             if let Ok(locale) = name.to_string_lossy().parse() {
-                self.load_locale(locale)?;
+                self.load_locale(locale).await?;
 
                 count += 1;
             }

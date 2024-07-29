@@ -120,7 +120,7 @@ pub async fn start(settings: Settings) -> Result<(), (Option<usize>, (Arc<RwLock
     let capacity = settings.queue_capacity.get();
     let localizer = Localizer::new(settings);
 
-    THREAD.async_api().set(StatefulInvoker::spawn("localization", localizer, self::run, capacity)?).await;
+    THREAD.async_api().set(StatefulInvoker::spawn_with_runtime("localization", localizer, self::run, capacity)?).await;
 
     Ok(())
 }
@@ -143,7 +143,7 @@ pub fn blocking_start(settings: Settings) -> Result<(), (Option<usize>, (Arc<RwL
     let capacity = settings.queue_capacity.get();
     let localizer = Localizer::new(settings);
 
-    THREAD.sync_api().set(StatefulInvoker::spawn("localization", localizer, self::run, capacity)?);
+    THREAD.sync_api().set(StatefulInvoker::spawn_with_runtime("localization", localizer, self::run, capacity)?);
 
     Ok(())
 }
@@ -328,19 +328,19 @@ pub fn blocking_load(locale: Option<Locale>) -> Result<usize, (Option<usize>, (A
 ///
 /// This function will return an error if the thread fails to localize the key.
 #[allow(clippy::needless_pass_by_value)]
-fn run<T>(localizer: Arc<RwLock<Localizer>>, input: Request<T>) -> Response<T>
+async fn run<T>(localizer: Arc<RwLock<Localizer>>, input: Request<T>) -> Response<T>
 where
-    T: Deref<Target = str> + for<'s> From<&'s str>,
+    T: Deref<Target = str> + Send + for<'s> From<&'s str>,
 {
     match input {
         Request::Clear => {
-            localizer.blocking_write().clear_locales();
+            localizer.write().await.clear_locales();
 
             Response::Clear
         }
-        Request::List => Response::List(localizer.blocking_read().locales().collect()),
+        Request::List => Response::List(localizer.read().await.locales().collect()),
         Request::Localize(locale, key) => {
-            let localizer = localizer.blocking_read();
+            let localizer = localizer.read().await;
             let locale = locale.unwrap_or_else(|| localizer.settings.default_locale);
             let result = localizer.get(locale, key.category(), key.key()).map(|v| v.as_owned());
 
@@ -349,12 +349,12 @@ where
             Response::Localize(result.map_err(Into::into))
         }
         Request::Load(Some(locale)) => {
-            let result = localizer.blocking_write().load_locale(locale);
+            let result = localizer.write().await.load_locale(locale).await;
 
             Response::Load(result.map(|()| 1).map_err(Into::into))
         }
         Request::Load(None) => {
-            let result = localizer.blocking_write().load_directory();
+            let result = localizer.write().await.load_directory().await;
 
             Response::Load(result.map_err(Into::into))
         }
