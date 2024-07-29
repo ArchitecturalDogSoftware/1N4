@@ -142,6 +142,7 @@ pub fn procedure(input: TokenStream) -> TokenStream {
 
             #[inline]
             fn data_path(&self) -> impl ::std::convert::AsRef<::std::path::Path> + ::std::marker::Send {
+                // TODO: Validate that the fields are in the proper type order.
                 ::std::format!(#path_format, #(self.#path_fields),*)
             }
         }
