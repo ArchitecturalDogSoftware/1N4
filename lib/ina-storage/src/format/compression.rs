@@ -82,13 +82,13 @@ impl<F: Debug + DataFormat> Compress<F> {
     }
 }
 
-impl<F: Debug + DataFormat> DataFormat for Compress<F> {
+impl<F: Debug + DataFormat + 'static> DataFormat for Compress<F> {
     fn extension(&self) -> impl AsRef<OsStr> {
         format!("{}.gz", self.inner.extension().as_ref().to_string_lossy())
     }
 }
 
-impl<F: Debug + DataFormat> DataEncode for Compress<F> {
+impl<F: Debug + DataFormat + 'static> DataEncode for Compress<F> {
     type Error = Error<F>;
 
     fn encode<T: Serialize>(&self, value: &T) -> Result<Arc<[u8]>, Self::Error> {
@@ -102,7 +102,7 @@ impl<F: Debug + DataFormat> DataEncode for Compress<F> {
     }
 }
 
-impl<F: Debug + DataFormat> DataDecode for Compress<F> {
+impl<F: Debug + DataFormat + 'static> DataDecode for Compress<F> {
     type Error = Error<F>;
 
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {

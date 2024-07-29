@@ -17,6 +17,7 @@ workspace = true
 
 [features]
 default = []
+full = ["format-compression", "format-json", "format-messagepack", "format-postcard", "format-xmachina"]
 format-compression = ["dep:flate2"]
 format-json = ["dep:serde_json"]
 format-messagepack = ["dep:rmp-serde"]

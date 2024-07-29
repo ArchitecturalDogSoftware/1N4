@@ -16,7 +16,8 @@
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::parse::ParseStream;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
 use syn::{bracketed, parse_macro_input, Attribute, DeriveInput, Error, Ident, LitStr, Result, Token, Type};
 
 /// The `data_format` attribute.
@@ -44,9 +45,9 @@ pub struct StoredPathAttribute {
     /// The format literal.
     pub format: LitStr,
     /// The required types.
-    pub arguments: Box<[Type]>,
+    pub arguments: Punctuated<Type, Token![,]>,
     /// The fields that create the path.
-    pub fields: Box<[Ident]>,
+    pub fields: Punctuated<Ident, Token![,]>,
 }
 
 impl StoredPathAttribute {
@@ -70,39 +71,27 @@ impl StoredPathAttribute {
 
             let format = input.parse::<LitStr>()?;
 
+            input.parse::<Token![,]>()?;
             input.parse::<kw::args>()?;
             input.parse::<Token![=]>()?;
 
-            let mut arguments = vec![];
             let arguments_input;
 
             bracketed!(arguments_input in input);
 
-            while !arguments_input.is_empty() && input.peek(Token![,]) {
-                arguments_input.parse::<Token![,]>()?;
+            let arguments = arguments_input.parse_terminated(Type::parse, Token![,])?;
 
-                if !arguments_input.is_empty() {
-                    arguments.push(arguments_input.parse()?);
-                }
-            }
-
+            input.parse::<Token![,]>()?;
             input.parse::<kw::from>()?;
             input.parse::<Token![=]>()?;
 
-            let mut fields = vec![];
             let fields_input;
 
             bracketed!(fields_input in input);
 
-            while !fields_input.is_empty() && input.peek(Token![,]) {
-                fields_input.parse::<Token![,]>()?;
+            let fields = fields_input.parse_terminated(Ident::parse, Token![,])?;
 
-                if !fields_input.is_empty() {
-                    fields.push(arguments_input.parse()?);
-                }
-            }
-
-            Ok(Self { format, arguments: arguments.into_boxed_slice(), fields: fields.into_boxed_slice() })
+            Ok(Self { format, arguments, fields })
         })
     }
 }
@@ -126,6 +115,8 @@ pub fn procedure(input: TokenStream) -> TokenStream {
         Ok(StoredPathAttribute { format, arguments, fields }) => (format, arguments, fields),
         Err(error) => return error.into_compile_error().into(),
     };
+    let path_arguments = path_arguments.iter();
+    let path_fields = path_fields.iter();
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let path_format_arguments = (0 .. path_arguments.len()).map(|n| format_ident!("_{n}")).collect::<Box<[_]>>();
@@ -151,7 +142,7 @@ pub fn procedure(input: TokenStream) -> TokenStream {
 
             #[inline]
             fn data_path(&self) -> impl ::std::convert::AsRef<::std::path::Path> + ::std::marker::Send {
-                Self::data_path_for((#(self.#path_fields),*))
+                ::std::format!(#path_format, #(self.#path_fields),*)
             }
         }
     }

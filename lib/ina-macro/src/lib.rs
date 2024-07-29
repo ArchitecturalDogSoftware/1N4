@@ -28,7 +28,7 @@ mod stored;
 /// ```
 /// #[derive(Stored)]
 /// #[data_format(ina_storage::format::MessagePack)]
-/// #[data_path(fmt = "dir/{}", args = [&'static str], with = [name])]
+/// #[data_path(fmt = "dir/{}", args = [&'static str], from = [name])]
 /// struct DataStructure {
 ///     name: &'static str,
 ///     value: u64,

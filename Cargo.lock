@@ -539,6 +539,8 @@ dependencies = [
  "dotenvy",
  "ina-localization",
  "ina-logging",
+ "ina-macro",
+ "ina-storage",
  "ina-threading",
  "rand",
  "serde",
