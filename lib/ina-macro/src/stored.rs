@@ -115,8 +115,8 @@ pub fn procedure(input: TokenStream) -> TokenStream {
         Ok(StoredPathAttribute { format, arguments, fields }) => (format, arguments, fields),
         Err(error) => return error.into_compile_error().into(),
     };
-    let path_arguments = path_arguments.iter();
-    let path_fields = path_fields.iter();
+    let path_arguments = path_arguments.iter().collect::<Box<[_]>>();
+    let path_fields = path_fields.iter().collect::<Box<[_]>>();
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let path_format_arguments = (0 .. path_arguments.len()).map(|n| format_ident!("_{n}")).collect::<Box<[_]>>();
@@ -142,7 +142,15 @@ pub fn procedure(input: TokenStream) -> TokenStream {
 
             #[inline]
             fn data_path(&self) -> impl ::std::convert::AsRef<::std::path::Path> + ::std::marker::Send {
-                // TODO: Validate that the fields are in the proper type order.
+                /// This impl allows type-level validation that the arguments are in proper type ordering.
+                struct TypeValidation<'lt>(#(&'lt #path_arguments),*);
+
+                impl<'lt> ::std::convert::From<&'lt #identifier> for TypeValidation<'lt> {
+                    fn from(value: &'lt #identifier) -> Self {
+                        Self(#(&value.#path_fields),*)
+                    }
+                }
+
                 ::std::format!(#path_format, #(self.#path_fields),*)
             }
         }
