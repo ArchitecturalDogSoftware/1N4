@@ -34,6 +34,9 @@ pub struct Arguments {
     /// The bot's settings.
     #[command(flatten)]
     pub bot_settings: client::Settings,
+    /// The storage instance's settings.
+    #[command(flatten)]
+    pub data_settings: ina_storage::Settings,
     /// The localization thread's settings.
     #[command(flatten)]
     pub lang_settings: ina_localization::Settings,
@@ -83,6 +86,10 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
     ina_localization::thread::start(arguments.lang_settings).await?;
 
     info!(async "initialized localization thread").await?;
+
+    ina_storage::initialize(arguments.data_settings).await;
+
+    info!(async "initialized storage instance").await?;
 
     let instance = Instance::new(arguments.bot_settings).await?;
 
