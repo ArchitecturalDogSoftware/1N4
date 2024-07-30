@@ -85,18 +85,20 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool>
 pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool> {
     info!(async "shard #{} connected to gateway", shard_id.number()).await?;
 
+    crate::command::initialize().await?;
+
     let client = api.client.interaction(event.application.id);
 
     if let Ok(guild_id) = crate::utility::secret::development_guild_id() {
-        let list = &[];
-        let list = client.set_guild_commands(guild_id, list).await?.model().await?;
+        let list = crate::command::registry().await.collect::<Box<[_]>>(Some(guild_id))?;
+        let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
 
         info!(async "patched {} server commands", list.len()).await?;
     }
 
     if cfg!(not(debug_assertions)) {
-        let list = &[];
-        let list = client.set_global_commands(list).await?.model().await?;
+        let list = crate::command::registry().await.collect::<Box<[_]>>(None)?;
+        let list = client.set_global_commands(&list).await?.model().await?;
 
         info!(async "patched {} global commands", list.len()).await?;
     }
