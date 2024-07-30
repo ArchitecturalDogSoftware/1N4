@@ -14,12 +14,15 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use ina_logging::{debug, info, warn};
 use twilight_gateway::{Event, ShardId};
-use twilight_model::gateway::payload::incoming::Ready;
+use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
+use twilight_model::gateway::payload::incoming::{InteractionCreate, Ready};
+use twilight_model::http::interaction::InteractionResponseType;
 
 use super::api::Api;
+use crate::command::context::Context;
 
 /// Handles an event.
 ///
@@ -32,6 +35,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool>
     let id = shard_id.number();
     let result: Result<bool> = match event {
         Event::Ready(event) => self::on_ready(api, *event, shard_id).await,
+        Event::InteractionCreate(event) => self::on_interaction(api, *event, shard_id).await,
         Event::Resumed => {
             info!(async "shard #{id} successfully resumed").await?;
 
@@ -104,4 +108,104 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool>
     }
 
     Ok(false)
+}
+
+/// Handles an [`InteractionCreate`] event.
+///
+/// # Errors
+///
+/// This function will return an error if the event could not be handled.
+pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> Result<bool> {
+    info!(async "shard #{} received interaction #{}", shard_id.number(), event.id).await?;
+
+    let result: Result<bool> = match event.kind {
+        InteractionType::ApplicationCommand => self::on_command(api, &event).await,
+        InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api, &event).await,
+        InteractionType::MessageComponent => self::on_component(api, &event).await,
+        InteractionType::ModalSubmit => self::on_modal(api, &event).await,
+        _ => Ok(false),
+    };
+
+    if let Err(ref error) = result {
+        warn!(async "shard #{} failed interaction #{} - {error}", shard_id.number(), event.id).await?;
+    } else {
+        info!(async "shard #{} succeeded interaction #{}", shard_id.number(), event.id).await?;
+    }
+
+    result
+}
+
+/// Handles a command [`Interaction`] event.
+///
+/// # Errors
+///
+/// This function will return an error if the event could not be handled.
+pub async fn on_command(api: Api, event: &Interaction) -> Result<bool> {
+    let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
+        bail!("missing command data");
+    };
+    let Some(command) = crate::command::registry().await.command(&data.name).copied() else {
+        bail!("missing command entry for '{}'", data.name);
+    };
+    let Some(callback) = command.callbacks.command else {
+        bail!("missing command callback for '{}'", data.name);
+    };
+
+    (callback)(Context::new(api.as_ref(), event, data)).await
+}
+
+/// Handles an autocomplete [`Interaction`] event.
+///
+/// # Errors
+///
+/// This function will return an error if the event could not be handled.
+pub async fn on_autocomplete(api: Api, event: &Interaction) -> Result<bool> {
+    let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
+        bail!("missing command data");
+    };
+    let Some(command) = crate::command::registry().await.command(&data.name).copied() else {
+        bail!("missing command entry for '{}'", data.name);
+    };
+    let Some(callback) = command.callbacks.autocomplete else {
+        bail!("missing autocomplete callback for '{}'", data.name);
+    };
+    let Some((name, text, kind)) = crate::command::find_focused_option(&data.options) else {
+        bail!("missing focused option for '{}'", data.name);
+    };
+
+    let choices = (callback)(Context::new(api.as_ref(), event, data), name, text, kind).await?;
+
+    crate::create_response!(api.client, event, struct {
+        kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
+        choices: choices,
+    })
+    .await?;
+
+    Ok(false)
+}
+
+/// Handles a component [`Interaction`] event.
+///
+/// # Errors
+///
+/// This function will return an error if the event could not be handled.
+pub async fn on_component(api: Api, event: &Interaction) -> Result<bool> {
+    let Some(InteractionData::MessageComponent(ref data)) = event.data else {
+        bail!("missing component data");
+    };
+
+    todo!()
+}
+
+/// Handles a modal [`Interaction`] event.
+///
+/// # Errors
+///
+/// This function will return an error if the event could not be handled.
+pub async fn on_modal(api: Api, event: &Interaction) -> Result<bool> {
+    let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
+        bail!("missing modal data");
+    };
+
+    todo!()
 }

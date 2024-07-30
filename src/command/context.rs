@@ -262,7 +262,7 @@ macro_rules! create_response {
         $crate::create_response!(@new(
             $client.interaction($interaction.application_id),
             $interaction.id,
-            $interaction.token,
+            &$interaction.token,
             { $($arguments)+ }
         ))
     };

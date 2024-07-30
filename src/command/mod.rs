@@ -24,8 +24,10 @@ use anyhow::{ensure, Result};
 use context::Context;
 use ina_logging::info;
 use tokio::sync::RwLock;
-use twilight_model::application::command::Command;
-use twilight_model::application::interaction::application_command::CommandData;
+use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionType};
+use twilight_model::application::interaction::application_command::{
+    CommandData, CommandDataOption, CommandOptionValue,
+};
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::id::marker::GuildMarker;
@@ -33,14 +35,37 @@ use twilight_model::id::Id;
 
 /// Provides an interaction context API.
 pub mod context;
+/// Provides a data-holding custom ID implementation.
+pub mod data_id;
 
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
 
 /// A command entry creation function.
 type CreateFunction = fn(&CommandEntry, Option<Id<GuildMarker>>) -> Result<Option<Command>>;
-/// A command entry callback function.
-type Callback<T> = for<'ap, 'ev> fn(Context<'ap, 'ev, T>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>;
+
+/// A command callback function.
+type CommandCallback =
+    for<'ap, 'ev> fn(Context<'ap, 'ev, &'ev CommandData>) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
+
+/// An autocomplete callback function.
+type AutocompleteCallback =
+    for<'ap, 'ev> fn(
+        Context<'ap, 'ev, &'ev CommandData>,
+        &'ev str,
+        &'ev str,
+        CommandOptionType,
+    ) -> Pin<Box<dyn Future<Output = Result<Box<[CommandOptionChoice]>>> + Send>>;
+
+/// A component callback function.
+type ComponentCallback = for<'ap, 'ev> fn(
+    Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
+
+/// A modal callback function.
+type ModalCallback = for<'ap, 'ev> fn(
+    Context<'ap, 'ev, &'ev ModalInteractionData>,
+) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
 
 /// The command registry.
 #[repr(transparent)]
@@ -61,14 +86,14 @@ impl CommandRegistry {
     /// Returns whether this [`CommandRegistry`] contains a command with the given name.
     #[inline]
     #[must_use]
-    pub fn contains(&self, name: &'static str) -> bool {
+    pub fn contains(&self, name: &str) -> bool {
         self.inner.contains_key(name)
     }
 
     /// Returns the command assigned to the given name from within this [`CommandRegistry`].
     #[inline]
     #[must_use]
-    pub fn command(&self, name: &'static str) -> Option<&CommandEntry> {
+    pub fn command(&self, name: &str) -> Option<&CommandEntry> {
         self.inner.get(name)
     }
 
@@ -135,13 +160,13 @@ pub struct CommandEntry {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct CommandEntryCallbacks {
     /// The command callback.
-    pub command: Option<Callback<CommandData>>,
+    pub command: Option<CommandCallback>,
     /// The component callback.
-    pub component: Option<Callback<MessageComponentInteractionData>>,
+    pub component: Option<ComponentCallback>,
     /// The modal callback.
-    pub modal: Option<Callback<ModalInteractionData>>,
+    pub modal: Option<ModalCallback>,
     /// The autocompletion callback.
-    pub autocomplete: Option<Callback<CommandData>>,
+    pub autocomplete: Option<AutocompleteCallback>,
 }
 
 /// Returns a reference to the command registry.
@@ -167,4 +192,17 @@ pub async fn initialize() -> Result<()> {
     drop(registry);
 
     info!(async "initialized command registry").await.map_err(Into::into)
+}
+
+/// Recursively attempts to find a focused option within the given iterator.
+pub fn find_focused_option<'cd, I>(options: I) -> Option<(&'cd str, &'cd str, CommandOptionType)>
+where
+    I: IntoIterator<Item = &'cd CommandDataOption>,
+{
+    options.into_iter().find_map(|option| match &option.value {
+        CommandOptionValue::Focused(text, kind) => Some((&(*option.name), &(**text), *kind)),
+        CommandOptionValue::SubCommand(options) => self::find_focused_option(options),
+        CommandOptionValue::SubCommandGroup(commands) => self::find_focused_option(commands),
+        _ => None,
+    })
 }
