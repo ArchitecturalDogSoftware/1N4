@@ -378,3 +378,39 @@ impl From<Error<Infallible>> for Error<(Option<usize>, (Arc<RwLock<Localizer>>, 
         }
     }
 }
+
+/// Returns the localized text assigned to the given key and category.
+///
+/// # Examples
+///
+/// ```
+/// let locale = "es-MX".parse::<Locale>()?;
+///
+/// // In the specified locale.
+/// localize!(async(in locale) "ui", "test-key").await?;
+/// // In the default locale ('en-US' by default).
+/// localize!(async "ui", "test-key").await?;
+///
+/// // In the specified locale.
+/// localize!((in locale) "ui", "test-key")?;
+/// // In the default locale ('en-US' by default).
+/// localize!("ui", "test-key")?;
+/// ```
+#[macro_export]
+macro_rules! localize {
+    (async(in $locale:expr) $category:expr, $key:expr) => {
+        $crate::thread::localize(Some($locale), $crate::thread::TranslationKey::new($category.into(), $key.into()))
+    };
+    (async $category:expr, $key:expr) => {
+        $crate::thread::localize(None, $crate::thread::TranslationKey::new($category.into(), $key.into()))
+    };
+    ((in $locale:expr) $category:expr, $key:expr) => {
+        $crate::thread::blocking_localize(
+            Some($locale),
+            $crate::thread::TranslationKey::new($category.into(), $key.into()),
+        )
+    };
+    ($category:expr, $key:expr) => {
+        $crate::thread::blocking_localize(None, $crate::thread::TranslationKey::new($category.into(), $key.into()))
+    };
+}
