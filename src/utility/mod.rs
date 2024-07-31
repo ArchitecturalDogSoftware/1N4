@@ -21,6 +21,8 @@ use twilight_model::channel::message::Component;
 
 /// Provides getters for client secrets.
 pub mod secret;
+/// Provides commonly-used trait definitions and blanket implementations.
+pub mod traits;
 
 /// A modal's data.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
