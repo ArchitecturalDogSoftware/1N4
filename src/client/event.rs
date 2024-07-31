@@ -23,6 +23,7 @@ use twilight_model::http::interaction::InteractionResponseType;
 
 use super::api::Api;
 use crate::command::context::Context;
+use crate::command::data_id::DataId;
 
 /// Handles an event.
 ///
@@ -193,8 +194,16 @@ pub async fn on_component(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::MessageComponent(ref data)) = event.data else {
         bail!("missing component data");
     };
+    let data_id = data.custom_id.parse::<DataId>()?;
 
-    todo!()
+    let Some(command) = crate::command::registry().await.command(data_id.name()).copied() else {
+        bail!("missing command entry for '{}'", data_id.name());
+    };
+    let Some(callback) = command.callbacks.component else {
+        bail!("missing component callback for '{}'", data_id.name());
+    };
+
+    (callback)(Context::new(api.as_ref(), event, data), data_id).await
 }
 
 /// Handles a modal [`Interaction`] event.
@@ -206,6 +215,14 @@ pub async fn on_modal(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
         bail!("missing modal data");
     };
+    let data_id = data.custom_id.parse::<DataId>()?;
 
-    todo!()
+    let Some(command) = crate::command::registry().await.command(data_id.name()).copied() else {
+        bail!("missing command entry for '{}'", data_id.name());
+    };
+    let Some(callback) = command.callbacks.modal else {
+        bail!("missing component callback for '{}'", data_id.name());
+    };
+
+    (callback)(Context::new(api.as_ref(), event, data), data_id).await
 }

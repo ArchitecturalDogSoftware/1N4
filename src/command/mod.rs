@@ -22,6 +22,7 @@ use std::sync::LazyLock;
 
 use anyhow::{ensure, Result};
 use context::Context;
+use data_id::DataId;
 use ina_logging::info;
 use tokio::sync::RwLock;
 use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionType};
@@ -60,11 +61,13 @@ type AutocompleteCallback =
 /// A component callback function.
 type ComponentCallback = for<'ap, 'ev> fn(
     Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    DataId,
 ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
 
 /// A modal callback function.
 type ModalCallback = for<'ap, 'ev> fn(
     Context<'ap, 'ev, &'ev ModalInteractionData>,
+    DataId,
 ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
 
 /// The command registry.
