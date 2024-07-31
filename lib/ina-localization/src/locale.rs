@@ -26,7 +26,7 @@ use crate::{Error, Result};
 
 /// A locale used within the localizer.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq)]
-pub struct Locale([char; 4]);
+pub struct Locale([char; 2], Option<[char; 2]>);
 
 impl Locale {
     /// Creates a new [`Locale`].
@@ -34,35 +34,29 @@ impl Locale {
     /// # Errors
     ///
     /// This function will return an error if the given locale contains a non-ascii-alphabetic character.
-    pub const fn new(language: [char; 2], territory: [char; 2]) -> Result<Self> {
-        let [l1, l2] = language;
-        let [t1, t2] = territory;
-
-        if !l1.is_ascii_alphabetic()
-            || !l2.is_ascii_alphabetic()
-            || !t1.is_ascii_alphabetic()
-            || !t2.is_ascii_alphabetic()
-        {
+    pub fn new(language: [char; 2], territory: Option<[char; 2]>) -> Result<Self> {
+        if !language.iter().all(char::is_ascii_alphabetic) {
+            return Err(Error::InvalidLocale);
+        }
+        if territory.is_some_and(|a| !a.iter().all(char::is_ascii_alphabetic)) {
             return Err(Error::InvalidLocale);
         }
 
-        Ok(Self([l1.to_ascii_lowercase(), l2.to_ascii_lowercase(), t1.to_ascii_uppercase(), t2.to_ascii_uppercase()]))
+        Ok(Self(language.map(|c| c.to_ascii_lowercase()), territory.map(|a| a.map(|c| c.to_ascii_uppercase()))))
     }
 
     /// Returns the language code of this [`Locale`].
     #[must_use]
     pub fn language(&self) -> String {
-        let Self([l1, l2, ..]) = self;
+        let Self([l1, l2], _) = self;
 
         format!("{l1}{l2}")
     }
 
     /// Returns the territory code of this [`Locale`].
     #[must_use]
-    pub fn territory(&self) -> String {
-        let Self([.., t1, t2]) = self;
-
-        format!("{t1}{t2}")
+    pub fn territory(&self) -> Option<String> {
+        self.1.map(|[t1, t2]| format!("{t1}{t2}"))
     }
 }
 
@@ -80,15 +74,19 @@ impl TryFrom<[char; 4]> for Locale {
 
     #[inline]
     fn try_from([l1, l2, t1, t2]: [char; 4]) -> Result<Self> {
-        Self::new([l1, l2], [t1, t2])
+        Self::new([l1, l2], Some([t1, t2]))
     }
 }
 
 impl Display for Locale {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self([l1, l2, t1, t2]) = self;
+        write!(f, "{}", self.language())?;
 
-        write!(f, "{l1}{l2}-{t1}{t2}")
+        if let Some(territory) = self.territory() {
+            write!(f, "{territory}")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -108,12 +106,14 @@ impl FromStr for Locale {
         let language_1 = next_char(&mut chars, char::is_ascii_alphabetic)?;
         let language_2 = next_char(&mut chars, char::is_ascii_alphabetic)?;
 
-        next_char(&mut chars, |c| c == &'-')?;
+        let territory: Option<Result<_>> = next_char(&mut chars, |c| c == &'-').ok().map(|_| {
+            let territory_1 = next_char(&mut chars, char::is_ascii_alphabetic)?;
+            let territory_2 = next_char(&mut chars, char::is_ascii_alphabetic)?;
 
-        let territory_1 = next_char(&mut chars, char::is_ascii_alphabetic)?;
-        let territory_2 = next_char(&mut chars, char::is_ascii_alphabetic)?;
+            Ok([territory_1, territory_2])
+        });
 
-        Self::new([language_1, language_2], [territory_1, territory_2])
+        Self::new([language_1, language_2], territory.transpose()?)
     }
 }
 
