@@ -24,6 +24,11 @@ pub mod secret;
 /// Provides commonly-used trait definitions and blanket implementations.
 pub mod traits;
 
+/// The base Discord CDN URL.
+pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";
+/// The base twemoji CDN URL.
+pub const TWEMOJI_CDN_URL: &str = "https://raw.githubusercontent.com/discord/twemoji/main/assets/72x72";
+
 /// A modal's data.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModalData {

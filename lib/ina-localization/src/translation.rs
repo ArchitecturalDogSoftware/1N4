@@ -39,22 +39,34 @@ impl<T> OwnedTranslation<T>
 where
     T: Deref<Target = str>,
 {
-    /// Returns whether this [`Translation`] is [`Translation::Present`].
+    /// Returns whether this [`OwnedTranslation<T>`] is [`OwnedTranslation::Present`].
     #[must_use]
     pub const fn is_present(&self) -> bool {
         matches!(self, Self::Present(..))
     }
 
-    /// Returns whether this [`Translation`] is [`Translation::Inherit`].
+    /// Returns whether this [`OwnedTranslation<T>`] is [`OwnedTranslation::Inherit`].
     #[must_use]
     pub const fn is_inherit(&self) -> bool {
         matches!(self, Self::Inherit(..))
     }
 
-    /// Returns whether this [`Translation`] is [`Translation::Missing`].
+    /// Returns whether this [`OwnedTranslation<T>`] is [`OwnedTranslation::Missing`].
     #[must_use]
     pub const fn is_missing(&self) -> bool {
         matches!(self, Self::Missing(..))
+    }
+
+    /// Converts from an [`OwnedTranslation<T>`] into an [`OwnedTranslation<U>`].
+    pub fn cast<U>(self) -> OwnedTranslation<U>
+    where
+        U: Deref<Target = str> + for<'s> From<&'s str>,
+    {
+        match self {
+            Self::Present(v) => OwnedTranslation::Present((&(*v)).into()),
+            Self::Inherit(l, v) => OwnedTranslation::Inherit(l, (&(*v)).into()),
+            Self::Missing(c, k) => OwnedTranslation::Missing((&(*c)).into(), (&(*k)).into()),
+        }
     }
 
     /// Returns the translation with the most highly-defined 'presence'.
