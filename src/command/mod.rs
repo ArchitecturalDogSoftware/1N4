@@ -37,6 +37,8 @@ use crate::utility::types::id::CustomId;
 
 /// Provides an interaction context API.
 pub mod context;
+/// Provides helpers for resolving command options.
+pub mod resolver;
 
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
