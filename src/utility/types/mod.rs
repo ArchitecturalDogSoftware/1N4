@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+/// A reference to an existing message.
+pub mod anchor;
 /// A type that defines custom identifiers.
 pub mod id;
 /// A type that defines modal data.
