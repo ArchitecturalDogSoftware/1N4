@@ -30,6 +30,7 @@ pub const VALUE_SEPARATOR: char = ';';
 pub type Inner = Arc<str>;
 
 /// An error that may be returned when interacting with custom identifiers.
+#[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Returned when the identifier contains an invalid character.

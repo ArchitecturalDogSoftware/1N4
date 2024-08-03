@@ -374,6 +374,7 @@ impl From<Error<Infallible>> for Error<(Option<usize>, (Arc<RwLock<Localizer>>, 
                 ina_threading::Error::Io(error) => ina_threading::Error::Io(error),
                 ina_threading::Error::Disconnected => ina_threading::Error::Disconnected,
                 ina_threading::Error::Send(_) => unreachable!(),
+                _ => unimplemented!(),
             }),
         }
     }

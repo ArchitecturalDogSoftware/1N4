@@ -40,6 +40,7 @@ pub mod thread;
 pub type Result<T, S = Infallible> = std::result::Result<T, Error<S>>;
 
 /// An error that may occur when using this library.
+#[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum Error<S = Infallible> {
     /// An IO error.

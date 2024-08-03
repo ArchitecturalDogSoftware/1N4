@@ -24,6 +24,7 @@ pub const MAX_INPUTS: usize = 5;
 pub const MAX_TITLE_LENGTH: usize = 45;
 
 /// An error that may be returned when interacting with modals.
+#[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// An invalid custom identifier was provided.
