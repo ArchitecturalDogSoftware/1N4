@@ -23,6 +23,8 @@ use twilight_model::channel::message::Component;
 pub mod secret;
 /// Provides commonly-used trait definitions and blanket implementations.
 pub mod traits;
+/// Provides various useful types and builders.
+pub mod types;
 
 /// The base Discord CDN URL.
 pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";

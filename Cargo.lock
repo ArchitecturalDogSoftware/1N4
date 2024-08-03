@@ -544,6 +544,7 @@ dependencies = [
  "ina-threading",
  "rand",
  "serde",
+ "thiserror",
  "time",
  "tokio",
  "tokio-stream",

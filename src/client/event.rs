@@ -23,7 +23,7 @@ use twilight_model::http::interaction::InteractionResponseType;
 
 use super::api::Api;
 use crate::command::context::Context;
-use crate::command::data_id::DataId;
+use crate::utility::types::id::CustomId;
 
 /// Handles an event.
 ///
@@ -194,7 +194,7 @@ pub async fn on_component(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::MessageComponent(ref data)) = event.data else {
         bail!("missing component data");
     };
-    let data_id = data.custom_id.parse::<DataId>()?;
+    let data_id = data.custom_id.parse::<CustomId>()?;
 
     let Some(command) = crate::command::registry().await.command(data_id.name()).copied() else {
         bail!("missing command entry for '{}'", data_id.name());
@@ -215,7 +215,7 @@ pub async fn on_modal(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
         bail!("missing modal data");
     };
-    let data_id = data.custom_id.parse::<DataId>()?;
+    let data_id = data.custom_id.parse::<CustomId>()?;
 
     let Some(command) = crate::command::registry().await.command(data_id.name()).copied() else {
         bail!("missing command entry for '{}'", data_id.name());

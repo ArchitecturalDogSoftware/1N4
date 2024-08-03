@@ -22,7 +22,6 @@ use std::sync::LazyLock;
 
 use anyhow::{ensure, Result};
 use context::Context;
-use data_id::DataId;
 use ina_logging::info;
 use tokio::sync::RwLock;
 use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionType};
@@ -34,10 +33,10 @@ use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
 
+use crate::utility::types::id::CustomId;
+
 /// Provides an interaction context API.
 pub mod context;
-/// Provides a data-holding custom ID implementation.
-pub mod data_id;
 
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
@@ -61,13 +60,13 @@ type AutocompleteCallback =
 /// A component callback function.
 type ComponentCallback = for<'ap, 'ev> fn(
     Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
-    DataId,
+    CustomId,
 ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
 
 /// A modal callback function.
 type ModalCallback = for<'ap, 'ev> fn(
     Context<'ap, 'ev, &'ev ModalInteractionData>,
-    DataId,
+    CustomId,
 ) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
 
 /// The command registry.
