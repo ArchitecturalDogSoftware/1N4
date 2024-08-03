@@ -26,7 +26,7 @@ use twilight_model::channel::message::{Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
 
 use crate::client::api::ApiRef;
-use crate::utility::ModalData;
+use crate::utility::types::modal::ModalData;
 
 /// A command interaction context.
 pub type CommandContext<'ar, 'ev> = Context<'ar, 'ev, &'ev CommandData>;
