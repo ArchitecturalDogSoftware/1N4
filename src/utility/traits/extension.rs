@@ -54,6 +54,7 @@ pub trait InteractionExt {
 }
 
 /// Displays an interaction label.
+#[must_use = "this value does nothing unless displayed"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct InteractionLabelDisplay<'ev> {
     /// The interaction identifier.
@@ -156,6 +157,7 @@ pub trait UserExt {
 }
 
 /// Displays a user's name.
+#[must_use = "this value does nothing unless displayed"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct UserNameDisplay<'us> {
     /// The user's guild nickname.
@@ -174,6 +176,7 @@ impl<'us> Display for UserNameDisplay<'us> {
 }
 
 /// Displays a user's account tag.
+#[must_use = "this value does nothing unless displayed"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct UserTagDisplay<'us> {
     /// The user's username.
