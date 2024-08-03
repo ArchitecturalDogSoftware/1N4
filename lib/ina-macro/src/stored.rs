@@ -122,6 +122,7 @@ pub fn procedure(input: TokenStream) -> TokenStream {
     let path_format_arguments = (0 .. path_arguments.len()).map(|n| format_ident!("_{n}")).collect::<Box<[_]>>();
 
     quote! {
+        #[automatically_derived]
         impl #impl_generics ::ina_storage::stored::Stored for #identifier #type_generics
         #where_clause
         {
