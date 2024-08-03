@@ -95,14 +95,14 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool>
     let client = api.client.interaction(event.application.id);
 
     if let Ok(guild_id) = crate::utility::secret::development_guild_id() {
-        let list = crate::command::registry().await.collect::<Box<[_]>>(Some(guild_id))?;
+        let list = crate::command::registry().await.collect::<Box<[_]>>(Some(guild_id)).await?;
         let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
 
         info!(async "patched {} server commands", list.len()).await?;
     }
 
     if cfg!(not(debug_assertions)) {
-        let list = crate::command::registry().await.collect::<Box<[_]>>(None)?;
+        let list = crate::command::registry().await.collect::<Box<[_]>>(None).await?;
         let list = client.set_global_commands(&list).await?.model().await?;
 
         info!(async "patched {} global commands", list.len()).await?;

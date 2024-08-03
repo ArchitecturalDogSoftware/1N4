@@ -39,12 +39,20 @@ use crate::utility::types::id::CustomId;
 pub mod context;
 /// Provides helpers for resolving command options.
 pub mod resolver;
+/// Provides all defined commands.
+pub mod definition {
+    /// The help command.
+    pub mod help;
+}
 
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
 
 /// A command entry creation function.
-type CreateFunction = fn(&CommandEntry, Option<Id<GuildMarker>>) -> Result<Option<Command>>;
+type CreateFunction = for<'ce> fn(
+    &'ce CommandEntry,
+    Option<Id<GuildMarker>>,
+) -> Pin<Box<dyn Future<Output = Result<Option<Command>>> + Send>>;
 
 /// A command callback function.
 type CommandCallback =
@@ -131,11 +139,20 @@ impl CommandRegistry {
     /// # Errors
     ///
     /// This function will return an error if a command fails to build.
-    pub fn collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
+    pub async fn collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
     where
         T: FromIterator<Command>,
     {
-        self.iter().filter_map(|entry| (entry.create)(entry, guild_id).transpose()).collect()
+        let mut buffer = Vec::with_capacity(self.inner.len());
+
+        for entry in self.iter() {
+            let command = (entry.create)(entry, guild_id).await;
+            let Some(command) = command.transpose() else { continue };
+
+            buffer.push(command?);
+        }
+
+        Ok(buffer.into_iter().collect())
     }
 }
 
@@ -209,4 +226,84 @@ where
         CommandOptionValue::SubCommandGroup(commands) => self::find_focused_option(commands),
         _ => None,
     })
+}
+
+/// Creates a command.
+#[macro_export]
+macro_rules! define_command {
+    (
+        $name:literal, $type:expr, struct {
+            $(dev_only: $dev_only:literal,)?
+            $(allow_dms: $allow_dms:literal,)?
+            $(is_nsfw: $is_nsfw:literal,)?
+            $(permissions: $permissions:expr,)?
+        },struct {
+            $(command_callback: $command_callback:expr,)?
+            $(component_callback: $component_callback:expr,)?
+            $(modal_callback: $modal_callback:expr,)?
+            $(autocomplete_callback: $autocomplete_callback:expr,)?
+        },struct { $($option_name:ident : $option_kind:ident { $($body:tt)* }),* $(,)? }
+    ) => {
+        /// Registers this command within the registry.
+        ///
+        /// # Errors
+        ///
+        /// This function will return an error if the command has already been registered.
+        pub async fn register() -> ::anyhow::Result<()> {
+            $crate::command::registry_mut().await.register(self::entry())
+        }
+
+        /// Returns this command's registry entry.
+        #[must_use]
+        pub fn entry() -> $crate::command::CommandEntry {
+            todo!()
+        }
+
+        /// Creates this command's API command value.
+        ///
+        /// # Errors
+        ///
+        /// This function will return an error if command creation fails.
+        #[must_use = r"futures do nothing unless polled"]
+        pub fn create(
+            entry: &'static $crate::command::CommandEntry,
+            guild_id: ::std::option::Option<::twilight_model::id::Id<::twilight_model::id::marker::GuildMarker>>,
+        ) -> ::std::pin::Pin<::std::boxed::Box<dyn ::std::future::Future<Output = ::anyhow::Result<::std::option::Option<::twilight_model::application::command::Command>>> + ::std::marker::Send>>
+        {
+            ::std::boxed::Box::pin(async move {
+                $(if $dev_only && guild_id.is_none() {
+                    return ::std::result::Result::Ok(::std::option::Option::None);
+                })?
+
+                let localizer_name_key = ::std::format!("{}-name", entry.name);
+                let localizer_description_key = ::std::format!("{}-description", entry.name);
+
+                let localized_name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async "command", &(*localizer_description_key)).await?);
+                let mut builder = ::twilight_util::builder::command::CommandBuilder::new(entry.name, localized_name, $type)
+                    $(.dm_permission($allow_dms))?
+                    $(.nsfw($is_nsfw))?
+                    $(.default_member_permissions($permissions))?;
+
+                if let ::std::option::Option::Some(guild_id) = guild_id {
+                    builder = builder.guild_id(guild_id);
+                }
+
+                let locales = ::ina_localization::thread::list().await?;
+                let mut localized_names = ::std::vec::Vec::with_capacity(locales.len());
+                let mut localized_descriptions = ::std::vec::Vec::with_capacity(locales.len());
+
+                for locale in locales {
+                    localized_names.push((locale.to_string(), ::ina_localization::localize!(async(in locale) "command", &(*localizer_name_key)).await?.to_string()));
+                    localized_descriptions.push((locale.to_string(), ::ina_localization::localize!(async(in locale) "command", &(*localizer_description_key)).await?.to_string()));
+                }
+
+                builder = builder.name_localizations(localized_names);
+                builder = builder.description_localizations(localized_descriptions);
+
+                $(builder = builder.option($crate::define_command!(@option(entry, $option_name, $option_type, { $($body)* })));)*
+
+                ::std::result::Result::Ok(::std::option::Option::Some(builder.validate()?.build()))
+            })
+        }
+    };
 }
