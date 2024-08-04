@@ -26,6 +26,16 @@ pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";
 /// The base twemoji CDN URL.
 pub const TWEMOJI_CDN_URL: &str = "https://raw.githubusercontent.com/discord/twemoji/main/assets/72x72";
 
+/// Localizer category constants.
+pub mod category {
+    /// The command information category.
+    pub const COMMAND: &str = "command";
+    /// The option information category.
+    pub const OPTION: &str = "option";
+    /// The choice information category.
+    pub const CHOICE: &str = "choice";
+}
+
 /// Color constants.
 pub mod color {
     /// The bot's branding color (A).

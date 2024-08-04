@@ -15,72 +15,53 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use twilight_model::application::command::CommandType;
+use twilight_model::application::command::{CommandOptionChoice, CommandOptionType, CommandType};
 use twilight_model::application::interaction::application_command::CommandData;
-use twilight_model::channel::ChannelType;
+use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
+use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::guild::Permissions;
 
 use crate::command::context::Context;
+use crate::utility::traits::convert::AsLocale;
+use crate::utility::types::id::CustomId;
 
 crate::define_command!("help", CommandType::ChatInput, struct {
-    dev_only: true,
     allow_dms: true,
     permissions: Permissions::USE_SLASH_COMMANDS,
 }, struct {
-    command_callback: _on_command,
-}, struct {
-    image: Attachment {
-        required: true,
-    },
-    flag: Boolean {
-        required: true,
-    },
-    channel: Channel {
-        required: false,
-        channel_types: [ChannelType::GuildText],
-    },
-    numbers: Integer {
-        required: true,
-        autocomplete: false,
-        minimum: 0,
-        maximum: 2,
-        choices: [("zero", 0), ("one", 1), ("two", 2)],
-    },
-    percentages: Number {
-        required: true,
-        autocomplete: false,
-        minimum: 0.0,
-        maximum: 1.0,
-        choices: [("zero", 0.0), ("half", 0.5), ("one", 1.0)],
-    },
-    role: Role {
-        required: false,
-    },
-    options: String {
-        required: true,
-        autocomplete: false,
-        minimum: 1,
-        maximum: 100,
-        choices: [("quiet", "quiet"), ("loud", "loud")],
-    },
-    other_command: SubCommand {
-        inner_option: Integer {
-            required: true,
-            minimum: 0,
-            maximum: 128,
-        },
-    },
-    command_group: SubCommandGroup {
-        command_a: SubCommand {},
-        command_b: SubCommand {},
-    },
-    user: User {
-        required: false,
-    },
-});
+    command_callback: on_command,
+    component_callback: on_component,
+    modal_callback: on_modal,
+    autocomplete_callback: on_autocomplete,
+}, struct {});
 
-async fn _on_command<'ap: 'ev, 'ev>(_context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool> {
-    ina_logging::debug!(async "test async call").await?;
+async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool> {
+    context.defer(true).await?;
+
+    let locale = context.interaction.author().map(AsLocale::as_locale).transpose()?;
 
     Ok(false)
+}
+
+async fn on_component<'ap: 'ev, 'ev>(
+    _context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    _custom_id: CustomId,
+) -> Result<bool> {
+    Ok(false)
+}
+
+async fn on_modal<'ap: 'ev, 'ev>(
+    _context: Context<'ap, 'ev, &'ev ModalInteractionData>,
+    _custom_id: CustomId,
+) -> Result<bool> {
+    Ok(false)
+}
+
+async fn on_autocomplete<'ap: 'ev, 'ev>(
+    _context: Context<'ap, 'ev, &'ev CommandData>,
+    _option: &'ev str,
+    _current: &'ev str,
+    _kind: CommandOptionType,
+) -> Result<Box<[CommandOptionChoice]>> {
+    Ok(Box::new([]))
 }
