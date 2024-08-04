@@ -94,6 +94,11 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool>
 pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool> {
     info!(async "shard #{} connected to gateway", shard_id.number()).await?;
 
+    // Only shard 0 should handle command registration.
+    if shard_id.number() != 0 {
+        return Ok(false);
+    }
+
     crate::command::initialize().await?;
 
     let client = api.client.interaction(event.application.id);
