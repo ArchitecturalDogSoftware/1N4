@@ -20,7 +20,6 @@ use anyhow::Result;
 use ina_localization::{localize, Locale};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::application_command::CommandData;
-use twilight_model::channel::message::MessageFlags;
 use twilight_model::guild::{PartialMember, Permissions, Role};
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
@@ -237,11 +236,7 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
         .description(buffer)
         .footer(EmbedFooterBuilder::new(footer).build());
 
-    crate::follow_up_response!(context, struct {
-        embeds: &[embed.build()],
-        flags: MessageFlags::EPHEMERAL,
-    })
-    .await?;
+    context.embed(embed.build(), true).await?;
 
     Ok(false)
 }
