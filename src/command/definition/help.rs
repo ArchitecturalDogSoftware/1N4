@@ -16,7 +16,7 @@
 
 use std::fmt::Write;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use ina_localization::{localize, Locale};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::application_command::CommandData;
