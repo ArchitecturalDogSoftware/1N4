@@ -15,9 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::collections::HashMap;
-use std::future::Future;
 use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
 use std::sync::LazyLock;
 
 use anyhow::{ensure, Result};
@@ -48,40 +46,78 @@ pub mod definition {
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
 
-/// A command entry creation function.
-type CreateFunction = for<'ce> fn(
-    &'ce CommandEntry,
-    Option<Id<GuildMarker>>,
-) -> Pin<Box<dyn Future<Output = Result<Option<Command>>> + Send>>;
+/// A type that can be invoked to construct a command.
+#[async_trait::async_trait]
+pub trait CommandFactory: Send + Sync {
+    /// Creates an API command value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if command creation fails.
+    async fn build(&self, entry: &CommandEntry, guild_id: Option<Id<GuildMarker>>) -> Result<Option<Command>>;
+}
 
-/// A command callback function.
-type CommandCallback =
-    for<'ap, 'ev> fn(Context<'ap, 'ev, &'ev CommandData>) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
+/// A type that can be invoked to execute a command.
+#[async_trait::async_trait]
+pub trait CommandCallable: Send + Sync {
+    /// Executes a command.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if execution fails.
+    async fn on_command<'ap: 'ev, 'ev>(&self, context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool>;
+}
 
-/// An autocomplete callback function.
-type AutocompleteCallback =
-    for<'ap, 'ev> fn(
-        Context<'ap, 'ev, &'ev CommandData>,
-        &'ev str,
-        &'ev str,
-        CommandOptionType,
-    ) -> Pin<Box<dyn Future<Output = Result<Box<[CommandOptionChoice]>>> + Send>>;
+/// A type that can be invoked to execute a component.
+#[async_trait::async_trait]
+pub trait ComponentCallable: Send + Sync {
+    /// Executes a component.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if execution fails.
+    async fn on_component<'ap: 'ev, 'ev>(
+        &self,
+        context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+        custom_id: CustomId,
+    ) -> Result<bool>;
+}
 
-/// A component callback function.
-type ComponentCallback = for<'ap, 'ev> fn(
-    Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
-    CustomId,
-) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
+/// A type that can be invoked to execute a modal.
+#[async_trait::async_trait]
+pub trait ModalCallable: Send + Sync {
+    /// Executes a modal.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if execution fails.
+    async fn on_modal<'ap: 'ev, 'ev>(
+        &self,
+        context: Context<'ap, 'ev, &'ev ModalInteractionData>,
+        custom_id: CustomId,
+    ) -> Result<bool>;
+}
 
-/// A modal callback function.
-type ModalCallback = for<'ap, 'ev> fn(
-    Context<'ap, 'ev, &'ev ModalInteractionData>,
-    CustomId,
-) -> Pin<Box<dyn Future<Output = Result<bool>> + Send>>;
+/// A type that can be invoked to execute an autocompletion.
+#[async_trait::async_trait]
+pub trait AutocompleteCallable: Send + Sync {
+    /// Executes an autocompletion.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if execution fails.
+    async fn on_autocomplete<'ap: 'ev, 'ev>(
+        &self,
+        context: Context<'ap, 'ev, &'ev CommandData>,
+        option: &'ev str,
+        current: &'ev str,
+        kind: CommandOptionType,
+    ) -> Result<Box<[CommandOptionChoice]>>;
+}
 
 /// The command registry.
 #[repr(transparent)]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Default)]
 pub struct CommandRegistry {
     /// The inner command list.
     inner: HashMap<&'static str, CommandEntry>,
@@ -146,7 +182,7 @@ impl CommandRegistry {
         let mut buffer = Vec::with_capacity(self.inner.len());
 
         for entry in self.iter() {
-            let command = (entry.create)(entry, guild_id).await;
+            let command = entry.factory.build(entry, guild_id).await;
             let Some(command) = command.transpose() else { continue };
 
             buffer.push(command?);
@@ -167,27 +203,26 @@ impl IntoIterator for CommandRegistry {
 }
 
 /// An entry within the command registry.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CommandEntry {
     /// The command's literal name.
     pub name: &'static str,
     /// The command's creation function.
-    pub create: CreateFunction,
+    pub factory: Box<dyn CommandFactory>,
     /// The command's callback functions.
     pub callbacks: CommandEntryCallbacks,
 }
 
 /// The callback functions of a [`CommandEntry`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Default)]
 pub struct CommandEntryCallbacks {
     /// The command callback.
-    pub command: Option<CommandCallback>,
+    pub command: Option<Box<dyn CommandCallable>>,
     /// The component callback.
-    pub component: Option<ComponentCallback>,
+    pub component: Option<Box<dyn ComponentCallable>>,
     /// The modal callback.
-    pub modal: Option<ModalCallback>,
+    pub modal: Option<Box<dyn ModalCallable>>,
     /// The autocompletion callback.
-    pub autocomplete: Option<AutocompleteCallback>,
+    pub autocomplete: Option<Box<dyn AutocompleteCallable>>,
 }
 
 /// Returns a reference to the command registry.
@@ -261,33 +296,17 @@ macro_rules! define_command {
             $(autocomplete_callback: $autocomplete_callback:expr,)?
         },struct { $($option_name:ident : $option_kind:ident { $($body:tt)* }),* $(,)? }
     ) => {
-        /// Registers this command within the registry.
-        ///
-        /// # Errors
-        ///
-        /// This function will return an error if the command has already been registered.
-        pub async fn register() -> ::anyhow::Result<()> {
-            $crate::command::registry_mut().await.register(self::entry())
-        }
+        /// The command implementation.
+        pub struct Impl;
 
-        /// Returns this command's registry entry.
-        #[must_use]
-        pub fn entry() -> $crate::command::CommandEntry {
-            todo!()
-        }
-
-        /// Creates this command's API command value.
-        ///
-        /// # Errors
-        ///
-        /// This function will return an error if command creation fails.
-        #[must_use = r"futures do nothing unless polled"]
-        pub fn create(
-            entry: &'static $crate::command::CommandEntry,
-            guild_id: ::std::option::Option<::twilight_model::id::Id<::twilight_model::id::marker::GuildMarker>>,
-        ) -> ::std::pin::Pin<::std::boxed::Box<dyn ::std::future::Future<Output = ::anyhow::Result<::std::option::Option<::twilight_model::application::command::Command>>> + ::std::marker::Send>>
-        {
-            ::std::boxed::Box::pin(async move {
+        #[::async_trait::async_trait]
+        impl $crate::command::CommandFactory for Impl {
+            async fn build(
+                &self,
+                entry: &$crate::command::CommandEntry,
+                guild_id: ::std::option::Option<::twilight_model::id::Id<::twilight_model::id::marker::GuildMarker>>,
+            ) -> ::anyhow::Result<::std::option::Option<::twilight_model::application::command::Command>>
+            {
                 $(if $dev_only && guild_id.is_none() {
                     return ::std::result::Result::Ok(::std::option::Option::None);
                 })?
@@ -324,7 +343,112 @@ macro_rules! define_command {
                 $(builder = builder.option($crate::define_command!(@option(entry, $option_name, $option_kind, &locales, { $($body)* })));)*
 
                 ::std::result::Result::Ok(::std::option::Option::Some(builder.validate()?.build()))
-            })
+            }
+        }
+
+        $(
+            #[::async_trait::async_trait]
+            impl $crate::command::CommandCallable for Impl {
+                #[inline]
+                async fn on_command<'ap: 'ev, 'ev>(
+                    &self,
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>
+                ) -> ::anyhow::Result<::std::primitive::bool>
+                {
+                    $command_callback(context).await
+                }
+            }
+        )?
+
+        $(
+            #[::async_trait::async_trait]
+            impl $crate::command::ComponentCallable for Impl {
+                #[inline]
+                async fn on_component<'ap: 'ev, 'ev>(
+                    &self,
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::CommandData>
+                    custom_id: $crate::utility::types::id::CustomId,
+                ) -> ::anyhow::Result<::std::primitive::bool>
+                {
+                    $component_callback(context, custom_id).await
+                }
+            }
+        )?
+
+        $(
+            #[::async_trait::async_trait]
+            impl $crate::command::ModalCallable for Impl {
+                #[inline]
+                async fn on_modal<'ap: 'ev, 'ev>(
+                    &self,
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::CommandData>
+                    custom_id: $crate::utility::types::id::CustomId,
+                ) -> ::anyhow::Result<::std::primitive::bool>
+                {
+                    $modal_callback(context, custom_id).await
+                }
+            }
+        )?
+
+        $(
+            #[::async_trait::async_trait]
+            impl $crate::command::AutocompleteCallable for Impl {
+                #[inline]
+                async fn on_autocomplete<'ap: 'ev, 'ev>(
+                    &self,
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
+                    option: &'ev ::std::primitive::str,
+                    current: &'ev ::std::primitive::str,
+                    kind: ::twilight_model::application::command::CommandOptionType,
+                ) -> ::anyhow::Result<::std::primitive::bool>
+                {
+                    $autocomplete_callback(context, option, current, kind).await
+                }
+            }
+        )?
+
+        /// Registers this command within the registry.
+        ///
+        /// # Errors
+        ///
+        /// This function will return an error if the command has already been registered.
+        #[inline]
+        pub async fn register() -> ::anyhow::Result<()> {
+            $crate::command::registry_mut().await.register(self::entry())
+        }
+
+        /// Returns this command's registry entry.
+        #[must_use = "command entries should be registered"]
+        pub fn entry() -> $crate::command::CommandEntry {
+            #[allow(unused_mut)]
+            let mut entry = $crate::command::CommandEntry {
+                name: $name,
+                factory: ::std::boxed::Box::new(Impl),
+                callbacks: <$crate::command::CommandEntryCallbacks as ::std::default::Default>::default(),
+            };
+
+            $({
+                let _ = $command_callback;
+
+                entry.callbacks.command = ::std::option::Option::Some(::std::boxed::Box::new(Impl));
+            })?
+            $({
+                let _ = $component_callback;
+
+                entry.callbacks.component = ::std::option::Option::Some(::std::boxed::Box::new(Impl));
+            })?
+            $({
+                let _ = $modal_callback;
+
+                entry.callbacks.modal = ::std::option::Option::Some(::std::boxed::Box::new(Impl));
+            })?
+            $({
+                let _ = $autocomplete_callback;
+
+                entry.callbacks.autocomplete = ::std::option::Option::Some(::std::boxed::Box::new(Impl));
+            })?
+
+            entry
         }
     };
     (@option($entry:expr, $name:ident, $kind:ident, $locales:expr, {

@@ -145,44 +145,17 @@ pub async fn on_command(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
         bail!("missing command data");
     };
-    let Some(command) = crate::command::registry().await.command(&data.name).copied() else {
+
+    let registry = &crate::command::registry().await;
+
+    let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
     };
-    let Some(callback) = command.callbacks.command else {
+    let Some(ref callable) = command.callbacks.command else {
         bail!("missing command callback for '{}'", data.name);
     };
 
-    (callback)(Context::new(api.as_ref(), event, data)).await
-}
-
-/// Handles an autocomplete [`Interaction`] event.
-///
-/// # Errors
-///
-/// This function will return an error if the event could not be handled.
-pub async fn on_autocomplete(api: Api, event: &Interaction) -> Result<bool> {
-    let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
-        bail!("missing command data");
-    };
-    let Some(command) = crate::command::registry().await.command(&data.name).copied() else {
-        bail!("missing command entry for '{}'", data.name);
-    };
-    let Some(callback) = command.callbacks.autocomplete else {
-        bail!("missing autocomplete callback for '{}'", data.name);
-    };
-    let Some((name, text, kind)) = crate::command::find_focused_option(&data.options) else {
-        bail!("missing focused option for '{}'", data.name);
-    };
-
-    let choices = (callback)(Context::new(api.as_ref(), event, data), name, text, kind).await?;
-
-    crate::create_response!(api.client, event, struct {
-        kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
-        choices: choices,
-    })
-    .await?;
-
-    Ok(false)
+    callable.on_command(Context::new(api.as_ref(), event, data)).await
 }
 
 /// Handles a component [`Interaction`] event.
@@ -194,16 +167,18 @@ pub async fn on_component(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::MessageComponent(ref data)) = event.data else {
         bail!("missing component data");
     };
-    let data_id = data.custom_id.parse::<CustomId>()?;
 
-    let Some(command) = crate::command::registry().await.command(data_id.name()).copied() else {
+    let data_id = data.custom_id.parse::<CustomId>()?;
+    let registry = &crate::command::registry().await;
+
+    let Some(command) = registry.command(data_id.name()) else {
         bail!("missing command entry for '{}'", data_id.name());
     };
-    let Some(callback) = command.callbacks.component else {
+    let Some(ref callable) = command.callbacks.component else {
         bail!("missing component callback for '{}'", data_id.name());
     };
 
-    (callback)(Context::new(api.as_ref(), event, data), data_id).await
+    callable.on_component(Context::new(api.as_ref(), event, data), data_id).await
 }
 
 /// Handles a modal [`Interaction`] event.
@@ -215,14 +190,49 @@ pub async fn on_modal(api: Api, event: &Interaction) -> Result<bool> {
     let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
         bail!("missing modal data");
     };
-    let data_id = data.custom_id.parse::<CustomId>()?;
 
-    let Some(command) = crate::command::registry().await.command(data_id.name()).copied() else {
+    let data_id = data.custom_id.parse::<CustomId>()?;
+    let registry = &crate::command::registry().await;
+
+    let Some(command) = registry.command(data_id.name()) else {
         bail!("missing command entry for '{}'", data_id.name());
     };
-    let Some(callback) = command.callbacks.modal else {
+    let Some(ref callback) = command.callbacks.modal else {
         bail!("missing component callback for '{}'", data_id.name());
     };
 
-    (callback)(Context::new(api.as_ref(), event, data), data_id).await
+    callback.on_modal(Context::new(api.as_ref(), event, data), data_id).await
+}
+
+/// Handles an autocomplete [`Interaction`] event.
+///
+/// # Errors
+///
+/// This function will return an error if the event could not be handled.
+pub async fn on_autocomplete(api: Api, event: &Interaction) -> Result<bool> {
+    let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
+        bail!("missing command data");
+    };
+
+    let registry = &crate::command::registry().await;
+
+    let Some(command) = registry.command(&data.name) else {
+        bail!("missing command entry for '{}'", data.name);
+    };
+    let Some(ref callback) = command.callbacks.autocomplete else {
+        bail!("missing autocomplete callback for '{}'", data.name);
+    };
+    let Some((name, text, kind)) = crate::command::find_focused_option(&data.options) else {
+        bail!("missing focused option for '{}'", data.name);
+    };
+
+    let choices = callback.on_autocomplete(Context::new(api.as_ref(), event, data), name, text, kind).await?;
+
+    crate::create_response!(api.client, event, struct {
+        kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
+        choices: choices,
+    })
+    .await?;
+
+    Ok(false)
 }
