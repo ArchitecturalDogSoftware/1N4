@@ -31,9 +31,18 @@ pub mod category {
     /// The command information category.
     pub const COMMAND: &str = "command";
     /// The option information category.
-    pub const OPTION: &str = "option";
+    pub const COMMAND_OPTION: &str = "command-option";
     /// The choice information category.
-    pub const CHOICE: &str = "choice";
+    pub const COMMAND_CHOICE: &str = "command-choice";
+
+    /// The user interface category.
+    pub const UI: &str = "ui";
+    /// The button category.
+    pub const UI_BUTTON: &str = "ui-button";
+    /// The select category.
+    pub const UI_SELECT: &str = "ui-select";
+    /// The input category.
+    pub const UI_INPUT: &str = "ui-input";
 }
 
 /// Color constants.

@@ -464,8 +464,8 @@ macro_rules! define_command {
         let mut localized_descriptions = ::std::vec::Vec::with_capacity($locales.len());
 
         for locale in $locales {
-            let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) $crate::utility::category::OPTION, &(*localizer_name_key)).await?);
-            let description = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) $crate::utility::category::OPTION, &(*localizer_description_key)).await?);
+            let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) $crate::utility::category::COMMAND_OPTION, &(*localizer_name_key)).await?);
+            let description = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) $crate::utility::category::COMMAND_OPTION, &(*localizer_description_key)).await?);
 
             localized_names.push((<_ as ::std::string::ToString>::to_string(locale), name));
             localized_descriptions.push((<_ as ::std::string::ToString>::to_string(locale), description));
@@ -481,7 +481,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::AttachmentBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -490,7 +490,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::BooleanBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -500,7 +500,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::ChannelBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.channel_types($channel_types))?
@@ -514,7 +514,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::IntegerBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.autocomplete($autocomplete))?
@@ -527,7 +527,7 @@ macro_rules! define_command {
                 let mut localized = ::std::vec::Vec::with_capacity($locales.len());
 
                 for locale in $locales {
-                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) $crate::utility::category::CHOICE, &(*localizer_key)).await?);
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) $crate::utility::category::COMMAND_CHOICE, &(*localizer_key)).await?);
 
                     localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
                 }
@@ -541,7 +541,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::MentionableBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -554,7 +554,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::NumberBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.autocomplete($autocomplete))?
@@ -581,7 +581,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::RoleBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -594,7 +594,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::StringBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.autocomplete($autocomplete))?
@@ -621,7 +621,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::SubCommandBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.option($crate::define_command!(@option($entry, $option_name, $option_kind, $locales, { $($body)* }))))*
     }};
@@ -630,7 +630,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::SubCommandGroupBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         .subcommands([$($crate::define_command!(@option($entry, $option_name, $option_kind, $locales, { $($body)* }))),*])
     }};
@@ -639,7 +639,7 @@ macro_rules! define_command {
     })) => {{
         ::twilight_util::builder::command::UserBuilder::new(
             $name,
-            ::ina_localization::localize!(async $crate::utility::category::OPTION, $name_key.as_str()).await?
+            ::ina_localization::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
