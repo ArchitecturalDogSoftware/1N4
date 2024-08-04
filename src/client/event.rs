@@ -23,6 +23,7 @@ use twilight_model::http::interaction::InteractionResponseType;
 
 use super::api::Api;
 use crate::command::context::Context;
+use crate::utility::traits::extension::InteractionExt;
 use crate::utility::types::id::CustomId;
 
 /// Handles an event.
@@ -75,11 +76,14 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool>
         _ => Ok(false),
     };
 
-    if let Err(error) = result {
-        warn!(async "failed to handle event: {error}").await?;
-    }
+    match result {
+        Ok(should_close) => Ok(should_close),
+        Err(error) => {
+            warn!(async "failed to handle event: {error}").await?;
 
-    Ok(false)
+            Ok(false)
+        }
+    }
 }
 
 /// Handles a [`Ready`] event.
@@ -117,7 +121,7 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool>
 ///
 /// This function will return an error if the event could not be handled.
 pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> Result<bool> {
-    info!(async "shard #{} received interaction #{}", shard_id.number(), event.id).await?;
+    info!(async "shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
 
     let result: Result<bool> = match event.kind {
         InteractionType::ApplicationCommand => self::on_command(api, &event).await,
@@ -128,9 +132,9 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
     };
 
     if let Err(ref error) = result {
-        warn!(async "shard #{} failed interaction #{} - {error}", shard_id.number(), event.id).await?;
+        warn!(async "shard #{} failed interaction {} - {error}", shard_id.number(), event.display_label()).await?;
     } else {
-        info!(async "shard #{} succeeded interaction #{}", shard_id.number(), event.id).await?;
+        info!(async "shard #{} succeeded interaction {}", shard_id.number(), event.display_label()).await?;
     }
 
     result
