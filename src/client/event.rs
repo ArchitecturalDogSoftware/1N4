@@ -230,11 +230,15 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> Result<bool> {
         bail!("missing focused option for '{}'", data.name);
     };
 
-    let choices = callback.on_autocomplete(Context::new(api.as_ref(), event, data), name, text, kind).await?;
+    let context = Context::new(api.as_ref(), event, &(**data));
+    let mut choices = callback.on_autocomplete(context, name, text, kind).await?.to_vec();
+
+    choices.dedup_by_key(|c| c.value.clone());
+    choices.sort_unstable_by_key(|c| c.name.clone());
 
     crate::create_response!(api.client, event, struct {
         kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
-        choices: choices,
+        choices: choices.into_iter().take(10),
     })
     .await?;
 
