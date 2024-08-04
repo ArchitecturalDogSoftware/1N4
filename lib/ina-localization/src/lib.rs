@@ -45,12 +45,18 @@ pub enum Error<S = Infallible> {
     /// A TOML deserializing error.
     #[error(transparent)]
     FromToml(#[from] toml::de::Error),
+    /// An invalid character was given.
+    #[error("an invalid character was provided: {0}")]
+    InvalidCharacter(char),
     /// An invalid locale was given.
-    #[error("an invalid locale was provided")]
-    InvalidLocale,
+    #[error("an invalid locale was provided: {0}")]
+    InvalidLocale(Box<str>),
     /// An IO error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    /// An expected character was missing.
+    #[error("an expected character was missing")]
+    MissingCharacter,
     /// A locale was missing.
     #[error("a requested locale was missing")]
     MissingLocale,

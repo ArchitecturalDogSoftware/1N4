@@ -365,8 +365,10 @@ impl From<Error<Infallible>> for Error<(Option<usize>, (Arc<RwLock<Localizer>>, 
     fn from(value: Error<Infallible>) -> Self {
         match value {
             Error::FromToml(error) => Self::FromToml(error),
-            Error::InvalidLocale => Self::InvalidLocale,
+            Error::InvalidCharacter(character) => Self::InvalidCharacter(character),
+            Error::InvalidLocale(locale) => Self::InvalidLocale(locale),
             Error::Io(error) => Self::Io(error),
+            Error::MissingCharacter => Self::MissingCharacter,
             Error::MissingLocale => Self::MissingLocale,
             Error::MissingTranslation => Self::MissingTranslation,
             Error::Send(_) => unreachable!(),
