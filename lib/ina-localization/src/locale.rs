@@ -90,7 +90,7 @@ impl Display for Locale {
         write!(f, "{}", self.language())?;
 
         if let Some(territory) = self.territory() {
-            write!(f, "{territory}")?;
+            write!(f, "-{territory}")?;
         }
 
         Ok(())

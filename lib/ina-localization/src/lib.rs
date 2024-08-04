@@ -52,10 +52,10 @@ pub enum Error<S = Infallible> {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     /// A locale was missing.
-    #[error("an requested locale was missing")]
+    #[error("a requested locale was missing")]
     MissingLocale,
     /// A translation was missing.
-    #[error("an requested translation was missing")]
+    #[error("a requested translation was missing")]
     MissingTranslation,
     /// A sending error.
     #[error(transparent)]
@@ -185,7 +185,7 @@ impl Localizer {
         while let Some(entry) = iterator.next_entry().await? {
             let metadata = entry.metadata().await?;
 
-            if metadata.is_file() {
+            if !metadata.is_file() {
                 continue;
             }
 
