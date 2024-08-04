@@ -33,7 +33,7 @@ Model No. '4D343144FE0FFE0FFE0F' rev. 2.\
 """
 
 help-global = "Global commands"
-help-guild = "Guild commands"
+help-guild = "Server commands"
 help-missing = "No commands found."
 
 help-tag-subcommands = "Has sub-commands"

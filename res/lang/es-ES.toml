@@ -1,0 +1,48 @@
+[command]
+help-name = "ayuda"
+help-description = "Muestra una lista de los comandos disponibles."
+localizer-name = "traductor"
+localizer-description = "Proporciona acceso al traductor del bot."
+ping-name = "ping"
+ping-description = "Calcula el tiempo de respuesta aproximado del bot."
+
+[command-option]
+localizer-reload-name = "actualizar"
+localizer-reload-description = "Actualiza las configuraciones regionales cargadas del traductor."
+
+localizer-localize-name = "traducir"
+localizer-localize-description = "Traduce la clave dada en la categoría especificada."
+localizer-locale-name = "regional"
+localizer-locale-description = "La configuración regional de destino."
+localizer-category-name = "categoría"
+localizer-category-description = "La categoría de traducción."
+localizer-key-name = "clave"
+localizer-key-description = "La clave de traducción."
+
+[ui]
+help-title = "Listado de Comandos de 1N4"
+help-header = """\
+¡Gracias por usar 1N4! Estoy feliz de ser de servicio.
+A continuación se muestra una lista de todos los comandos que están disponsibles para usted.
+
+Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/Jaxydog/1N4/issues).\
+"""
+help-footer = """\
+Propiedad de Arden Inc., versión %V+neon.
+Número de Modelo. '4D343144FE0FFE0FFE0F' cor. 2.\
+"""
+
+help-global = "Comandos globales"
+help-guild = "Comandos del servidor"
+help-missing = "No se han encontrado comandos."
+
+help-tag-subcommands = "Tiene subcomandos"
+help-tag-dms = "Utilizable en mensajes directos"
+help-tag-nsfw = "NSFW"
+
+localizer-reloaded = "¡Actualizado!"
+localizer-locales = "Configuraciones regionales"
+localizer-unknown = "Configuración regional desconocida"
+
+ping-start = "Calculando..."
+ping-finish = "Operación exitosa!"
