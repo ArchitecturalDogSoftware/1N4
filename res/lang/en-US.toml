@@ -1,6 +1,8 @@
 [command]
 help-name = "help"
 help-description = "Displays a list of available commands."
+ping-name = "ping"
+ping-description = "Calculates the bot's approximate response time."
 
 [ui]
 help-title = "1N4 Command Listing"
@@ -22,3 +24,6 @@ help-missing = "No commands found."
 help-tag-subcommands = "Has sub-commands"
 help-tag-dms = "Usable in DMs"
 help-tag-nsfw = "NSFW"
+
+ping-start = "Calculating..."
+ping-finish = "Operation successful!"
