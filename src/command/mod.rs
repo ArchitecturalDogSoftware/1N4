@@ -41,6 +41,8 @@ pub mod resolver;
 pub mod definition {
     /// The help command.
     pub mod help;
+    /// The localizer command.
+    pub mod localizer;
     /// The ping command.
     pub mod ping;
 }
@@ -246,6 +248,7 @@ pub async fn initialize() -> Result<()> {
     let mut registry = self::registry_mut().await;
 
     registry.register(self::definition::help::entry())?;
+    registry.register(self::definition::localizer::entry())?;
     registry.register(self::definition::ping::entry())?;
 
     drop(registry);

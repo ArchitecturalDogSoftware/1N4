@@ -1,8 +1,23 @@
 [command]
 help-name = "help"
 help-description = "Displays a list of available commands."
+localizer-name = "localizer"
+localizer-description = "Provides access to the bot's localizer."
 ping-name = "ping"
 ping-description = "Calculates the bot's approximate response time."
+
+[command-option]
+localizer-reload-name = "reload"
+localizer-reload-description = "Reloads the localizer's loaded locales."
+
+localizer-localize-name = "localize"
+localizer-localize-description = "Localizes the given key in the specified category."
+localizer-locale-name = "locale"
+localizer-locale-description = "The target locale."
+localizer-category-name = "category"
+localizer-category-description = "The translation category."
+localizer-key-name = "key"
+localizer-key-description = "The translation key."
 
 [ui]
 help-title = "1N4 Command Listing"
@@ -24,6 +39,10 @@ help-missing = "No commands found."
 help-tag-subcommands = "Has sub-commands"
 help-tag-dms = "Usable in DMs"
 help-tag-nsfw = "NSFW"
+
+localizer-reloaded = "Reloaded!"
+localizer-locales = "Locales"
+localizer-unknown = "Unknown locale"
 
 ping-start = "Calculating..."
 ping-finish = "Operation successful!"

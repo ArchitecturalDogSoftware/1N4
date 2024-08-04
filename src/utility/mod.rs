@@ -26,23 +26,27 @@ pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";
 /// The base twemoji CDN URL.
 pub const TWEMOJI_CDN_URL: &str = "https://raw.githubusercontent.com/discord/twemoji/main/assets/72x72";
 
-/// Localizer category constants.
-pub mod category {
-    /// The command information category.
-    pub const COMMAND: &str = "command";
-    /// The option information category.
-    pub const COMMAND_OPTION: &str = "command-option";
-    /// The choice information category.
-    pub const COMMAND_CHOICE: &str = "command-choice";
+macro_rules! define_categories {
+    ($($name:ident => $value:literal;)*) => {
+        /// Localizer category constants.
+        #[allow(missing_docs)]
+        pub mod category {
+            pub const LIST: &[&str] = &[$(self::$name),*];
 
-    /// The user interface category.
-    pub const UI: &str = "ui";
-    /// The button category.
-    pub const UI_BUTTON: &str = "ui-button";
-    /// The select category.
-    pub const UI_SELECT: &str = "ui-select";
-    /// The input category.
-    pub const UI_INPUT: &str = "ui-input";
+            $(pub const $name: &str = $value;)*
+        }
+    };
+}
+
+define_categories! {
+    COMMAND => "command";
+    COMMAND_OPTION => "command-option";
+    COMMAND_CHOICE => "command-choice";
+
+    UI => "ui";
+    UI_BUTTON => "ui-button";
+    UI_SELECT => "ui-select";
+    UI_INPUT => "ui-input";
 }
 
 /// Color constants.
