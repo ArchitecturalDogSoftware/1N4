@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use anyhow::{bail, Result};
 use ina_localization::{localize, Locale};
 use ina_logging::{info, warn};
@@ -151,14 +153,14 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
             Ok(choices.collect())
         }
         "category" => {
-            let mut categories: Vec<String> = category::LIST.iter().copied().map(Into::into).collect();
+            let mut categories: HashSet<String> = category::LIST.iter().copied().map(Into::into).collect();
 
             if !current.is_empty() {
                 categories.retain(|c| self::fuzzy_contains(c, current));
 
                 let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
 
-                categories.push(replaced);
+                categories.insert(replaced);
             }
 
             let choices = categories.into_iter().map(|name| {
