@@ -1,0 +1,24 @@
+[command]
+help-name = "help"
+help-description = "Displays a list of available commands."
+
+[ui]
+help-title = "1N4 Command Listing"
+help-header = """\
+Thank you for using 1N4! I'm happy to be of service.
+Below is a list of all commands that are available to you.
+
+If you encounter any issues, please report them through our [issue tracker](https://github.com/Jaxydog/1N4/issues).\
+"""
+help-footer = """\
+Property of Arden Inc., version %V+neon.
+Model No. '4D343144FE0FFE0FFE0F' rev. 2.\
+"""
+
+help-global = "Global commands"
+help-guild = "Guild commands"
+help-missing = "No commands found."
+
+help-tag-subcommands = "Has sub-commands"
+help-tag-dms = "Usable in DMs"
+help-tag-nsfw = "NSFW"

@@ -16,6 +16,8 @@
 
 //! Your resident M41D Unit, here to help with your server.
 
+#![feature(is_none_or)]
+
 use anyhow::Result;
 use clap::Parser;
 use client::Instance;

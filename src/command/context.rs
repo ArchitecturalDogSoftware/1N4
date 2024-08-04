@@ -15,8 +15,10 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Display;
+use std::str::FromStr;
 
 use anyhow::{ensure, Result};
+use ina_localization::Locale;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
@@ -26,6 +28,7 @@ use twilight_model::channel::message::{Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
 
 use crate::client::api::ApiRef;
+use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::modal::ModalData;
 
 /// A command interaction context.
@@ -219,6 +222,27 @@ where
         self.is_completed = true;
 
         Ok(())
+    }
+}
+
+impl<'ar: 'ev, 'ev, T> AsLocale for Context<'ar, 'ev, T>
+where
+    T: Send,
+{
+    type Error = <Locale as FromStr>::Err;
+
+    // Check in the following order:
+    // 1. interaction locale
+    // 2. user locale
+    // 3. guild locale
+    fn as_locale(&self) -> Result<Locale, Self::Error> {
+        self.interaction
+            .locale
+            .as_deref()
+            .or_else(|| self.interaction.author().and_then(|u| u.locale.as_deref()))
+            .or(self.interaction.guild_locale.as_deref())
+            .map(str::parse)
+            .ok_or(ina_localization::Error::MissingLocale)?
     }
 }
 

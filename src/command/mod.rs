@@ -241,9 +241,9 @@ pub async fn registry_mut() -> impl DerefMut<Target = CommandRegistry> {
 ///
 /// This function will return an error if a command fails to be registered.
 pub async fn initialize() -> Result<()> {
-    let registry = self::registry_mut().await;
+    let mut registry = self::registry_mut().await;
 
-    // TODO: Implement commands and register them here.
+    registry.register(self::definition::help::entry())?;
 
     drop(registry);
 
@@ -406,16 +406,6 @@ macro_rules! define_command {
                 }
             }
         )?
-
-        /// Registers this command within the registry.
-        ///
-        /// # Errors
-        ///
-        /// This function will return an error if the command has already been registered.
-        #[inline]
-        pub async fn register() -> ::anyhow::Result<()> {
-            $crate::command::registry_mut().await.register(self::entry())
-        }
 
         /// Returns this command's registry entry.
         #[must_use = r"command entries should be registered"]
