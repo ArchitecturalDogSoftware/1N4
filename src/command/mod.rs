@@ -352,7 +352,7 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_command<'ap: 'ev, 'ev>(
                     &self,
-                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
                 ) -> ::anyhow::Result<::std::primitive::bool>
                 {
                     $command_callback(context).await
@@ -366,7 +366,7 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_component<'ap: 'ev, 'ev>(
                     &self,
-                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::CommandData>
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
                     custom_id: $crate::utility::types::id::CustomId,
                 ) -> ::anyhow::Result<::std::primitive::bool>
                 {
@@ -381,7 +381,7 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_modal<'ap: 'ev, 'ev>(
                     &self,
-                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::CommandData>
+                    context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
                     custom_id: $crate::utility::types::id::CustomId,
                 ) -> ::anyhow::Result<::std::primitive::bool>
                 {
@@ -400,7 +400,7 @@ macro_rules! define_command {
                     option: &'ev ::std::primitive::str,
                     current: &'ev ::std::primitive::str,
                     kind: ::twilight_model::application::command::CommandOptionType,
-                ) -> ::anyhow::Result<::std::primitive::bool>
+                ) -> ::anyhow::Result<::std::boxed::Box<[::twilight_model::application::command::CommandOptionChoice]>>
                 {
                     $autocomplete_callback(context, option, current, kind).await
                 }
