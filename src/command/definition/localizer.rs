@@ -28,7 +28,7 @@ use twilight_util::builder::embed::EmbedBuilder;
 use crate::command::context::Context;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::AsLocale;
-use crate::utility::{category, color};
+use crate::utility::{category, color, fuzzy_contains, Strictness};
 
 crate::define_command!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
@@ -51,14 +51,6 @@ crate::define_command!("localizer", CommandType::ChatInput, struct {
         },
     },
 });
-
-/// Returns whether `current` is contained within `source`, ignoring casing and symbols.
-fn fuzzy_contains(source: &str, current: &str) -> bool {
-    let source = source.to_lowercase().replace(|c: char| !c.is_alphanumeric(), "");
-    let current = current.to_lowercase().replace(|c: char| !c.is_alphanumeric(), "");
-
-    source.contains(&current)
-}
 
 /// Executes the command.
 ///
@@ -142,7 +134,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
         "locale" => {
             let mut locales = ina_localization::thread::list().await?.to_vec();
 
-            locales.retain(|l| self::fuzzy_contains(&l.to_string(), current));
+            locales.retain(|l| fuzzy_contains(Strictness::Firm(true), l.to_string(), current));
 
             let choices = locales.iter().map(|locale| CommandOptionChoice {
                 name: locale.to_string(),
@@ -156,7 +148,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
             let mut categories: HashSet<String> = category::LIST.iter().copied().map(Into::into).collect();
 
             if !current.is_empty() {
-                categories.retain(|c| self::fuzzy_contains(c, current));
+                categories.retain(|c| fuzzy_contains(Strictness::Firm(true), c, current));
 
                 let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
                 let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
