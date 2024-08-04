@@ -214,7 +214,11 @@ impl Localizer {
         key: &'ag str,
     ) -> Result<Translation<'lc, 'ag>> {
         let Some(translations) = self.locales.get(&locale) else {
-            return self.settings.miss_behavior.call(category, key);
+            if self.settings.default_locale == locale {
+                return self.settings.miss_behavior.call(category, key);
+            }
+
+            return self.get(self.settings.default_locale, category, key);
         };
 
         translations.get_inherited(self.settings.miss_behavior, &self.locales, category, key)
