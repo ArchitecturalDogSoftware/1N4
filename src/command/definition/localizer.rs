@@ -144,10 +144,10 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
 
             locales.retain(|l| self::fuzzy_contains(&l.to_string(), current));
 
-            let choices = locales.iter().map(|l| {
-                let value = CommandOptionChoiceValue::String(l.to_string());
-
-                CommandOptionChoice { name: l.to_string(), name_localizations: None, value }
+            let choices = locales.iter().map(|locale| CommandOptionChoice {
+                name: locale.to_string(),
+                name_localizations: None,
+                value: CommandOptionChoiceValue::String(locale.to_string()),
             });
 
             Ok(choices.collect())
@@ -159,14 +159,17 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
                 categories.retain(|c| self::fuzzy_contains(c, current));
 
                 let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
+                let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
 
-                categories.insert(replaced);
+                if !replaced.is_empty() {
+                    categories.insert(replaced.to_string());
+                }
             }
 
-            let choices = categories.into_iter().map(|name| {
-                let value = CommandOptionChoiceValue::String(name.clone());
-
-                CommandOptionChoice { name, name_localizations: None, value }
+            let choices = categories.into_iter().map(|category| CommandOptionChoice {
+                name: category.clone(),
+                name_localizations: None,
+                value: CommandOptionChoiceValue::String(category),
             });
 
             Ok(choices.collect())
@@ -174,17 +177,19 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
         "key" if current.is_empty() => Ok(Box::new([])),
         "key" => {
             let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
-
-            Ok(Box::new([CommandOptionChoice {
-                name: replaced.clone(),
+            let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
+            let output = (!replaced.is_empty()).then(|| CommandOptionChoice {
+                name: replaced.to_string(),
                 name_localizations: None,
-                value: CommandOptionChoiceValue::String(replaced),
-            }]))
+                value: CommandOptionChoiceValue::String(replaced.to_string()),
+            });
+
+            Ok(output.into_iter().collect())
         }
         option => {
             warn!(async "unknown option '{option}'").await?;
 
-            Ok(Box::default())
+            Ok(Box::new([]))
         }
     }
 }
