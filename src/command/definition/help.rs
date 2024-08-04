@@ -17,6 +17,7 @@
 use anyhow::Result;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
+use twilight_model::channel::ChannelType;
 use twilight_model::guild::Permissions;
 
 use crate::command::context::Context;
@@ -27,7 +28,56 @@ crate::define_command!("help", CommandType::ChatInput, struct {
     permissions: Permissions::USE_SLASH_COMMANDS,
 }, struct {
     command_callback: _on_command,
-}, struct {});
+}, struct {
+    image: Attachment {
+        required: true,
+    },
+    flag: Boolean {
+        required: true,
+    },
+    channel: Channel {
+        required: false,
+        channel_types: [ChannelType::GuildText],
+    },
+    numbers: Integer {
+        required: true,
+        autocomplete: false,
+        minimum: 0,
+        maximum: 2,
+        choices: [("zero", 0), ("one", 1), ("two", 2)],
+    },
+    percentages: Number {
+        required: true,
+        autocomplete: false,
+        minimum: 0.0,
+        maximum: 1.0,
+        choices: [("zero", 0.0), ("half", 0.5), ("one", 1.0)],
+    },
+    role: Role {
+        required: false,
+    },
+    options: String {
+        required: true,
+        autocomplete: false,
+        minimum: 1,
+        maximum: 100,
+        choices: [("quiet", "quiet"), ("loud", "loud")],
+    },
+    other_command: SubCommand {
+        inner_option: Integer {
+            required: true,
+            minimum: 0,
+            maximum: 128,
+        },
+    },
+    command_group: SubCommandGroup {
+        command_a: SubCommand {},
+        command_b: SubCommand {},
+    },
+    user: User {
+        required: false,
+    },
+});
 
 async fn _on_command<'ap: 'ev, 'ev>(_context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool> {
     ina_logging::debug!(async "test async call").await?;

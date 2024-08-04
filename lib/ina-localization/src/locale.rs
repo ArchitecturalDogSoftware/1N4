@@ -78,6 +78,13 @@ impl TryFrom<[char; 4]> for Locale {
     }
 }
 
+impl From<Locale> for String {
+    #[inline]
+    fn from(value: Locale) -> Self {
+        value.to_string()
+    }
+}
+
 impl Display for Locale {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.language())?;

@@ -114,6 +114,16 @@ where
     }
 }
 
+impl<T> From<OwnedTranslation<T>> for String
+where
+    T: Deref<Target = str>,
+{
+    #[inline]
+    fn from(value: OwnedTranslation<T>) -> Self {
+        value.to_string()
+    }
+}
+
 impl<T> Display for OwnedTranslation<T>
 where
     T: Deref<Target = str>,

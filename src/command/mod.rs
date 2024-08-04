@@ -229,6 +229,23 @@ where
 }
 
 /// Creates a command.
+///
+/// # Examples
+///
+/// ```
+/// define_command!("help", CommandType::ChatInput, struct {
+///     dev_only: false,
+///     allow_dms: true,
+///     is_nsfw: false,
+///     permissions: Permissions::USE_SLASH_COMMANDS,
+/// }, struct {
+///     command_callback: command,
+/// }, struct {
+///     ephemeral: Boolean {
+///         required: true,
+///     }
+/// });
+/// ```
 #[macro_export]
 macro_rules! define_command {
     (
@@ -278,11 +295,12 @@ macro_rules! define_command {
                 let localizer_name_key = ::std::format!("{}-name", entry.name);
                 let localizer_description_key = ::std::format!("{}-description", entry.name);
 
-                let localized_name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async "command", &(*localizer_description_key)).await?);
-                let mut builder = ::twilight_util::builder::command::CommandBuilder::new(entry.name, localized_name, $type)
-                    $(.dm_permission($allow_dms))?
-                    $(.nsfw($is_nsfw))?
-                    $(.default_member_permissions($permissions))?;
+                let localized_name = ::ina_localization::localize!(async "command", &(*localizer_description_key)).await?;
+                let mut builder = ::twilight_util::builder::command::CommandBuilder::new(entry.name, localized_name, $type);
+
+                $(builder = builder.dm_permission($allow_dms);)?
+                $(builder = builder.nsfw($is_nsfw);)?
+                $(builder = builder.default_member_permissions($permissions);)?
 
                 if let ::std::option::Option::Some(guild_id) = guild_id {
                     builder = builder.guild_id(guild_id);
@@ -292,18 +310,213 @@ macro_rules! define_command {
                 let mut localized_names = ::std::vec::Vec::with_capacity(locales.len());
                 let mut localized_descriptions = ::std::vec::Vec::with_capacity(locales.len());
 
-                for locale in locales {
-                    localized_names.push((locale.to_string(), ::ina_localization::localize!(async(in locale) "command", &(*localizer_name_key)).await?.to_string()));
-                    localized_descriptions.push((locale.to_string(), ::ina_localization::localize!(async(in locale) "command", &(*localizer_description_key)).await?.to_string()));
+                for locale in &locales {
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "command", &(*localizer_name_key)).await?);
+                    let description = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "command", &(*localizer_description_key)).await?);
+
+                    localized_names.push((<_ as ::std::string::ToString>::to_string(locale), name));
+                    localized_descriptions.push((<_ as ::std::string::ToString>::to_string(locale), description));
                 }
 
                 builder = builder.name_localizations(localized_names);
                 builder = builder.description_localizations(localized_descriptions);
 
-                $(builder = builder.option($crate::define_command!(@option(entry, $option_name, $option_type, { $($body)* })));)*
+                $(builder = builder.option($crate::define_command!(@option(entry, $option_name, $option_kind, &locales, { $($body)* })));)*
 
                 ::std::result::Result::Ok(::std::option::Option::Some(builder.validate()?.build()))
             })
         }
     };
+    (@option($entry:expr, $name:ident, $kind:ident, $locales:expr, {
+        $($body:tt)*
+    })) => {{
+        let name = ::std::stringify!($name);
+        let localizer_name_key = ::std::format!("{}-{name}-name", $entry.name);
+        let localizer_description_key = ::std::format!("{}-{name}-description", $entry.name);
+
+        let mut builder = $crate::define_command!(@option<$kind>($entry, name, &localizer_name_key, $locales, { $($body)* }));
+
+        let mut localized_names = ::std::vec::Vec::with_capacity($locales.len());
+        let mut localized_descriptions = ::std::vec::Vec::with_capacity($locales.len());
+
+        for locale in $locales {
+            let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "option", &(*localizer_name_key)).await?);
+            let description = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "option", &(*localizer_description_key)).await?);
+
+            localized_names.push((<_ as ::std::string::ToString>::to_string(locale), name));
+            localized_descriptions.push((<_ as ::std::string::ToString>::to_string(locale), description));
+        }
+
+        builder = builder.name_localizations(localized_names);
+        builder = builder.description_localizations(localized_descriptions);
+
+        builder
+    }};
+    (@option<Attachment>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+    })) => {{
+        ::twilight_util::builder::command::AttachmentBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+    }};
+    (@option<Boolean>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+    })) => {{
+        ::twilight_util::builder::command::BooleanBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+    }};
+    (@option<Channel>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+        $(channel_types: $channel_types:expr,)?
+    })) => {{
+        ::twilight_util::builder::command::ChannelBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+        $(.channel_types($channel_types))?
+    }};
+    (@option<Integer>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+        $(autocomplete: $autocomplete:expr,)?
+        $(minimum: $minimum:expr,)?
+        $(maximum: $maximum:expr,)?
+        $(choices: [$(($choice_name:expr, $choice_value:expr)),+ $(,)?],)?
+    })) => {{
+        ::twilight_util::builder::command::IntegerBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+        $(.autocomplete($autocomplete))?
+        $(.min_value($minimum))?
+        $(.max_value($maximum))?
+        $(
+            .choices([$(($choice_name, $choice_value)),*])
+            $(.choice_localizations($choice_name, {
+                let localizer_key = ::std::format!("{}-{}-{}", $entry.name, $name, $choice_name);
+                let mut localized = ::std::vec::Vec::with_capacity($locales.len());
+
+                for locale in $locales {
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "choice", &(*localizer_key)).await?);
+
+                    localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
+                }
+
+                localized
+            }))*
+        )?
+    }};
+    (@option<Mentionable>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+    })) => {{
+        ::twilight_util::builder::command::MentionableBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+    }};
+    (@option<Number>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+        $(autocomplete: $autocomplete:expr,)?
+        $(minimum: $minimum:expr,)?
+        $(maximum: $maximum:expr,)?
+        $(choices: [$(($choice_name:expr, $choice_value:expr)),+ $(,)?],)?
+    })) => {{
+        ::twilight_util::builder::command::NumberBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+        $(.autocomplete($autocomplete))?
+        $(.min_value($minimum))?
+        $(.max_value($maximum))?
+        $(
+            .choices([$(($choice_name, $choice_value)),*])
+            $(.choice_localizations($choice_name, {
+                let localizer_key = ::std::format!("{}-{}-{}", $entry.name, $name, $choice_name);
+                let mut localized = ::std::vec::Vec::with_capacity($locales.len());
+
+                for locale in $locales {
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "choice", &(*localizer_key)).await?);
+
+                    localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
+                }
+
+                localized
+            }))*
+        )?
+    }};
+    (@option<Role>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+    })) => {{
+        ::twilight_util::builder::command::RoleBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+    }};
+    (@option<String>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+        $(autocomplete: $autocomplete:expr,)?
+        $(minimum: $minimum:expr,)?
+        $(maximum: $maximum:expr,)?
+        $(choices: [$(($choice_name:expr, $choice_value:expr)),+ $(,)?],)?
+    })) => {{
+        ::twilight_util::builder::command::StringBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+        $(.autocomplete($autocomplete))?
+        $(.min_length($minimum))?
+        $(.max_length($maximum))?
+        $(
+            .choices([$(($choice_name, $choice_value)),*])
+            $(.choice_localizations($choice_name, {
+                let localizer_key = ::std::format!("{}-{}-{}", $entry.name, $name, $choice_name);
+                let mut localized = ::std::vec::Vec::with_capacity($locales.len());
+
+                for locale in $locales {
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localization::localize!(async(in *locale) "choice", &(*localizer_key)).await?);
+
+                    localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
+                }
+
+                localized
+            }))*
+        )?
+    }};
+    (@option<SubCommand>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $($option_name:ident : $option_kind:ident { $($body:tt)* }),* $(,)?
+    })) => {{
+        ::twilight_util::builder::command::SubCommandBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.option($crate::define_command!(@option($entry, $option_name, $option_kind, $locales, { $($body)* }))))*
+    }};
+    (@option<SubCommandGroup>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $($option_name:ident : $option_kind:ident { $($body:tt)* }),* $(,)?
+    })) => {{
+        ::twilight_util::builder::command::SubCommandGroupBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        .subcommands([$($crate::define_command!(@option($entry, $option_name, $option_kind, $locales, { $($body)* }))),*])
+    }};
+    (@option<User>($entry:expr, $name:expr, $name_key:expr, $locales:expr, {
+        $(required: $required:expr,)?
+    })) => {{
+        ::twilight_util::builder::command::UserBuilder::new(
+            $name,
+            ::ina_localization::localize!(async "option", $name_key.as_str()).await?
+        )
+        $(.required($required))?
+    }};
 }
