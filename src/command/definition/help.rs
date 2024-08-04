@@ -18,6 +18,7 @@ use std::fmt::Write;
 
 use anyhow::Result;
 use ina_localization::{localize, Locale};
+use rand::{thread_rng, Rng};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::{PartialMember, Permissions, Role};
@@ -232,7 +233,7 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
     let embed = EmbedBuilder::new()
         .title(title)
         .author(author)
-        .color(color::BRANDING_A)
+        .color(if thread_rng().gen_bool(0.5) { color::BRANDING_A } else { color::BRANDING_B })
         .description(buffer)
         .footer(EmbedFooterBuilder::new(footer).build());
 
