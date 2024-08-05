@@ -1,4 +1,6 @@
 [command]
+echo-name = "echo"
+echo-description = "Echoes the given message."
 help-name = "help"
 help-description = "Displays a list of available commands."
 localizer-name = "localizer"
@@ -7,6 +9,9 @@ ping-name = "ping"
 ping-description = "Calculates the bot's approximate response time."
 
 [command-option]
+echo-content-name = "content"
+echo-content-description = "The message to echo."
+
 localizer-reload-name = "reload"
 localizer-reload-description = "Reloads the localizer's loaded locales."
 
@@ -20,6 +25,8 @@ localizer-key-name = "key"
 localizer-key-description = "The translation key."
 
 [ui]
+echo-done = "Message echoed."
+
 help-title = "1N4 Command Listing"
 help-header = """\
 Thank you for using 1N4! I'm happy to be of service.

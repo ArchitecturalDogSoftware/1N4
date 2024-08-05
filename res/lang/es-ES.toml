@@ -1,4 +1,6 @@
 [command]
+echo-name = "eco"
+echo-description = "Se hace eco del mensaje dado."
 help-name = "ayuda"
 help-description = "Muestra una lista de los comandos disponibles."
 localizer-name = "traductor"
@@ -7,6 +9,9 @@ ping-name = "ping"
 ping-description = "Calcula el tiempo de respuesta aproximado del bot."
 
 [command-option]
+echo-content-name = "contento"
+echo-content-description = "El mensaje para resonar."
+
 localizer-reload-name = "actualizar"
 localizer-reload-description = "Actualiza las configuraciones regionales cargadas del traductor."
 
@@ -20,6 +25,8 @@ localizer-key-name = "clave"
 localizer-key-description = "La clave de traducción."
 
 [ui]
+echo-done = "Mensaje resonante."
+
 help-title = "Listado de Comandos de 1N4"
 help-header = """\
 ¡Gracias por usar 1N4! Estoy feliz de ser de servicio.

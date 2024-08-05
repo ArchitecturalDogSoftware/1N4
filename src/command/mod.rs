@@ -39,6 +39,8 @@ pub mod context;
 pub mod resolver;
 /// Provides all defined commands.
 pub mod definition {
+    /// The echo command.
+    pub mod echo;
     /// The help command.
     pub mod help;
     /// The localizer command.
@@ -247,6 +249,7 @@ pub async fn registry_mut() -> impl DerefMut<Target = CommandRegistry> {
 pub async fn initialize() -> Result<()> {
     let mut registry = self::registry_mut().await;
 
+    registry.register(self::definition::echo::entry())?;
     registry.register(self::definition::help::entry())?;
     registry.register(self::definition::localizer::entry())?;
     registry.register(self::definition::ping::entry())?;
