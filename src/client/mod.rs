@@ -15,14 +15,14 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::future::Future;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use api::Api;
 use clap::Args;
-use ina_logging::warn;
+use ina_logging::{debug, warn};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
@@ -31,7 +31,9 @@ use twilight_gateway::{Config, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::Client;
 use twilight_model::gateway::connection_info::BotConnectionInfo;
 use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
+use twilight_model::gateway::payload::outgoing::UpdatePresence;
 use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status};
+use twilight_model::gateway::OpCode;
 
 /// Provides an API structure to be passed between functions.
 pub mod api;
@@ -59,13 +61,17 @@ pub struct Settings {
     /// The location of the file that determines the bot's status.
     #[arg(long = "status-file", default_value = "./res/status.toml")]
     pub status_file: Box<Path>,
+    /// The interval at which to refresh the bot's status in minutes.
+    #[arg(short = 'S', long = "status-interval", default_value = "30")]
+    pub status_interval: NonZeroU64,
+
     /// The number of shards to spawn.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[arg(short = 's', long = "shards")]
     pub shards: Option<NonZeroU32>,
     /// The interval at which to reshard in hours.
     #[arg(short = 'r', long = "reshard-interval", default_value = "8")]
-    pub reshard_interval: u64,
+    pub reshard_interval: NonZeroU64,
 }
 
 /// The bot's status definition schema.
@@ -75,6 +81,16 @@ pub struct StatusList {
     pub testing: Box<[StatusDefinition]>,
     /// The bot's release status definitions.
     pub release: Box<[StatusDefinition]>,
+}
+
+impl StatusList {
+    /// Returns a reference to a random status from this [`StatusList`].
+    #[must_use]
+    pub fn random(&self) -> &StatusDefinition {
+        let list = if cfg!(debug_assertions) { &self.testing } else { &self.release };
+
+        &list[thread_rng().gen_range(0 .. list.len())]
+    }
 }
 
 /// A status definition.
@@ -154,10 +170,7 @@ impl Instance {
     /// This function will return an error if the [`Config`] could not be created.
     pub fn new_config(token: String, status: Option<&StatusList>) -> Result<Config> {
         let payload = if let Some(status) = status {
-            let list = if cfg!(debug_assertions) { &status.testing } else { &status.release };
-            let index = thread_rng().gen_range(0 .. list.len());
-
-            Self::get_status(&list[index])?
+            Self::get_status(status.random())?
         } else {
             Self::get_status(&StatusDefinition::default())?
         };
@@ -228,7 +241,7 @@ impl Instance {
         settings: &Settings,
         status: Option<&StatusList>,
     ) -> Result<Box<[Shard]>> {
-        let seconds = settings.reshard_interval.saturating_mul(60 * 60);
+        let seconds = settings.reshard_interval.get().saturating_mul(60 * 60);
 
         tokio::time::sleep(Duration::from_secs(seconds)).await;
 
@@ -283,9 +296,11 @@ impl Instance {
     /// This function will return an error if the instance encounters an unhandled exception.
     pub async fn run(mut self) -> Result<()> {
         loop {
+            let mut senders = Vec::with_capacity(self.shards.len());
             let mut tasks = JoinSet::new();
 
             for shard in self.shards {
+                senders.push(shard.sender());
                 tasks.spawn(Self::run_shard(self.api.clone(), shard));
             }
 
@@ -293,12 +308,33 @@ impl Instance {
 
             tokio::pin!(shards);
 
+            let duration = Duration::from_secs(self.settings.status_interval.get().saturating_mul(60));
+            let mut status_interval = tokio::time::interval_at((Instant::now() + duration).into(), duration);
+
             loop {
                 tokio::select! {
                     // If the reshard is complete, restart the process loop.
                     shards = shards.as_mut() => {
                         self.shards = shards?;
                         break;
+                    }
+                    _ = status_interval.tick() => {
+                        let payload = if let Some(ref status) = self.status {
+                            Self::get_status(status.random())?
+                        } else {
+                            Self::get_status(&StatusDefinition::default())?
+                        };
+
+                        let presence = UpdatePresence {
+                            op: OpCode::PresenceUpdate,
+                            d: payload,
+                        };
+
+                        for sender in senders.iter().filter(|c| !c.is_closed()) {
+                            sender.command(&presence)?;
+                        }
+
+                        debug!(async "updated client presence").await?;
                     }
                     // If a task finishes and indicates that we should exit, return early.
                     Some(should_exit) = tasks.join_next() => match should_exit {
