@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use anyhow::{bail, Result};
+use anyhow::bail;
 use ina_localization::localize;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::Permissions;
 
+use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
@@ -52,9 +53,10 @@ crate::define_command!("echo", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool> {
-    let resolver = CommandOptionResolver::new(context.state);
-    let Some(ref channel) = context.interaction.channel else { bail!("this command must be used in a channel") };
+async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+    let Some(ref channel) = context.interaction.channel else {
+        bail!("this command must be used in a channel");
+    };
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -62,6 +64,7 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
         Err(error) => return Err(error.into()),
     };
 
+    let resolver = CommandOptionResolver::new(context.state);
     let message = resolver.get_str("content")?;
     let message: Box<[_]> = match resolver.get_i64("format").copied().unwrap_or(0) {
         1 => message.chars().map(|c| format!("0b{:b}", u32::from(c))).collect(),
@@ -74,5 +77,5 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
     context.api.client.create_message(channel.id).content(&message.join(" ")).await?;
     context.text(localize!(async(try in locale) category::UI, "echo-done").await?, true).await?;
 
-    Ok(false)
+    crate::client::event::pass()
 }

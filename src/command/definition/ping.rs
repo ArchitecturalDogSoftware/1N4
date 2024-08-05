@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
 use ina_localization::localize;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
 
+use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::traits::extension::IdExt;
@@ -36,7 +36,7 @@ crate::define_command!("ping", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool> {
+async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
         Err(ina_localization::Error::MissingLocale) => None,
@@ -55,5 +55,5 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
 
     context.client().update_response(&context.interaction.token).embeds(Some(&[embed.build()])).await?;
 
-    Ok(false)
+    crate::client::event::pass()
 }

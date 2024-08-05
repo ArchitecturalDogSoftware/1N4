@@ -22,6 +22,7 @@ use std::time::{Duration, Instant};
 use anyhow::Result;
 use api::Api;
 use clap::Args;
+use event::{EventOutput, EventResult};
 use ina_logging::{debug, warn};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -339,7 +340,7 @@ impl Instance {
                     // If a task finishes and indicates that we should exit, return early.
                     Some(should_exit) = tasks.join_next() => match should_exit {
                         // If we should exit, return early.
-                        Ok(Ok(true)) => return Ok(()),
+                        Ok(Ok(EventOutput::Exit)) => return Ok(()),
                         // If the task returns an error, return it.
                         Ok(Err(error)) => return Err(error),
                         // If the task fails to join from a panic, indicate an error.
@@ -357,7 +358,7 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if the shard's task fails.
-    pub(crate) async fn run_shard(api: Api, mut shard: Shard) -> Result<bool> {
+    pub(crate) async fn run_shard(api: Api, mut shard: Shard) -> EventResult {
         use twilight_gateway::StreamExt;
 
         let mut tasks = JoinSet::new();
@@ -376,7 +377,7 @@ impl Instance {
                 // If a task finishes and indicates that we should exit, return early.
                 Some(should_exit) = tasks.join_next() => match should_exit {
                     // If we should exit, return early.
-                    Ok(Ok(true)) => return Ok(true),
+                    Ok(Ok(EventOutput::Exit)) => return Ok(EventOutput::Exit),
                     // If the task returns an error, return it.
                     Ok(Err(error)) => return Err(error),
                     // If the task fails to join from a panic, indicate an error.
@@ -390,6 +391,6 @@ impl Instance {
         // Wait for all tasks to join.
         while tasks.join_next().await.is_some() {}
 
-        Ok(false)
+        Ok(EventOutput::Pass)
     }
 }

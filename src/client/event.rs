@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use anyhow::{bail, Result};
+use anyhow::bail;
 use ina_logging::{debug, info, warn};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
@@ -26,63 +26,89 @@ use crate::command::context::Context;
 use crate::utility::traits::extension::InteractionExt;
 use crate::utility::types::id::CustomId;
 
+/// A result returned by an event handler.
+pub type EventResult = std::result::Result<EventOutput, anyhow::Error>;
+
+/// An output returned by an event handler.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum EventOutput {
+    /// Continue running.
+    Pass,
+    /// Exit the application.
+    Exit,
+}
+
+/// Returns `Ok(EventOutput::Pass)`.
+#[allow(clippy::missing_errors_doc)]
+pub const fn pass() -> EventResult {
+    Ok(EventOutput::Pass)
+}
+
+/// Returns `Ok(EventOutput::Exit)`.
+#[allow(clippy::missing_errors_doc)]
+pub const fn exit() -> EventResult {
+    Ok(EventOutput::Exit)
+}
+
 /// Handles an event.
 ///
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool> {
+pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult {
     api.cache.update(&event);
 
     let id = shard_id.number();
-    let result: Result<bool> = match event {
+    let result: EventResult = match event {
         Event::Ready(event) => self::on_ready(api, *event, shard_id).await,
         Event::InteractionCreate(event) => self::on_interaction(api, *event, shard_id).await,
         Event::Resumed => {
             info!(async "shard #{id} successfully resumed").await?;
 
-            Ok(false)
+            self::pass()
         }
         Event::GatewayHeartbeat(event) => {
             debug!(async "shard #{id} received heartbeat (seq. {event})").await?;
 
-            Ok(false)
+            self::pass()
         }
         Event::GatewayHeartbeatAck => {
             debug!(async "shard #{id} received heartbeat acknowledgement").await?;
 
-            Ok(false)
+            self::pass()
         }
         Event::GatewayHello(event) => {
             info!(async "shard #{id} connecting to gateway ({}ms)", event.heartbeat_interval).await?;
 
-            Ok(false)
+            self::pass()
         }
         Event::GatewayClose(None) => {
             warn!(async "shard #{id} disconnected from gateway").await?;
 
-            Ok(false)
+            self::pass()
         }
         Event::GatewayClose(Some(frame)) => {
             warn!(async "shard #{id} disconnected from gateway: {}", frame.reason).await?;
 
-            Ok(false)
+            self::pass()
         }
         Event::GatewayReconnect => {
             info!(async "shard #{id} reconnecting to gateway").await?;
 
-            Ok(false)
+            self::pass()
         }
-        _ => Ok(false),
+        _ => self::pass(),
     };
 
     match result {
-        Ok(should_close) => Ok(should_close),
+        // Capture and log errors.
         Err(error) => {
             warn!(async "failed to handle event: {error}").await?;
 
-            Ok(false)
+            self::pass()
         }
+        result => result,
     }
 }
 
@@ -91,12 +117,12 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> Result<bool>
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool> {
+pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult {
     info!(async "shard #{} connected to gateway", shard_id.number()).await?;
 
     // Only shard 0 should handle command registration.
     if shard_id.number() != 0 {
-        return Ok(false);
+        return self::pass();
     }
 
     crate::command::initialize().await?;
@@ -117,7 +143,7 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool>
         info!(async "patched {} global commands", list.len()).await?;
     }
 
-    Ok(false)
+    self::pass()
 }
 
 /// Handles an [`InteractionCreate`] event.
@@ -125,24 +151,27 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> Result<bool>
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> Result<bool> {
+pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> EventResult {
     info!(async "shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
 
-    let result: Result<bool> = match event.kind {
+    let result: EventResult = match event.kind {
         InteractionType::ApplicationCommand => self::on_command(api, &event).await,
         InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api, &event).await,
         InteractionType::MessageComponent => self::on_component(api, &event).await,
         InteractionType::ModalSubmit => self::on_modal(api, &event).await,
-        _ => Ok(false),
+        _ => self::pass(),
     };
 
+    // Capture errors here to prevent duplicate logging.
     if let Err(ref error) = result {
         warn!(async "shard #{} failed interaction {} - {error}", shard_id.number(), event.display_label()).await?;
+
+        self::pass()
     } else {
         info!(async "shard #{} succeeded interaction {}", shard_id.number(), event.display_label()).await?;
-    }
 
-    result
+        result
+    }
 }
 
 /// Handles a command [`Interaction`] event.
@@ -150,7 +179,7 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_command(api: Api, event: &Interaction) -> Result<bool> {
+pub async fn on_command(api: Api, event: &Interaction) -> EventResult {
     let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
         bail!("missing command data");
     };
@@ -172,7 +201,7 @@ pub async fn on_command(api: Api, event: &Interaction) -> Result<bool> {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_component(api: Api, event: &Interaction) -> Result<bool> {
+pub async fn on_component(api: Api, event: &Interaction) -> EventResult {
     let Some(InteractionData::MessageComponent(ref data)) = event.data else {
         bail!("missing component data");
     };
@@ -195,7 +224,7 @@ pub async fn on_component(api: Api, event: &Interaction) -> Result<bool> {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_modal(api: Api, event: &Interaction) -> Result<bool> {
+pub async fn on_modal(api: Api, event: &Interaction) -> EventResult {
     let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
         bail!("missing modal data");
     };
@@ -218,7 +247,7 @@ pub async fn on_modal(api: Api, event: &Interaction) -> Result<bool> {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_autocomplete(api: Api, event: &Interaction) -> Result<bool> {
+pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
     let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
         bail!("missing command data");
     };
@@ -247,5 +276,5 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> Result<bool> {
     })
     .await?;
 
-    Ok(false)
+    self::pass()
 }

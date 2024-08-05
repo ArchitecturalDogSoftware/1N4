@@ -31,6 +31,7 @@ use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
 
+use crate::client::event::EventResult;
 use crate::utility::types::id::CustomId;
 
 /// Provides an interaction context API.
@@ -71,7 +72,7 @@ pub trait CommandCallable: Send + Sync {
     /// # Errors
     ///
     /// This function will return an error if execution fails.
-    async fn on_command<'ap: 'ev, 'ev>(&self, context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool>;
+    async fn on_command<'ap: 'ev, 'ev>(&self, context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult;
 }
 
 /// A type that can be invoked to execute a component.
@@ -86,7 +87,7 @@ pub trait ComponentCallable: Send + Sync {
         &self,
         context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
         custom_id: CustomId,
-    ) -> Result<bool>;
+    ) -> EventResult;
 }
 
 /// A type that can be invoked to execute a modal.
@@ -101,7 +102,7 @@ pub trait ModalCallable: Send + Sync {
         &self,
         context: Context<'ap, 'ev, &'ev ModalInteractionData>,
         custom_id: CustomId,
-    ) -> Result<bool>;
+    ) -> EventResult;
 }
 
 /// A type that can be invoked to execute an autocompletion.
@@ -362,7 +363,7 @@ macro_rules! define_command {
                 async fn on_command<'ap: 'ev, 'ev>(
                     &self,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
-                ) -> ::anyhow::Result<::std::primitive::bool>
+                ) -> $crate::client::event::EventResult
                 {
                     $command_callback(context).await
                 }
@@ -377,7 +378,7 @@ macro_rules! define_command {
                     &self,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
                     custom_id: $crate::utility::types::id::CustomId,
-                ) -> ::anyhow::Result<::std::primitive::bool>
+                ) -> $crate::client::event::EventResult
                 {
                     $component_callback(context, custom_id).await
                 }
@@ -392,7 +393,7 @@ macro_rules! define_command {
                     &self,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
                     custom_id: $crate::utility::types::id::CustomId,
-                ) -> ::anyhow::Result<::std::primitive::bool>
+                ) -> $crate::client::event::EventResult
                 {
                     $modal_callback(context, custom_id).await
                 }

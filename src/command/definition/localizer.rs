@@ -25,6 +25,7 @@ use twilight_model::application::command::{
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
 
+use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::AsLocale;
@@ -57,15 +58,16 @@ crate::define_command!("localizer", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> Result<bool> {
+async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
     context.defer(true).await?;
 
-    let resolver = CommandOptionResolver::new(context.state);
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
         Err(ina_localization::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
+
+    let resolver = CommandOptionResolver::new(context.state);
 
     if resolver.get_subcommand("reload").is_ok() {
         info!(async "reloading localization thread").await?;
@@ -88,7 +90,7 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
 
         context.embed(embed.build(), true).await?;
 
-        return Ok(false);
+        return crate::client::event::pass();
     }
 
     if let Ok(resolver) = resolver.get_subcommand("localize") {
@@ -103,7 +105,7 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
 
                 context.embed(embed.build(), true).await?;
 
-                return Ok(false);
+                return crate::client::event::pass();
             };
 
             localize!(async(in locale) category, key).await?
@@ -113,7 +115,7 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
 
         context.text(translated, true).await?;
 
-        return Ok(false);
+        return crate::client::event::pass();
     }
 
     bail!("unknown or missing subcommand")
