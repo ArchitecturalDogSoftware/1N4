@@ -33,7 +33,17 @@ crate::define_command!("echo", CommandType::ChatInput, struct {
 }, struct {
     content: String {
         required: true,
-        maximum: 2000,
+        // This can blow up fast when formatting.
+        maximum: 500,
+    },
+    format: Integer {
+        choices: [
+            ("plain", 0),
+            ("binary", 1),
+            ("octal", 2),
+            ("decimal", 3),
+            ("hexadecimal", 4),
+        ],
     }
 });
 
@@ -52,7 +62,16 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
         Err(error) => return Err(error.into()),
     };
 
-    context.api.client.create_message(channel.id).content(resolver.get_str("content")?).await?;
+    let message = resolver.get_str("content")?;
+    let message: Box<[_]> = match resolver.get_i64("format").copied().unwrap_or(0) {
+        1 => message.chars().map(|c| format!("0b{:b}", u32::from(c))).collect(),
+        2 => message.chars().map(|c| format!("0o{:o}", u32::from(c))).collect(),
+        3 => message.chars().map(|c| format!("0d{}", u32::from(c))).collect(),
+        4 => message.chars().map(|c| format!("0x{:X}", u32::from(c))).collect(),
+        _ => Box::new([message.to_string()]),
+    };
+
+    context.api.client.create_message(channel.id).content(&message.join(" ")).await?;
     context.text(localize!(async(try in locale) category::UI, "echo-done").await?, true).await?;
 
     Ok(false)

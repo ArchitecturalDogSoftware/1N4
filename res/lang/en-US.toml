@@ -11,6 +11,8 @@ ping-description = "Calculates the bot's approximate response time."
 [command-option]
 echo-content-name = "content"
 echo-content-description = "The message to echo."
+echo-format-name = "format"
+echo-format-description = "The message formatting."
 
 localizer-reload-name = "reload"
 localizer-reload-description = "Reloads the localizer's loaded locales."
@@ -23,6 +25,13 @@ localizer-category-name = "category"
 localizer-category-description = "The translation category."
 localizer-key-name = "key"
 localizer-key-description = "The translation key."
+
+[command-choice]
+echo-format-plain = "Plaintext"
+echo-format-binary = "Binary (0-1)"
+echo-format-octal = "Octal (0-7)"
+echo-format-decimal = "Decimal (0-9)"
+echo-format-hexadecimal = "Hexadecimal (0-F)"
 
 [ui]
 echo-done = "Message echoed."

@@ -11,6 +11,8 @@ ping-description = "Calcula el tiempo de respuesta aproximado del bot."
 [command-option]
 echo-content-name = "contento"
 echo-content-description = "El mensaje para resonar."
+echo-format-name = "formato"
+echo-format-description = "El formato del mensaje."
 
 localizer-reload-name = "actualizar"
 localizer-reload-description = "Actualiza las configuraciones regionales cargadas del traductor."
@@ -23,6 +25,13 @@ localizer-category-name = "categoría"
 localizer-category-description = "La categoría de traducción."
 localizer-key-name = "clave"
 localizer-key-description = "La clave de traducción."
+
+[command-choice]
+echo-format-plain = "Texto sin formato"
+echo-format-binary = "Binario (0-1)"
+echo-format-octal = "Octal (0-7)"
+echo-format-decimal = "Decimal (0-9)"
+echo-format-hexadecimal = "Hexadecimal (0-F)"
 
 [ui]
 echo-done = "Mensaje resonante."
