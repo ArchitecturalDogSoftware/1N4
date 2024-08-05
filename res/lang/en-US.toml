@@ -36,7 +36,7 @@ If you encounter any issues, please report them through our [issue tracker](http
 """
 help-footer = """\
 Property of Arden Inc., version %V+neon.
-Model No. '4D343144FE0FFE0FFE0F' rev. 2.\
+Model No. '4D3431442D554E4954' rev. 2.\
 """
 
 help-global = "Global commands"
