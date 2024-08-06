@@ -99,11 +99,9 @@ async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandDa
 
         let translated = if let Ok(locale_str) = resolver.get_str("locale") {
             let Ok(locale) = locale_str.parse::<Locale>() else {
-                // Maybe make this failure pattern into a macro/function?
                 let title = localize!(async(try in locale) category::UI, "localize-unknown").await?;
-                let embed = EmbedBuilder::new().title(format!("{title}: '{locale_str}'")).color(color::FAILURE);
 
-                context.embed(embed.build(), true).await?;
+                context.failure(title, Some(format!("`{locale_str}`"))).await?;
 
                 return crate::client::event::pass();
             };

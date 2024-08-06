@@ -23,11 +23,13 @@ use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
-use twilight_model::application::interaction::Interaction;
+use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::channel::message::{Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
+use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::client::api::ApiRef;
+use crate::utility::color;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::modal::ModalData;
 
@@ -138,6 +140,11 @@ where
     /// on an invalid interaction type.
     #[inline]
     pub async fn defer_update(&mut self, ephemeral: bool) -> Result<()> {
+        ensure!(
+            matches!(self.interaction.kind, InteractionType::MessageComponent | InteractionType::ModalSubmit),
+            "invalid interaction type"
+        );
+
         self.defer_any(ephemeral, InteractionResponseType::DeferredUpdateMessage).await
     }
 
@@ -145,8 +152,8 @@ where
     ///
     /// # Errors
     ///
-    /// This function will return an error if the interaction has been completed or deferred, or if the context fails to
-    /// respond to the interaction.
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
     pub async fn text(&mut self, content: impl Send + Display, ephemeral: bool) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
 
@@ -175,8 +182,8 @@ where
     ///
     /// # Errors
     ///
-    /// This function will return an error if the interaction has been completed or deferred, or if the context fails to
-    /// respond to the interaction.
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
     pub async fn embed(&mut self, embed: impl Into<Embed> + Send, ephemeral: bool) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
 
@@ -205,8 +212,8 @@ where
     ///
     /// # Errors
     ///
-    /// This function will return an error if the interaction has been completed or deferred, or if the context fails to
-    /// respond to the interaction.
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
     pub async fn modal(&mut self, ModalData { custom_id, title, components }: ModalData) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
         ensure!(!self.is_deferred(), "the interaction must not be deferred");
@@ -222,6 +229,56 @@ where
         self.is_completed = true;
 
         Ok(())
+    }
+
+    /// Finishes an interaction with an embedded message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    async fn finish<N, D>(&mut self, color: u32, title: N, description: Option<D>) -> Result<()>
+    where
+        N: Display + Send,
+        D: Display + Send,
+    {
+        let mut embed = EmbedBuilder::new().color(color).title(title.to_string());
+
+        if let Some(description) = description {
+            embed = embed.description(description.to_string());
+        }
+
+        self.embed(embed.build(), if self.is_deferred() { self.is_ephemeral() } else { true }).await
+    }
+
+    /// Finishes an interaction with an embedded success message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    #[inline]
+    pub async fn success<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    where
+        N: Display + Send,
+        D: Display + Send,
+    {
+        self.finish(color::SUCCESS, title, description).await
+    }
+
+    /// Finishes an interaction with an embedded failure message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    #[inline]
+    pub async fn failure<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    where
+        N: Display + Send,
+        D: Display + Send,
+    {
+        self.finish(color::FAILURE, title, description).await
     }
 }
 
