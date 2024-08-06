@@ -35,7 +35,7 @@ use crate::utility::{category, color};
 crate::define_command!("help", CommandType::ChatInput, struct {
     allow_dms: true,
 }, struct {
-    command_callback: on_command,
+    command: on_command,
 }, struct {});
 
 /// Writes a command entry into the given buffer.

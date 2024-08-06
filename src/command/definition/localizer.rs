@@ -34,8 +34,8 @@ use crate::utility::{category, color, fuzzy_contains, Strictness};
 crate::define_command!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
 }, struct {
-    command_callback: on_command,
-    autocomplete_callback: on_autocomplete,
+    command: on_command,
+    autocomplete: on_autocomplete,
 }, struct {
     reload: SubCommand {},
     localize: SubCommand {

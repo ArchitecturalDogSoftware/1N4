@@ -30,7 +30,7 @@ crate::define_command!("echo", CommandType::ChatInput, struct {
     allow_dms: true,
     permissions: Permissions::ADMINISTRATOR,
 }, struct {
-    command_callback: on_command,
+    command: on_command,
 }, struct {
     content: String {
         required: true,
@@ -38,13 +38,7 @@ crate::define_command!("echo", CommandType::ChatInput, struct {
         maximum: 500,
     },
     format: Integer {
-        choices: [
-            ("plain", 0),
-            ("binary", 1),
-            ("octal", 2),
-            ("decimal", 3),
-            ("hexadecimal", 4),
-        ],
+        choices: [("plain", 0), ("binary", 1), ("octal", 2), ("decimal", 3), ("hexadecimal", 4)],
     }
 });
 

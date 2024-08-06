@@ -300,10 +300,10 @@ macro_rules! define_command {
             $(is_nsfw: $is_nsfw:literal,)?
             $(permissions: $permissions:expr,)?
         },struct {
-            $(command_callback: $command_callback:expr,)?
-            $(component_callback: $component_callback:expr,)?
-            $(modal_callback: $modal_callback:expr,)?
-            $(autocomplete_callback: $autocomplete_callback:expr,)?
+            $(command: $command_callback:expr,)?
+            $(component: $component_callback:expr,)?
+            $(modal: $modal_callback:expr,)?
+            $(autocomplete: $autocomplete_callback:expr,)?
         },struct { $($option_name:ident : $option_kind:ident { $($body:tt)* }),* $(,)? }
     ) => {
         /// The command implementation.
