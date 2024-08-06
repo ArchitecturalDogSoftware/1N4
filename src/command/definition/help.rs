@@ -38,6 +38,88 @@ crate::define_command!("help", CommandType::ChatInput, struct {
     command: on_command,
 }, struct {});
 
+/// Executes the command.
+///
+/// # Errors
+///
+/// This function will return an error if the command could not be executed.
+async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    let mut buffer = String::new();
+
+    writeln!(&mut buffer, "{}", localize!(async(try in locale) category::UI, "help-header").await?)?;
+
+    writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-global").await?)?;
+
+    let commands = context.client().global_commands().await?.model().await?;
+
+    self::write_command_section(&context, locale, commands, &mut buffer).await?;
+
+    if let Some(guild_id) = context.interaction.guild_id {
+        writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-guild").await?)?;
+
+        let commands = context.client().guild_commands(guild_id).await?.model().await?;
+
+        self::write_command_section(&context, locale, commands, &mut buffer).await?;
+    }
+
+    let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
+    let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
+    let footer = EmbedFooterBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).build();
+    let color = if thread_rng().gen_bool(0.5) { color::BRANDING_A } else { color::BRANDING_B };
+    let author = if let Some(user) = context.api.cache.current_user() {
+        user.as_embed_author()?
+    } else {
+        let user = context.api.client.current_user().await?.model().await?;
+
+        user.as_embed_author()?
+    };
+
+    let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).footer(footer);
+
+    context.embed(embed.build(), true).await?;
+
+    crate::client::event::pass()
+}
+
+/// Writes a command section into the given buffer.
+///
+/// # Errors
+///
+/// This function will return an error if a command entry could not be created.
+async fn write_command_section<'ap: 'ev, 'ev, F>(
+    context: &Context<'ap, 'ev, &'ev CommandData>,
+    locale: Option<Locale>,
+    mut commands: Vec<Command>,
+    f: &mut F,
+) -> Result<()>
+where
+    F: Write + Send,
+{
+    self::clean_commands(context, &mut commands).await?;
+
+    if commands.is_empty() {
+        writeln!(f, "> *{}*", localize!(async(try in locale) category::UI, "help-missing").await?)?;
+
+        return Ok(());
+    }
+
+    for command in commands {
+        self::write_command(locale, command, f).await?;
+
+        writeln!(f)?;
+    }
+
+    Ok(())
+}
+
 /// Writes a command entry into the given buffer.
 ///
 /// # Errors
@@ -89,22 +171,23 @@ where
     write!(f, "\n> {localized_description}").map_err(Into::into)
 }
 
-/// Writes a list of command entries into the given buffer.
+/// Cleans up a list of commands.
 ///
 /// # Errors
 ///
-/// This function will return an error if a command entry could not be created.
-async fn write_command_list<I, F>(locale: Option<Locale>, commands: I, f: &mut F) -> Result<()>
-where
-    I: IntoIterator<Item = Command> + Send,
-    I::IntoIter: Send,
-    F: Write + Send,
-{
-    for command in commands {
-        self::write_command(locale, command, f).await?;
+/// This function will return an error if the commands could not be cleaned.
+async fn clean_commands<'ap: 'ev, 'ev>(
+    context: &Context<'ap, 'ev, &'ev CommandData>,
+    commands: &mut Vec<Command>,
+) -> Result<()> {
+    if let Some((guild_id, user_id)) = context.interaction.guild_id.zip(context.interaction.author_id()) {
+        let member = context.interaction.member.as_ref();
+        let permissions = self::get_member_permissions(context, guild_id, user_id, member).await?;
 
-        writeln!(f)?;
-    }
+        commands.retain(|c| c.default_member_permissions.is_none_or(|p| p.contains(permissions)));
+    };
+
+    commands.sort_unstable_by_key(|c| c.name.clone());
 
     Ok(())
 }
@@ -154,91 +237,4 @@ async fn get_member_permissions<'ap: 'ev, 'ev>(
     } else {
         calculator.root()
     })
-}
-
-/// Cleans up a list of commands.
-///
-/// # Errors
-///
-/// This function will return an error if the commands could not be cleaned.
-async fn clean_commands<'ap: 'ev, 'ev>(
-    context: &Context<'ap, 'ev, &'ev CommandData>,
-    commands: &mut Vec<Command>,
-) -> Result<()> {
-    if let Some((guild_id, user_id)) = context.interaction.guild_id.zip(context.interaction.author_id()) {
-        let member = context.interaction.member.as_ref();
-        let permissions = self::get_member_permissions(context, guild_id, user_id, member).await?;
-
-        commands.retain(|c| c.default_member_permissions.is_none_or(|p| p.contains(permissions)));
-    };
-
-    commands.sort_unstable_by_key(|c| c.name.clone());
-
-    Ok(())
-}
-
-/// Executes the command.
-///
-/// # Errors
-///
-/// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
-    context.defer(true).await?;
-
-    let locale = match context.as_locale() {
-        Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
-        Err(error) => return Err(error.into()),
-    };
-
-    let mut buffer = String::new();
-
-    writeln!(&mut buffer, "{}", localize!(async(try in locale) category::UI, "help-header").await?)?;
-    writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-global").await?)?;
-
-    let mut commands = context.client().global_commands().await?.model().await?;
-
-    self::clean_commands(&context, &mut commands).await?;
-
-    if commands.is_empty() {
-        writeln!(&mut buffer, "> *{}*", localize!(async(try in locale) category::UI, "help-missing").await?)?;
-    } else {
-        self::write_command_list(locale, commands, &mut buffer).await?;
-    }
-
-    if let Some(guild_id) = context.interaction.guild_id {
-        writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-guild").await?)?;
-
-        let mut commands = context.client().guild_commands(guild_id).await?.model().await?;
-
-        self::clean_commands(&context, &mut commands).await?;
-
-        if commands.is_empty() {
-            writeln!(&mut buffer, "> *{}*", localize!(async(try in locale) category::UI, "help-missing").await?)?;
-        } else {
-            self::write_command_list(locale, commands, &mut buffer).await?;
-        }
-    }
-
-    let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
-    let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
-    let footer = footer.replace("%V", env!("CARGO_PKG_VERSION"));
-    let author = if let Some(user) = context.api.cache.current_user() {
-        user.as_embed_author()?
-    } else {
-        let user = context.api.client.current_user().await?.model().await?;
-
-        user.as_embed_author()?
-    };
-
-    let embed = EmbedBuilder::new()
-        .title(title)
-        .author(author)
-        .color(if thread_rng().gen_bool(0.5) { color::BRANDING_A } else { color::BRANDING_B })
-        .description(buffer)
-        .footer(EmbedFooterBuilder::new(footer).build());
-
-    context.embed(embed.build(), true).await?;
-
-    crate::client::event::pass()
 }
