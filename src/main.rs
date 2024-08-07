@@ -23,6 +23,7 @@ use clap::Parser;
 use client::Instance;
 use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
 use ina_logging::{error, info};
+use serde::{Deserialize, Serialize};
 
 /// The bot's client implementation.
 pub mod client;
@@ -32,19 +33,23 @@ pub mod command;
 pub mod utility;
 
 /// The application's command-line arguments.
-#[derive(Clone, Debug, PartialEq, Eq, Parser)]
+#[derive(Clone, Debug, PartialEq, Eq, Parser, Serialize, Deserialize)]
 pub struct Arguments {
     /// The bot's settings.
     #[command(flatten)]
+    #[serde(rename = "client")]
     pub bot_settings: client::Settings,
     /// The storage instance's settings.
     #[command(flatten)]
+    #[serde(rename = "storage")]
     pub data_settings: ina_storage::Settings,
     /// The localization thread's settings.
     #[command(flatten)]
+    #[serde(rename = "localizer")]
     pub lang_settings: ina_localization::Settings,
     /// The logging thread's settings.
     #[command(flatten)]
+    #[serde(rename = "logger")]
     pub log_settings: ina_logging::settings::Settings,
 }
 
