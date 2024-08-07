@@ -20,9 +20,6 @@ use std::str::FromStr;
 use anyhow::{ensure, Result};
 use ina_localization::Locale;
 use twilight_http::client::InteractionClient;
-use twilight_model::application::interaction::application_command::CommandData;
-use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
-use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::channel::message::{Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
@@ -32,13 +29,6 @@ use crate::client::api::ApiRef;
 use crate::utility::color;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::modal::ModalData;
-
-/// A command interaction context.
-pub type CommandContext<'ar, 'ev> = Context<'ar, 'ev, &'ev CommandData>;
-/// A component interaction context.
-pub type ComponentContext<'ar, 'ev> = Context<'ar, 'ev, &'ev MessageComponentInteractionData>;
-/// A modal interaction context.
-pub type ModalContext<'ar, 'ev> = Context<'ar, 'ev, &'ev ModalInteractionData>;
 
 /// An interaction context.
 #[derive(Clone, Copy, Debug)]
