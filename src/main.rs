@@ -34,6 +34,7 @@ pub mod utility;
 
 /// The application's command-line arguments.
 #[derive(Clone, Debug, PartialEq, Eq, Parser, Serialize, Deserialize)]
+#[command(about, version)]
 pub struct Arguments {
     /// The bot's settings.
     #[command(flatten)]
