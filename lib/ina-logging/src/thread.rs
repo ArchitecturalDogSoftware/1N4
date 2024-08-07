@@ -19,26 +19,33 @@ use std::fmt::Display;
 use ina_threading::{Consumer, ConsumingThread, Join, JoinStatic};
 use tokio::sync::mpsc::Receiver;
 
-use crate::{Entry, Level, Logger, Result, Settings};
+use crate::endpoint::Endpoint;
+use crate::entry::{Entry, Level};
+use crate::settings::Settings;
+use crate::{Logger, Result};
 
-/// The logging thread handle.
-static THREAD: LoggingThread<'static> = LoggingThread::new();
+/// The logging thread's handle.
+static THREAD: LoggingThread = LoggingThread::new();
 
 /// The logging thread's type.
-pub type LoggingThread<'lv> = JoinStatic<Consumer<Request<'lv>, Result<()>>, Result<()>>;
+pub type LoggingThread = JoinStatic<Consumer<Request, Result<()>>, Result<()>>;
 
-/// A request sent to the logging thread.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Request<'lv> {
-    /// Flushes the inner queue of the [`Logger`].
+/// A request send to the logging thread.
+#[derive(Debug)]
+pub enum Request {
+    /// Initializes the logger.
+    Setup,
+    /// Closes the logging thread.
+    Close,
+    /// Flush the queue of the thread's logger.
     Flush,
-    /// Queues a log to be output during the next flush.
-    Queue(Entry<'lv>),
+    /// Queues an entry to be output during the next flush.
+    Entry(Entry<'static>),
+    /// Adds an endpoint to the logger.
+    Endpoint(Box<dyn Endpoint>),
 }
 
 /// Starts the logging thread.
-///
-/// This blocks the current thread.
 ///
 /// # Panics
 ///
@@ -46,16 +53,15 @@ pub enum Request<'lv> {
 ///
 /// # Errors
 ///
-/// This function will return an error if the logging thread fails to start.
-#[allow(clippy::missing_panics_doc)] // This doesn't actually panic during the function call.
-pub async fn start(settings: Settings) -> Result<(), Request<'static>> {
+/// This function will return an error if the thread could not be initialized.
+pub async fn start(settings: Settings) -> Result<()> {
     assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
-    let thread = Consumer::spawn_with_runtime("logging", |r| run(settings, r), capacity);
-    let handle = Join::clean_up_handle(thread?, |handle| {
+    let handle = Consumer::spawn_with_runtime("logging", |r| self::run(settings, r), capacity)?;
+    let handle = Join::clean_up_handle(handle, |handle| {
         #[allow(clippy::expect_used)]
-        handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread");
+        handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
     });
 
     THREAD.async_api().set(handle).await;
@@ -73,19 +79,150 @@ pub async fn start(settings: Settings) -> Result<(), Request<'static>> {
 ///
 /// # Errors
 ///
-/// This function will return an error if the logging thread fails to start.
-#[allow(clippy::missing_panics_doc)] // This doesn't actually panic during the function call.
-pub fn blocking_start(settings: Settings) -> Result<(), Request<'static>> {
+/// This function will return an error if the thread could not be initialized.
+pub fn blocking_start(settings: Settings) -> Result<()> {
     assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
-    let thread = Consumer::spawn_with_runtime("logging", |r| run(settings, r), capacity);
-    let handle = Join::clean_up_handle(thread?, |handle| {
+    let handle = Consumer::spawn_with_runtime("logging", |r| self::run(settings, r), capacity)?;
+    let handle = Join::clean_up_handle(handle, |handle| {
         #[allow(clippy::expect_used)]
-        handle.as_sender().blocking_send(Request::Flush).expect("failed to flush logging thread");
+        handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
     });
 
     THREAD.sync_api().set(handle);
+
+    Ok(())
+}
+
+/// Requests that the logging thread outputs to the given endpoint.
+///
+/// # Panics
+///
+/// Panics if the thread has not been initialized.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn endpoint(endpoint: impl Endpoint) -> Result<()> {
+    THREAD.async_api().get().await.as_sender().send(Request::Endpoint(Box::new(endpoint))).await?;
+
+    Ok(())
+}
+
+/// Requests that the logging thread outputs to the given endpoint.
+///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the thread has not been initialized or this is called in an asynchronous context.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub fn blocking_endpoint(endpoint: impl Endpoint) -> Result<()> {
+    THREAD.sync_api().get().as_sender().blocking_send(Request::Endpoint(Box::new(endpoint)))?;
+
+    Ok(())
+}
+
+/// Requests that the logging thread outputs the given log.
+///
+/// # Panics
+///
+/// Panics if the thread has not been initialized.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn entry(level: Level<'static>, text: impl Display + Send) -> Result<()> {
+    let entry = Entry::new(level, text.to_string().into_boxed_str());
+
+    THREAD.async_api().get().await.as_sender().send(Request::Entry(entry)).await?;
+
+    Ok(())
+}
+
+/// Requests that the logging thread outputs the given log.
+///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the thread has not been initialized or this is called in an asynchronous context.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub fn blocking_entry(level: Level<'static>, text: impl Display) -> Result<()> {
+    let entry = Entry::new(level, text.to_string().into_boxed_str());
+
+    THREAD.sync_api().get().as_sender().blocking_send(Request::Entry(entry))?;
+
+    Ok(())
+}
+
+/// Requests that the logging thread flushes its buffer.
+///
+/// # Panics
+///
+/// Panics if the thread has not been initialized.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn flush() -> Result<()> {
+    THREAD.async_api().get().await.as_sender().send(Request::Flush).await?;
+
+    Ok(())
+}
+
+/// Requests that the logging thread flushes its buffer.
+///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the thread has not been initialized or this is called in an asynchronous context.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub fn blocking_flush() -> Result<()> {
+    THREAD.sync_api().get().as_sender().blocking_send(Request::Flush)?;
+
+    Ok(())
+}
+
+/// Initializes the logging thread.
+///
+/// # Panics
+///
+/// Panics if the logging thread is not initialized.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn setup() -> Result<()> {
+    THREAD.async_api().get().await.as_sender().send(Request::Setup).await?;
+
+    Ok(())
+}
+
+/// Initializes the logging thread.
+///
+/// This blocks the current thread.
+///
+/// # Panics
+///
+/// Panics if the logging thread is not initialized or if this is called in an asynchronous context.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub fn blocking_setup() -> Result<()> {
+    THREAD.sync_api().get().as_sender().blocking_send(Request::Setup)?;
 
     Ok(())
 }
@@ -114,91 +251,25 @@ pub fn blocking_close() {
     THREAD.sync_api().drop();
 }
 
-/// Requests that the logging thread outputs the given log.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub async fn queue(level: Level<'static>, text: impl Display + Send) -> Result<(), Request<'static>> {
-    let entry = Entry::new(level, text.to_string());
-
-    THREAD.async_api().get().await.as_sender().send(Request::Queue(entry)).await?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread outputs the given log.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized or this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub fn blocking_queue(level: Level<'static>, text: impl Display) -> Result<(), Request<'static>> {
-    let entry = Entry::new(level, text.to_string());
-
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Queue(entry))?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread flushes its buffer.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub async fn flush() -> Result<(), Request<'static>> {
-    THREAD.async_api().get().await.as_sender().send(Request::Flush).await?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread flushes its buffer.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized or this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub fn blocking_flush() -> Result<(), Request<'static>> {
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Flush)?;
-
-    Ok(())
-}
-
 /// Runs the thread process.
 ///
 /// # Errors
 ///
 /// This function will return an error if the thread fails to run.
-async fn run(settings: Settings, mut receiver: Receiver<Request<'static>>) -> Result<()> {
-    let mut logger = Logger::<'static>::new(settings).await?;
-    let mut timeout = tokio::time::interval(logger.timeout());
+async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> {
+    let mut logger = Logger::new(settings);
+    let mut duration = tokio::time::interval(logger.duration());
 
     loop {
         tokio::select! {
-            _ = timeout.tick() => logger.flush().await?,
-            result = receiver.recv() => match result {
-                Some(Request::Queue(entry)) => logger.queue(entry).await?,
+            _ = duration.tick() => logger.flush().await?,
+            request = receiver.recv() => match request {
+                Some(Request::Entry(entry)) => logger.push_entry(entry).await?,
                 Some(Request::Flush) => logger.flush().await?,
-                None => return Ok(()),
-            }
+                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint).await?,
+                Some(Request::Setup) => logger.setup().await?,
+                None | Some(Request::Close) => return logger.close().await,
+            },
         }
     }
 }
@@ -208,53 +279,55 @@ async fn run(settings: Settings, mut receiver: Receiver<Request<'static>>) -> Re
 /// # Examples
 ///
 /// ```
-/// debug!(async "This is a debug log!").await?;
-/// debug!("This is a debug log!")?;
+/// debug!(async "This is an asynchronous debug log!").await?;
+///
+/// debug!("This is a synchronous debug log!")?;
 /// ```
 #[macro_export]
 macro_rules! debug {
     (async $($args:tt)+) => {{
         #[cfg(debug_assertions)]
         {
-            $crate::thread::queue($crate::Level::DEBUG, ::std::format!($($args)+))
+            $crate::thread::entry($crate::entry::Level::DEBUG, ::std::format!($($args)+))
         }
         #[cfg(not(debug_assertions))]
         {
-            // Prevents unused variable warnings.
             ::std::mem::drop(::std::format_args!($($args)+));
-            ::std::future::ready($crate::Result::<(), $crate::thread::Request<'static>>::Ok(()))
+
+            ::std::future::ready($crate::Result::<()>::Ok(()))
         }
     }};
     ($($args:tt)+) => {{
         #[cfg(debug_assertions)]
         {
-            $crate::thread::blocking_queue($crate::Level::DEBUG, ::std::format!($($args)+))
+            $crate::thread::blocking_entry($crate::entry::Level::DEBUG, ::std::format_args!($($args)+))
         }
         #[cfg(not(debug_assertions))]
         {
-            // Prevents unused variable warnings.
             ::std::mem::drop(::std::format_args!($($args)+));
-            $crate::Result::<(), $crate::thread::Request<'static>>::Ok(())
+
+            $crate::Result::<()>::Ok(())
         }
     }};
 }
 
-/// Outputs an informational log.
+/// Outputs an information log.
 ///
 /// # Examples
 ///
 /// ```
-/// info!(async "This is an informational log!").await?;
-/// info!("This is an informational log!")?;
+/// info!(async "This is an asynchronous information log!").await?;
+///
+/// info!("This is a synchronous information log!")?;
 /// ```
 #[macro_export]
 macro_rules! info {
-    (async $($args:tt)+) => {
-        $crate::thread::queue($crate::Level::INFO, ::std::format!($($args)+))
-    };
-    ($($args:tt)+) => {
-        $crate::thread::blocking_queue($crate::Level::INFO, ::std::format!($($args)+))
-    };
+    (async $($args:tt)+) => {{
+        $crate::thread::entry($crate::entry::Level::INFO, ::std::format!($($args)+))
+    }};
+    ($($args:tt)+) => {{
+        $crate::thread::blocking_entry($crate::entry::Level::INFO, ::std::format_args!($($args)+))
+    }};
 }
 
 /// Outputs a warning log.
@@ -262,17 +335,18 @@ macro_rules! info {
 /// # Examples
 ///
 /// ```
-/// warn!(async "This is a warning log!").await?;
-/// warn!("This is a warning log!")?;
+/// warn!(async "This is an asynchronous warning log!").await?;
+///
+/// warn!("This is a synchronous warning log!")?;
 /// ```
 #[macro_export]
 macro_rules! warn {
-    (async $($args:tt)+) => {
-        $crate::thread::queue($crate::Level::WARN, ::std::format!($($args)+))
-    };
-    ($($args:tt)+) => {
-        $crate::thread::blocking_queue($crate::Level::WARN, ::std::format!($($args)+))
-    };
+    (async $($args:tt)+) => {{
+        $crate::thread::entry($crate::entry::Level::WARN, ::std::format!($($args)+))
+    }};
+    ($($args:tt)+) => {{
+        $crate::thread::blocking_entry($crate::entry::Level::WARN, ::std::format_args!($($args)+))
+    }};
 }
 
 /// Outputs an error log.
@@ -280,15 +354,16 @@ macro_rules! warn {
 /// # Examples
 ///
 /// ```
-/// error!(async "This is an error log!").await?;
-/// error!("This is an error log!")?;
+/// error!(async "This is an asynchronous error log!").await?;
+///
+/// error!("This is a synchronous error log!")?;
 /// ```
 #[macro_export]
 macro_rules! error {
-    (async $($args:tt)+) => {
-        $crate::thread::queue($crate::Level::ERROR, ::std::format!($($args)+))
-    };
-    ($($args:tt)+) => {
-        $crate::thread::blocking_queue($crate::Level::ERROR, ::std::format!($($args)+))
-    };
+    (async $($args:tt)+) => {{
+        $crate::thread::entry($crate::entry::Level::ERROR, ::std::format!($($args)+))
+    }};
+    ($($args:tt)+) => {{
+        $crate::thread::blocking_entry($crate::entry::Level::ERROR, ::std::format_args!($($args)+))
+    }};
 }

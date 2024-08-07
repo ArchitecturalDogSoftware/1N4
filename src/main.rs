@@ -21,6 +21,7 @@
 use anyhow::Result;
 use clap::Parser;
 use client::Instance;
+use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
 use ina_logging::{error, info};
 
 /// The bot's client implementation.
@@ -44,7 +45,7 @@ pub struct Arguments {
     pub lang_settings: ina_localization::Settings,
     /// The logging thread's settings.
     #[command(flatten)]
-    pub log_settings: ina_logging::Settings,
+    pub log_settings: ina_logging::settings::Settings,
 }
 
 /// The application's main entrypoint.
@@ -56,6 +57,9 @@ pub fn main() -> Result<()> {
     let arguments = Arguments::parse();
 
     ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
+    ina_logging::thread::blocking_endpoint(TerminalEndpoint::new())?;
+    ina_logging::thread::blocking_endpoint(FileEndpoint::new())?;
+    ina_logging::thread::blocking_setup()?;
 
     info!("initialized logging thread")?;
 
@@ -83,7 +87,7 @@ pub fn main() -> Result<()> {
 ///
 /// This function will return an error if the program's execution fails.
 pub async fn async_main(arguments: Arguments) -> Result<()> {
-    info!(async "entering asynchronous runtime").await?;
+    info!(async "entered asynchronous runtime").await?;
 
     ina_localization::thread::start(arguments.lang_settings).await?;
 

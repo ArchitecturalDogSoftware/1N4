@@ -16,159 +16,109 @@
 
 //! Provides logging solutions for 1N4.
 
-use std::convert::Infallible;
-use std::fmt::Display;
-use std::num::{NonZeroU64, NonZeroUsize};
-use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
-use clap::{Args, ColorChoice};
-use owo_colors::{AnsiColors, OwoColorize, Stream};
-use serde::{Deserialize, Serialize};
-use time::format_description::well_known::Iso8601;
-use time::format_description::FormatItem;
-use time::macros::format_description;
-use time::OffsetDateTime;
-use tokio::fs::File;
-use tokio::io::{AsyncWriteExt, Stderr, Stdout};
+use endpoint::Endpoint;
+use settings::Settings;
+use thread::Request;
 use tokio::sync::mpsc::error::SendError;
+use tokio::sync::RwLock;
+use tokio::task::{JoinError, JoinSet};
 
-/// Contains the logger's thread implementation.
+use crate::entry::Entry;
+
+/// Defines various output endpoints for the logger.
+pub mod endpoint;
+/// Defines log entries, the internal representation for logs.
+pub mod entry;
+/// Defines the logger's settings.
+pub mod settings;
+/// Defines the logger's thread.
 pub mod thread;
 
-/// A result alias with a defaulted error type.
-pub type Result<T, S = Infallible> = std::result::Result<T, Error<S>>;
+/// A result that may be returned when using this library.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// An error that may occur when using this library.
+/// An error that may be returned when using this library.
 #[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
-pub enum Error<S = Infallible> {
+pub enum Error {
+    /// The logger was already initialized.
+    #[error("the logger has already been initialized")]
+    AlreadyInitialized,
+    /// A duplicate endpoint.
+    #[error("the '{0}' endpoint has already been added")]
+    DuplicateEndpoint(&'static str),
     /// An IO error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    /// An invalid endpoint state.
+    #[error("the '{0}' endpoint has an invalid state")]
+    InvalidEndpointState(&'static str),
+    /// The logger has not been initialized.
+    #[error("the logger has not been initialized")]
+    NotInitialized,
+    /// A join error.
+    #[error("a task failed to join")]
+    Join(#[from] JoinError),
+    /// A request failed to send.
+    #[error("a request failed to send")]
+    Send(#[from] SendError<Request>),
     /// A threading error.
     #[error(transparent)]
-    Threading(#[from] ina_threading::Error<S>),
-    /// A sending error.
-    #[error(transparent)]
-    Send(#[from] SendError<S>),
+    Thread(#[from] ina_threading::Error<Request>),
 }
 
-/// The logger's settings.
-#[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
-#[group(id = "LogSettings")]
-pub struct Settings {
-    /// Sets the logger's color preferences.
-    #[arg(short = 'c', long = "color", default_value = "auto")]
-    #[serde(with = "color_choice")]
-    pub color: ColorChoice,
-
-    /// Disables terminal output.
-    #[arg(short = 'q', long = "quiet")]
-    #[serde(rename = "quiet")]
-    pub no_term_output: bool,
-    /// Disables file output.
-    #[arg(short = 'e', long = "ephemeral")]
-    #[serde(rename = "ephemeral")]
-    pub no_file_output: bool,
-
-    /// The directory within which to output log files.
-    #[arg(id = "LOG_DIRECTORY", long = "log-directory", default_value = "./log/")]
-    #[serde(rename = "directory")]
-    pub file_directory: Box<Path>,
-
-    /// The logger's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(id = "LOG_QUEUE_CAPACITY", long = "log-queue-capacity", default_value = "8")]
-    #[serde(rename = "queue-capacity")]
-    pub queue_capacity: NonZeroUsize,
-    /// The logger's output queue timeout in milliseconds.
-    #[arg(long = "log-queue-timeout", default_value = "20")]
-    #[serde(rename = "queue-timeout")]
-    pub queue_timeout: NonZeroU64,
-}
-
-/// A logger with a buffered output.
-#[derive(Debug)]
-pub struct Logger<'lg> {
+/// A logger with buffered output.
+pub struct Logger {
     /// The logger's settings.
     settings: Settings,
-    /// The logger's queue.
-    queue: Vec<Entry<'lg>>,
-
-    /// A write lock for stdout.
-    out: Option<Stdout>,
-    /// A write lock for stderr.
-    err: Option<Stderr>,
-    /// A write lock for the output file.
-    file: Option<File>,
+    /// The logger's endpoints.
+    endpoints: Vec<Arc<RwLock<Box<dyn Endpoint>>>>,
+    /// The logger's entry queue.
+    queue: Vec<Entry<'static>>,
+    /// Whether the logger has been initialized.
+    initialized: bool,
 }
 
-impl<'lg> Logger<'lg> {
-    /// The time formatter used to create log file names.
-    const FILE_NAME_FORMAT: &'static [FormatItem<'static>] = format_description!(
-        version = 2,
-        "[year repr:last_two][month padding:zero repr:numerical][day padding:zero]-[hour padding:zero][minute \
-         padding:zero][second padding:zero]-[subsecond digits:6]"
-    );
-
+impl Logger {
     /// Creates a new [`Logger`].
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the logger failed to create its file.
-    pub async fn new(settings: Settings) -> Result<Self> {
+    #[must_use]
+    pub fn new(settings: Settings) -> Self {
         let queue = Vec::with_capacity(settings.queue_capacity.get());
-        let out = if settings.no_term_output { None } else { Some(tokio::io::stdout()) };
-        let err = if settings.no_term_output { None } else { Some(tokio::io::stderr()) };
-        let file = if settings.no_file_output { None } else { Some(Self::new_file(&settings.file_directory).await?) };
 
-        Ok(Self { settings, queue, out, err, file })
-    }
-
-    /// Creates a new log file within the given directory.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the file could not be created.
-    pub(crate) async fn new_file(directory: &Path) -> Result<File> {
-        let time = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
-        let name = time.format(Self::FILE_NAME_FORMAT).unwrap_or_else(|_| unreachable!());
-        let path = directory.join(name).with_extension("log");
-
-        tokio::fs::create_dir_all(directory).await?;
-
-        File::options().create(true).append(true).open(path).await.map_err(Into::into)
+        Self { settings, endpoints: vec![], queue, initialized: false }
     }
 
     /// Returns whether this [`Logger`] is enabled.
     #[must_use]
-    pub const fn is_enabled(&self) -> bool {
-        !self.settings.no_term_output || !self.settings.no_file_output
+    pub fn is_enabled(&self) -> bool {
+        !self.settings.quiet && !self.endpoints.is_empty()
     }
 
     /// Returns whether this [`Logger`] is disabled.
     #[must_use]
-    pub const fn is_disabled(&self) -> bool {
-        self.settings.no_term_output && self.settings.no_file_output
+    pub fn is_disabled(&self) -> bool {
+        self.settings.quiet || self.endpoints.is_empty()
+    }
+
+    /// Returns the queue timeout of this [`Logger`].
+    #[must_use]
+    pub const fn duration(&self) -> Duration {
+        Duration::from_millis(self.settings.queue_duration.get())
+    }
+
+    /// Returns the queue capacity of this [`Logger`].
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
+        self.settings.queue_capacity.get()
     }
 
     /// Returns whether this [`Logger`] has entry buffering.
     #[must_use]
     pub const fn is_buffered(&self) -> bool {
-        self.capacity().get() == 1
-    }
-
-    /// Returns the queue capacity of this [`Logger`].
-    #[must_use]
-    pub const fn capacity(&self) -> NonZeroUsize {
-        self.settings.queue_capacity
-    }
-
-    /// Returns the queue timeout of this [`Logger`].
-    #[must_use]
-    pub const fn timeout(&self) -> Duration {
-        Duration::from_millis(self.settings.queue_timeout.get())
+        self.capacity() > 1
     }
 
     /// Returns the number of entries within the inner queue of this [`Logger`].
@@ -186,22 +136,61 @@ impl<'lg> Logger<'lg> {
     /// Returns whether the inner queue of this [`Logger`] is full.
     #[must_use]
     pub fn is_full(&self) -> bool {
-        self.len() >= self.capacity().get()
+        self.len() >= self.capacity()
     }
 
-    /// Queues a log to be output during the next flush.
+    /// Initializes the endpoints of this [`Logger`].
     ///
-    /// If this logger's buffer capacity is 1, this will flush immediately.
+    /// # Errors
+    ///
+    /// This function will return an error if an endpoint fails to initialize, or if this has already been run.
+    pub async fn setup(&mut self) -> Result<()> {
+        if self.initialized {
+            return Err(Error::AlreadyInitialized);
+        }
+
+        for endpoint in &self.endpoints {
+            endpoint.write().await.setup(&self.settings).await?;
+        }
+
+        self.initialized = true;
+
+        Ok(())
+    }
+
+    /// Adds an endpoint to the logger.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the endpoint was already added.
+    pub async fn push_endpoint(&mut self, endpoint: Box<dyn Endpoint>) -> Result<()> {
+        if self.initialized {
+            return Err(Error::AlreadyInitialized);
+        }
+
+        for contained in &self.endpoints {
+            if contained.read().await.name() == endpoint.name() {
+                return Err(Error::DuplicateEndpoint(endpoint.name()));
+            }
+        }
+
+        self.endpoints.push(Arc::new(RwLock::new(endpoint)));
+
+        Ok(())
+    }
+
+    /// Adds an entry to the logger, flushing if its buffer capacity is met.
     ///
     /// # Errors
     ///
     /// This function will return an error if the logger could not be flushed.
-    pub async fn queue(&mut self, entry: Entry<'lg>) -> Result<()> {
-        if self.is_disabled() {
-            return Ok(());
+    pub async fn push_entry(&mut self, entry: Entry<'static>) -> Result<()> {
+        if !self.initialized {
+            return Err(Error::NotInitialized);
         }
-
-        self.queue.push(entry);
+        if self.is_enabled() {
+            self.queue.push(entry);
+        }
 
         if self.is_full() { self.flush().await } else { Ok(()) }
     }
@@ -212,175 +201,49 @@ impl<'lg> Logger<'lg> {
     ///
     /// This function will return an error if the queue could not be flushed.
     pub async fn flush(&mut self) -> Result<()> {
-        /// Writes the given display into a possibly [`None`] writer.
-        #[inline]
-        async fn writeln<A, D>(writer: Option<&mut A>, display: D) -> Result<()>
-        where
-            A: AsyncWriteExt + Send + Unpin,
-            D: Display + Send,
-        {
-            if let Some(writer) = writer {
-                writer.write_all((format!("{display}\n")).as_bytes()).await?;
-                writer.flush().await?;
-            }
+        if !self.initialized {
+            return Err(Error::NotInitialized);
+        }
+        if self.is_disabled() {
+            self.queue.clear();
 
-            Ok(())
+            return Ok(());
         }
 
         for entry in self.queue.drain(..) {
-            if !self.settings.no_term_output {
-                if entry.level.error {
-                    writeln(self.err.as_mut(), entry.as_display(Some(Stream::Stderr))).await?;
-                } else {
-                    writeln(self.out.as_mut(), entry.as_display(Some(Stream::Stdout))).await?;
-                }
+            let entry = Arc::new(entry);
+            let mut tasks = JoinSet::new();
+
+            for endpoint in self.endpoints.iter().map(Arc::clone) {
+                let entry = Arc::clone(&entry);
+
+                tasks.spawn(async move { endpoint.write().await.write(entry).await });
             }
 
-            if !self.settings.no_file_output {
-                writeln(self.file.as_mut(), entry.as_display(None)).await?;
+            while let Some(result) = tasks.join_next().await {
+                result??;
             }
         }
 
         Ok(())
     }
-}
 
-/// A log level.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Level<'lv> {
-    /// The log level's name.
-    pub name: &'lv str,
-    /// The log level's color.
-    pub color: AnsiColors,
-    /// Whether this level is considered to be an error.
-    pub error: bool,
-}
-
-impl<'lv> Level<'lv> {
-    /// The debug log level.
-    #[cfg(debug_assertions)]
-    pub const DEBUG: Self = Self::new("debug", AnsiColors::BrightMagenta, false);
-    /// The error log level.
-    pub const ERROR: Self = Self::new("error", AnsiColors::BrightRed, true);
-    /// The informational log level.
-    pub const INFO: Self = Self::new("info", AnsiColors::BrightBlue, false);
-    /// The warning log level.
-    pub const WARN: Self = Self::new("warn", AnsiColors::BrightYellow, true);
-
-    /// Creates a new [`Level`].
-    #[must_use]
-    pub const fn new(name: &'lv str, color: AnsiColors, error: bool) -> Self {
-        Self { name, color, error }
-    }
-
-    /// Returns a display implementation for this level.
-    #[must_use]
-    pub const fn as_display(&'lv self, stream: Option<Stream>) -> impl Display + 'lv {
-        #[derive(Clone, Copy, Debug)]
-        struct LevelDisplay<'lv>(&'lv Level<'lv>, Option<Stream>);
-
-        impl<'lv> Display for LevelDisplay<'lv> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let Self(Level { name, color, .. }, stream) = *self;
-
-                if let Some(stream) = stream {
-                    write!(f, "{}", format_args!("({name})").if_supports_color(stream, |v| v.color(*color)))
-                } else {
-                    write!(f, "({name})")
-                }
-            }
+    /// Closes the logger and its endpoints.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the logger fails to close.
+    pub async fn close(mut self) -> Result<()> {
+        if !self.initialized {
+            return Err(Error::NotInitialized);
         }
 
-        LevelDisplay(self, stream)
-    }
-}
+        self.flush().await?;
 
-/// A log entry.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Entry<'lv> {
-    /// The entry's creation time.
-    pub time: OffsetDateTime,
-    /// The entry's log level.
-    pub level: Level<'lv>,
-    /// The entry's text.
-    pub text: Box<str>,
-}
-
-impl<'lv> Entry<'lv> {
-    /// Creates a new [`Entry`].
-    pub fn new(level: Level<'lv>, text: impl AsRef<str>) -> Self {
-        let time = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
-
-        Self { time, level, text: Box::from(text.as_ref()) }
-    }
-
-    /// Returns a display implementation for this entry.
-    #[must_use]
-    pub const fn as_display(&'lv self, stream: Option<Stream>) -> impl Display + 'lv {
-        #[derive(Clone, Copy, Debug)]
-        struct EntryDisplay<'lv>(&'lv Entry<'lv>, Option<Stream>);
-
-        impl<'lv> Display for EntryDisplay<'lv> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                let Self(Entry { time, level, text }, stream) = *self;
-                let time = time.format(&Iso8601::DEFAULT).unwrap_or_else(|_| unreachable!());
-                let level = level.as_display(stream);
-
-                if let Some(stream) = stream {
-                    write!(f, "{} {level} {text}", format_args!("[{time}]").if_supports_color(stream, |v| v.dimmed()))
-                } else {
-                    write!(f, "[{time}] {level} {text}")
-                }
-            }
+        for endpoint in self.endpoints {
+            endpoint.write().await.close().await?;
         }
 
-        EntryDisplay(self, stream)
-    }
-}
-
-mod color_choice {
-    use clap::ColorChoice;
-    use serde::de::{Unexpected, Visitor};
-    use serde::{Deserializer, Serializer};
-
-    #[allow(clippy::trivially_copy_pass_by_ref)]
-    pub fn serialize<S>(value: &ColorChoice, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(match value {
-            ColorChoice::Auto => "auto",
-            ColorChoice::Always => "always",
-            ColorChoice::Never => "never",
-        })
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<ColorChoice, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct ChoiceVisitor;
-
-        impl Visitor<'_> for ChoiceVisitor {
-            type Value = ColorChoice;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "a color choice")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                match v {
-                    "auto" => Ok(ColorChoice::Auto),
-                    "always" => Ok(ColorChoice::Always),
-                    "never" => Ok(ColorChoice::Never),
-                    _ => Err(E::invalid_value(Unexpected::Str(v), &self)),
-                }
-            }
-        }
-
-        deserializer.deserialize_str(ChoiceVisitor)
+        Ok(())
     }
 }
