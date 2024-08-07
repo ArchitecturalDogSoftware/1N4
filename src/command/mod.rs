@@ -278,18 +278,26 @@ where
 /// # Examples
 ///
 /// ```
-/// define_command!("help", CommandType::ChatInput, struct {
+/// define_command!("scream", CommandType::ChatInput, struct {
 ///     dev_only: false,
 ///     allow_dms: true,
 ///     is_nsfw: false,
 ///     permissions: Permissions::USE_SLASH_COMMANDS,
 /// }, struct {
-///     command_callback: command,
+///     command: on_command,
 /// }, struct {
 ///     ephemeral: Boolean {
 ///         required: true,
 ///     }
 /// });
+///
+/// async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+///     let resolver = CommandOptionResolver::new(context.state);
+///     
+///     context.text("AAAAAAAAAAAAAA", resolver.get_bool("ephemeral")?).await?;
+///
+///     crate::client::event::pass()
+/// }
 /// ```
 #[macro_export]
 macro_rules! define_command {
