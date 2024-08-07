@@ -298,20 +298,21 @@ where
 /// # Examples
 ///
 /// ```
-/// let response = create_response!(context, struct {
-///     kind: DeferredChannelMessageWithSource,
-/// });
-///
-/// response.await?;
+/// // Defer a message.
+/// create_response!(context, struct {
+///     kind: InteractionResponseType::DeferredChannelMessageWithSource,
+/// })
+/// .await?;
 /// ```
 /// ```
-/// let response = create_response!(api.client, &interaction, struct {
-///     client: api.client,
-///     interaction: interaction,
-///     kind: DeferredChannelMessageWithSource,
-/// });
+/// // Respond with an embed.
+/// let embed = EmbedBuilder::new().title("An embedded message!");
 ///
-/// response.await?;
+/// create_response!(api.client, &interaction, struct {
+///     kind: InteractionResponseType::ChannelMessageWithSource,
+///     embeds: [embed.build()]
+/// })
+/// .await?;
 /// ```
 #[macro_export]
 macro_rules! create_response {
@@ -374,16 +375,15 @@ macro_rules! create_response {
 /// # Examples
 ///
 /// ```
-/// let response = follow_up_response!(context, struct {});
-///
-/// response.await?;
+/// /// An empty follow-up.
+/// follow_up_response!(context, struct {}).await?;
 /// ```
 /// ```
-/// let response = follow_up_response!(api.client, interaction, struct {
+/// /// Follow up with an embed.
+/// follow_up_response!(api.client, interaction, struct {
 ///     embeds: &[embed.build()],
-/// });
-///
-/// response.await?;
+/// })
+/// .await?;
 /// ```
 #[macro_export]
 macro_rules! follow_up_response {
