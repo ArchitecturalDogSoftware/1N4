@@ -16,8 +16,6 @@
 
 /// Provides getters for client secrets.
 pub mod secret;
-/// Provides commonly-used trait definitions and blanket implementations.
-pub mod traits;
 /// Provides various useful types and builders.
 pub mod types;
 
@@ -65,6 +63,14 @@ pub mod color {
     pub const SUCCESS: u32 = 0x45_E0_51;
     /// The bot's failure color.
     pub const FAILURE: u32 = 0xDC_3F_31;
+}
+
+/// Provides commonly-used trait definitions and blanket implementations.
+pub mod traits {
+    /// Type conversion traits.
+    pub mod convert;
+    /// Type extension traits.
+    pub mod extension;
 }
 
 /// Determines how strict a contains search is.
