@@ -24,19 +24,7 @@ pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";
 /// The base twemoji CDN URL.
 pub const TWEMOJI_CDN_URL: &str = "https://raw.githubusercontent.com/discord/twemoji/main/assets/72x72";
 
-macro_rules! define_categories {
-    ($($name:ident => $value:literal;)*) => {
-        /// Localizer category constants.
-        #[allow(missing_docs)]
-        pub mod category {
-            pub const LIST: &[&str] = &[$(self::$name),*];
-
-            $(pub const $name: &str = $value;)*
-        }
-    };
-}
-
-define_categories! {
+crate::define_categories! {
     COMMAND => "command";
     COMMAND_OPTION => "command-option";
     COMMAND_CHOICE => "command-choice";
@@ -111,4 +99,35 @@ pub fn fuzzy_contains(strictness: Strictness, base: impl AsRef<str>, find: impl 
             if ignore_casing { base.to_lowercase().contains(&find.to_lowercase()) } else { base.contains(find) }
         }
     }
+}
+
+/// Defines localization category constants within their own 'category' module.
+///
+/// # Examples
+///
+/// ```
+/// define_categories! {
+///     TEXT => "text";
+///     WORDS => "words";
+///     OTHER => "other";
+///     THINGS => "things";
+/// }
+///
+/// localize!(async category::TEXT, "some_key").await?;
+///
+/// for category in category::LIST {
+///     info!(async "categories include '{category}'").await?;
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_categories {
+    ($($name:ident => $value:literal;)*) => {
+        /// Localizer category constants.
+        #[allow(missing_docs)]
+        pub mod category {
+            pub const LIST: &[&str] = &[$(self::$name),*];
+
+            $(pub const $name: &str = $value;)*
+        }
+    };
 }
