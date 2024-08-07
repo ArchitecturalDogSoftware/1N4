@@ -384,17 +384,14 @@ macro_rules! create_response {
 /// # Examples
 ///
 /// ```
-/// let response = follow_up_response! {
-///     context: context,
-/// };
+/// let response = follow_up_response!(context, struct {});
 ///
 /// response.await?;
 /// ```
 /// ```
-/// let response = follow_up_response! {
-///     client: api.client,
-///     interaction: interaction,
-/// };
+/// let response = follow_up_response!(api.client, interaction, struct {
+///     embeds: &[embed.build()],
+/// });
 ///
 /// response.await?;
 /// ```
