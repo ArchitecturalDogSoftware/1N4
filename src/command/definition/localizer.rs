@@ -27,6 +27,7 @@ use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::client::event::EventResult;
 use crate::command::context::Context;
+use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::{category, color, fuzzy_contains, Strictness};
@@ -58,7 +59,7 @@ crate::define_command!("localizer", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
     context.defer(true).await?;
 
     let locale = match context.as_locale() {
@@ -149,6 +150,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
 ///
 /// This function will return an error if the autocompletion could not be executed.
 async fn on_autocomplete<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
     _: Context<'ap, 'ev, &'ev CommandData>,
     option: &'ev str,
     current: &'ev str,

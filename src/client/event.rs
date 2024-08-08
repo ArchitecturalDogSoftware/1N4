@@ -195,7 +195,7 @@ pub async fn on_command(api: Api, event: &Interaction) -> EventResult {
         bail!("missing command callback for '{}'", data.name);
     };
 
-    callable.on_command(Context::new(api.as_ref(), event, data)).await
+    callable.on_command(command, Context::new(api.as_ref(), event, data)).await
 }
 
 /// Handles a component [`Interaction`] event.
@@ -218,7 +218,7 @@ pub async fn on_component(api: Api, event: &Interaction) -> EventResult {
         bail!("missing component callback for '{}'", data_id.name());
     };
 
-    callable.on_component(Context::new(api.as_ref(), event, data), data_id).await
+    callable.on_component(command, Context::new(api.as_ref(), event, data), data_id).await
 }
 
 /// Handles a modal [`Interaction`] event.
@@ -241,7 +241,7 @@ pub async fn on_modal(api: Api, event: &Interaction) -> EventResult {
         bail!("missing component callback for '{}'", data_id.name());
     };
 
-    callback.on_modal(Context::new(api.as_ref(), event, data), data_id).await
+    callback.on_modal(command, Context::new(api.as_ref(), event, data), data_id).await
 }
 
 /// Handles an autocomplete [`Interaction`] event.
@@ -267,7 +267,7 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
     };
 
     let context = Context::new(api.as_ref(), event, &(**data));
-    let mut choices = callback.on_autocomplete(context, name, text, kind).await?.to_vec();
+    let mut choices = callback.on_autocomplete(command, context, name, text, kind).await?.to_vec();
 
     choices.dedup_by_key(|c| c.value.clone());
     choices.sort_unstable_by_key(|c| c.name.clone());

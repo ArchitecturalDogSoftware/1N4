@@ -29,6 +29,7 @@ use twilight_util::permission_calculator::PermissionCalculator;
 
 use crate::client::event::EventResult;
 use crate::command::context::Context;
+use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::{category, color};
 
@@ -43,7 +44,7 @@ crate::define_command!("help", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
     context.defer(true).await?;
 
     let locale = match context.as_locale() {

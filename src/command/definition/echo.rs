@@ -22,6 +22,7 @@ use twilight_model::guild::Permissions;
 
 use crate::client::event::EventResult;
 use crate::command::context::Context;
+use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
 use crate::utility::traits::convert::AsLocale;
@@ -47,7 +48,10 @@ crate::define_command!("echo", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+async fn on_command<'ap: 'ev, 'ev>(
+    entry: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev CommandData>,
+) -> EventResult {
     let Some(ref channel) = context.interaction.channel else {
         bail!("this command must be used in a channel");
     };

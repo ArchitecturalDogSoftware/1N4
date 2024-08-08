@@ -44,6 +44,8 @@ pub mod definition {
     pub mod localizer;
     /// The ping command.
     pub mod ping;
+    /// The role command.
+    pub mod role;
 }
 
 /// A type that can be invoked to construct a command.
@@ -65,7 +67,11 @@ pub trait CommandCallable: Send + Sync {
     /// # Errors
     ///
     /// This function will return an error if execution fails.
-    async fn on_command<'ap: 'ev, 'ev>(&self, context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult;
+    async fn on_command<'ap: 'ev, 'ev>(
+        &self,
+        entry: &CommandEntry,
+        context: Context<'ap, 'ev, &'ev CommandData>,
+    ) -> EventResult;
 }
 
 /// A type that can be invoked to execute a component.
@@ -78,6 +84,7 @@ pub trait ComponentCallable: Send + Sync {
     /// This function will return an error if execution fails.
     async fn on_component<'ap: 'ev, 'ev>(
         &self,
+        entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
         custom_id: CustomId,
     ) -> EventResult;
@@ -93,6 +100,7 @@ pub trait ModalCallable: Send + Sync {
     /// This function will return an error if execution fails.
     async fn on_modal<'ap: 'ev, 'ev>(
         &self,
+        entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev ModalInteractionData>,
         custom_id: CustomId,
     ) -> EventResult;
@@ -108,6 +116,7 @@ pub trait AutocompleteCallable: Send + Sync {
     /// This function will return an error if execution fails.
     async fn on_autocomplete<'ap: 'ev, 'ev>(
         &self,
+        entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev CommandData>,
         option: &'ev str,
         current: &'ev str,
@@ -212,10 +221,11 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_command<'ap: 'ev, 'ev>(
                     &self,
+                    entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
                 ) -> $crate::client::event::EventResult
                 {
-                    $command_callback(context).await
+                    $command_callback(entry, context).await
                 }
             }
         )?
@@ -226,11 +236,12 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_component<'ap: 'ev, 'ev>(
                     &self,
+                    entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
                     custom_id: $crate::utility::types::id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
-                    $component_callback(context, custom_id).await
+                    $component_callback(entry, context, custom_id).await
                 }
             }
         )?
@@ -241,11 +252,12 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_modal<'ap: 'ev, 'ev>(
                     &self,
+                    entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
                     custom_id: $crate::utility::types::id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
-                    $modal_callback(context, custom_id).await
+                    $modal_callback(entry, context, custom_id).await
                 }
             }
         )?
@@ -256,13 +268,14 @@ macro_rules! define_command {
                 #[inline]
                 async fn on_autocomplete<'ap: 'ev, 'ev>(
                     &self,
+                    entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
                     option: &'ev ::std::primitive::str,
                     current: &'ev ::std::primitive::str,
                     kind: ::twilight_model::application::command::CommandOptionType,
                 ) -> ::anyhow::Result<::std::boxed::Box<[::twilight_model::application::command::CommandOptionChoice]>>
                 {
-                    $autocomplete_callback(context, option, current, kind).await
+                    $autocomplete_callback(entry, context, option, current, kind).await
                 }
             }
         )?
