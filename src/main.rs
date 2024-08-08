@@ -20,10 +20,11 @@
 
 use anyhow::Result;
 use clap::Parser;
-use client::Instance;
 use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
 use ina_logging::{error, info};
 use serde::{Deserialize, Serialize};
+
+use self::client::Instance;
 
 /// The bot's client implementation.
 pub mod client;
@@ -39,7 +40,7 @@ pub struct Arguments {
     /// The bot's settings.
     #[command(flatten)]
     #[serde(rename = "client")]
-    pub bot_settings: client::Settings,
+    pub bot_settings: self::client::Settings,
     /// The storage instance's settings.
     #[command(flatten)]
     #[serde(rename = "storage")]

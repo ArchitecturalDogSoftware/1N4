@@ -33,6 +33,7 @@ pub mod context;
 pub mod registry;
 /// Provides helpers for resolving command options.
 pub mod resolver;
+
 /// Provides all defined commands.
 pub mod definition {
     /// The echo command.
