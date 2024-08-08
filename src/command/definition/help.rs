@@ -103,7 +103,7 @@ async fn write_command_section<'ap: 'ev, 'ev, F>(
 where
     F: Write + Send,
 {
-    self::clean_commands(context, &mut commands).await?;
+    self::clean_commands(context, &mut commands);
 
     if commands.is_empty() {
         writeln!(f, "> *{}*", localize!(async(try in locale) category::UI, "help-missing").await?)?;
@@ -172,24 +172,17 @@ where
 }
 
 /// Cleans up a list of commands.
-///
-/// # Errors
-///
-/// This function will return an error if the commands could not be cleaned.
-async fn clean_commands<'ap: 'ev, 'ev>(
-    context: &Context<'ap, 'ev, &'ev CommandData>,
-    commands: &mut Vec<Command>,
-) -> Result<()> {
-    if let Some((guild_id, user_id)) = context.interaction.guild_id.zip(context.interaction.author_id()) {
-        let member = context.interaction.member.as_ref();
-        let permissions = self::get_member_permissions(context, guild_id, user_id, member).await?;
-
-        commands.retain(|c| c.default_member_permissions.is_none_or(|p| p.contains(permissions)));
-    };
+fn clean_commands<'ap: 'ev, 'ev>(_: &Context<'ap, 'ev, &'ev CommandData>, commands: &mut [Command]) {
+    // TODO: See if there's a way to improve this; currently it hides *too many* commands.
+    //
+    // if let Some((guild_id, user_id)) = context.interaction.guild_id.zip(context.interaction.author_id()) {
+    // let member = context.interaction.member.as_ref();
+    // let permissions = self::get_member_permissions(context, guild_id, user_id, member).await?;
+    //
+    // commands.retain(|c| c.default_member_permissions.is_none_or(|p| p.contains(permissions)));
+    // };
 
     commands.sort_unstable_by_key(|c| c.name.clone());
-
-    Ok(())
 }
 
 /// Returns a given member's permissions.
@@ -197,6 +190,7 @@ async fn clean_commands<'ap: 'ev, 'ev>(
 /// # Errors
 ///
 /// This function will return an error if the member's permissions could not be resolved.
+#[allow(unused)]
 async fn get_member_permissions<'ap: 'ev, 'ev>(
     context: &Context<'ap, 'ev, &'ev CommandData>,
     guild_id: Id<GuildMarker>,
