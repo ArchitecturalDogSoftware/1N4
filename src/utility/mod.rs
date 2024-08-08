@@ -16,8 +16,6 @@
 
 /// Provides getters for client secrets.
 pub mod secret;
-/// Provides various useful types and builders.
-pub mod types;
 
 /// The base Discord CDN URL.
 pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";
@@ -59,6 +57,16 @@ pub mod traits {
     pub mod convert;
     /// Type extension traits.
     pub mod extension;
+}
+
+/// Provides various useful types and builders.
+pub mod types {
+    /// A reference to an existing message.
+    pub mod anchor;
+    /// A type that defines custom identifiers.
+    pub mod id;
+    /// A type that defines modal data.
+    pub mod modal;
 }
 
 /// Determines how strict a contains search is.

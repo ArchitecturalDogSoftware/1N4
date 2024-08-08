@@ -234,3 +234,16 @@ impl<'ev> ModalFieldResolver<'ev> {
         self.fields.get(name).copied().ok_or_else(|| Error::MissingField(name.into()))
     }
 }
+
+/// Recursively attempts to find a focused option within the given iterator.
+pub fn find_focused_option<'cd, I>(options: I) -> Option<(&'cd str, &'cd str, CommandOptionType)>
+where
+    I: IntoIterator<Item = &'cd CommandDataOption>,
+{
+    options.into_iter().find_map(|option| match &option.value {
+        CommandOptionValue::Focused(text, kind) => Some((&(*option.name), &(**text), *kind)),
+        CommandOptionValue::SubCommand(options) => self::find_focused_option(options),
+        CommandOptionValue::SubCommandGroup(commands) => self::find_focused_option(commands),
+        _ => None,
+    })
+}

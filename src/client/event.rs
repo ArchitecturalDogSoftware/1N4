@@ -23,6 +23,8 @@ use twilight_model::http::interaction::InteractionResponseType;
 
 use super::api::Api;
 use crate::command::context::Context;
+use crate::command::registry::registry;
+use crate::command::resolver::find_focused_option;
 use crate::utility::traits::extension::InteractionExt;
 use crate::utility::types::id::CustomId;
 
@@ -125,19 +127,19 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
         return self::pass();
     }
 
-    crate::command::initialize().await?;
+    crate::command::registry::initialize().await?;
 
     let client = api.client.interaction(event.application.id);
 
     if let Ok(guild_id) = crate::utility::secret::development_guild_id() {
-        let list = crate::command::registry().await.collect::<Box<[_]>>(Some(guild_id)).await?;
+        let list = registry().await.collect::<Box<[_]>>(Some(guild_id)).await?;
         let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
 
         info!(async "patched {} server commands", list.len()).await?;
     }
 
     if cfg!(not(debug_assertions)) {
-        let list = crate::command::registry().await.collect::<Box<[_]>>(None).await?;
+        let list = registry().await.collect::<Box<[_]>>(None).await?;
         let list = client.set_global_commands(&list).await?.model().await?;
 
         info!(async "patched {} global commands", list.len()).await?;
@@ -184,7 +186,7 @@ pub async fn on_command(api: Api, event: &Interaction) -> EventResult {
         bail!("missing command data");
     };
 
-    let registry = &crate::command::registry().await;
+    let registry = &registry().await;
 
     let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
@@ -207,7 +209,7 @@ pub async fn on_component(api: Api, event: &Interaction) -> EventResult {
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
-    let registry = &crate::command::registry().await;
+    let registry = &registry().await;
 
     let Some(command) = registry.command(data_id.name()) else {
         bail!("missing command entry for '{}'", data_id.name());
@@ -230,7 +232,7 @@ pub async fn on_modal(api: Api, event: &Interaction) -> EventResult {
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
-    let registry = &crate::command::registry().await;
+    let registry = &registry().await;
 
     let Some(command) = registry.command(data_id.name()) else {
         bail!("missing command entry for '{}'", data_id.name());
@@ -252,7 +254,7 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
         bail!("missing command data");
     };
 
-    let registry = &crate::command::registry().await;
+    let registry = &registry().await;
 
     let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
@@ -260,7 +262,7 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
     let Some(ref callback) = command.callbacks.autocomplete else {
         bail!("missing autocomplete callback for '{}'", data.name);
     };
-    let Some((name, text, kind)) = crate::command::find_focused_option(&data.options) else {
+    let Some((name, text, kind)) = find_focused_option(&data.options) else {
         bail!("missing focused option for '{}'", data.name);
     };
 

@@ -20,9 +20,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use api::Api;
 use clap::Args;
-use event::{EventOutput, EventResult};
 use ina_logging::{debug, warn};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -35,6 +33,9 @@ use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresenceP
 use twilight_model::gateway::payload::outgoing::UpdatePresence;
 use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status};
 use twilight_model::gateway::OpCode;
+
+use self::api::Api;
+use self::event::{EventOutput, EventResult};
 
 /// Provides an API structure to be passed between functions.
 pub mod api;
