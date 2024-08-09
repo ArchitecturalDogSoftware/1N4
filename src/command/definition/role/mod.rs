@@ -361,12 +361,6 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     let Some(guild_id) = context.interaction.guild_id else {
         bail!("this component must be used in a guild");
     };
-    let Some(channel_id) = context.interaction.channel.as_ref().map(|c| c.id) else {
-        bail!("this component must be used in a channel");
-    };
-    let Some(message_id) = context.interaction.message.as_ref().map(|m| m.id) else {
-        bail!("this component must be used on a message");
-    };
     let Some(user_id) = context.interaction.author_id() else {
         bail!("this component must be used by a user");
     };
@@ -425,8 +419,6 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
         })
         .await?;
     }
-
-    context.api.client.delete_message(channel_id, message_id).await?;
 
     crate::client::event::pass()
 }

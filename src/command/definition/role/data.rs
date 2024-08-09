@@ -46,9 +46,10 @@ impl Selector {
     ///
     /// This function will return an error if the button could not be created.
     pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Button> {
+        let style = if kind == super::component::remove::NAME { ButtonStyle::Danger } else { ButtonStyle::Secondary };
         let custom_id = CustomId::<Box<str>>::new(entry.name, kind)?;
 
-        Ok(ButtonBuilder::new(ButtonStyle::Secondary)
+        Ok(ButtonBuilder::new(style)
             .custom_id(custom_id.with(self.id.to_string())?)?
             .disabled(disabled)
             .emoji(self.icon.as_emoji()?)?
@@ -87,7 +88,7 @@ impl SelectorList {
         let mut action_row = ActionRowBuilder::new();
 
         for (index, selector) in self.inner.iter().enumerate() {
-            if index % 5 == 0 {
+            if index != 0 && index % 5 == 0 {
                 action_rows.push(action_row.build().into());
 
                 action_row = ActionRowBuilder::new();
