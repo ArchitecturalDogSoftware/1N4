@@ -34,7 +34,7 @@ pub struct Settings {
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
     /// The duration in milliseconds that the logger's queue should retain entries for before flushing.
-    #[arg(id = "LOG_QUEUE_MS", long = "queue-duration", default_value = "10")]
+    #[arg(id = "LOG_QUEUE_MS", long = "queue-duration", default_value = "5")]
     #[serde(default = "default_queue_duration")]
     pub queue_duration: NonZeroU64,
 
