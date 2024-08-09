@@ -345,7 +345,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
     context.api.client.update_guild_member(guild_id, user_id).roles(&member.roles).await?;
     context.success(title, None::<&str>).await?;
 
-    todo!()
+    crate::client::event::pass()
 }
 
 /// Executes the remove component.
