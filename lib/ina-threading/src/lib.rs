@@ -133,17 +133,14 @@ impl<T> HandleHolder<T> for Thread<T>
 where
     T: Send + 'static,
 {
-    #[inline]
     fn as_handle(&self) -> &JoinHandle<T> {
         &self.inner
     }
 
-    #[inline]
     fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
         &mut self.inner
     }
 
-    #[inline]
     fn into_handle(self) -> JoinHandle<T> {
         self.inner
     }

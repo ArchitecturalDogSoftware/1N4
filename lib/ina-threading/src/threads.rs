@@ -89,17 +89,14 @@ where
     S: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_handle(&self) -> &JoinHandle<T> {
         self.thread.as_handle()
     }
 
-    #[inline]
     fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
         self.thread.as_handle_mut()
     }
 
-    #[inline]
     fn into_handle(self) -> JoinHandle<T> {
         self.thread.into_handle()
     }
@@ -110,22 +107,18 @@ where
     S: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_sender(&self) -> &Sender<S> {
         &self.sender
     }
 
-    #[inline]
     fn as_sender_mut(&mut self) -> &mut Sender<S> {
         &mut self.sender
     }
 
-    #[inline]
     fn into_sender(self) -> Sender<S> {
         self.sender
     }
 
-    #[inline]
     fn clone_sender(&self) -> Sender<S> {
         self.sender.clone()
     }
@@ -193,17 +186,14 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_handle(&self) -> &JoinHandle<T> {
         self.thread.as_handle()
     }
 
-    #[inline]
     fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
         self.thread.as_handle_mut()
     }
 
-    #[inline]
     fn into_handle(self) -> JoinHandle<T> {
         self.thread.into_handle()
     }
@@ -214,17 +204,14 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_receiver(&self) -> &Receiver<R> {
         &self.receiver
     }
 
-    #[inline]
     fn as_receiver_mut(&mut self) -> &mut Receiver<R> {
         &mut self.receiver
     }
 
-    #[inline]
     fn into_receiver(self) -> Receiver<R> {
         self.receiver
     }
@@ -298,17 +285,14 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_handle(&self) -> &JoinHandle<T> {
         self.thread.as_handle()
     }
 
-    #[inline]
     fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
         self.thread.as_handle_mut()
     }
 
-    #[inline]
     fn into_handle(self) -> JoinHandle<T> {
         self.thread.into_handle()
     }
@@ -320,22 +304,18 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_sender(&self) -> &Sender<S> {
         &self.sender
     }
 
-    #[inline]
     fn as_sender_mut(&mut self) -> &mut Sender<S> {
         &mut self.sender
     }
 
-    #[inline]
     fn into_sender(self) -> Sender<S> {
         self.sender
     }
 
-    #[inline]
     fn clone_sender(&self) -> Sender<S> {
         self.sender.clone()
     }
@@ -347,17 +327,14 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    #[inline]
     fn as_receiver(&self) -> &Receiver<R> {
         &self.receiver
     }
 
-    #[inline]
     fn as_receiver_mut(&mut self) -> &mut Receiver<R> {
         &mut self.receiver
     }
 
-    #[inline]
     fn into_receiver(self) -> Receiver<R> {
         self.receiver
     }
@@ -566,17 +543,14 @@ where
     S: Send + 'static,
     R: Send + 'static,
 {
-    #[inline]
     fn as_handle(&self) -> &JoinHandle<()> {
         self.inner.as_handle()
     }
 
-    #[inline]
     fn as_handle_mut(&mut self) -> &mut JoinHandle<()> {
         self.inner.as_handle_mut()
     }
 
-    #[inline]
     fn into_handle(self) -> JoinHandle<()> {
         self.inner.into_handle()
     }
@@ -587,22 +561,18 @@ where
     S: Send + 'static,
     R: Send + 'static,
 {
-    #[inline]
     fn as_sender(&self) -> &Sender<(Option<usize>, S)> {
         self.inner.as_sender()
     }
 
-    #[inline]
     fn as_sender_mut(&mut self) -> &mut Sender<(Option<usize>, S)> {
         self.inner.as_sender_mut()
     }
 
-    #[inline]
     fn into_sender(self) -> Sender<(Option<usize>, S)> {
         self.inner.into_sender()
     }
 
-    #[inline]
     fn clone_sender(&self) -> Sender<(Option<usize>, S)> {
         self.inner.clone_sender()
     }
@@ -613,17 +583,14 @@ where
     S: Send + 'static,
     R: Send + 'static,
 {
-    #[inline]
     fn as_receiver(&self) -> &Receiver<(Option<usize>, R)> {
         self.inner.as_receiver()
     }
 
-    #[inline]
     fn as_receiver_mut(&mut self) -> &mut Receiver<(Option<usize>, R)> {
         self.inner.as_receiver_mut()
     }
 
-    #[inline]
     fn into_receiver(self) -> Receiver<(Option<usize>, R)> {
         self.inner.into_receiver()
     }
@@ -693,7 +660,6 @@ where
     ///
     /// This function will return an error if the thread is disconnected.
     #[allow(clippy::type_complexity)]
-    #[inline]
     pub async fn invoke(&mut self, input: S) -> Result<R, (Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.invoke((Arc::clone(&self.state), input)).await
     }
@@ -710,7 +676,6 @@ where
     ///
     /// This function will return an error if the thread is disconnected.
     #[allow(clippy::type_complexity)]
-    #[inline]
     pub fn blocking_invoke(&mut self, input: S) -> Result<R, (Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.blocking_invoke((Arc::clone(&self.state), input))
     }
@@ -721,7 +686,6 @@ where
     ///
     /// This function will return an error if the thread is disconnected.
     #[allow(clippy::type_complexity)]
-    #[inline]
     pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.invoke_and_forget((Arc::clone(&self.state), input)).await
     }
@@ -738,7 +702,6 @@ where
     ///
     /// This function will return an error if the thread is disconnected.
     #[allow(clippy::type_complexity)]
-    #[inline]
     pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.blocking_invoke_and_forget((Arc::clone(&self.state), input))
     }
@@ -750,17 +713,14 @@ where
     S: Send + 'static,
     R: Send + 'static,
 {
-    #[inline]
     fn as_handle(&self) -> &JoinHandle<()> {
         self.inner.as_handle()
     }
 
-    #[inline]
     fn as_handle_mut(&mut self) -> &mut JoinHandle<()> {
         self.inner.as_handle_mut()
     }
 
-    #[inline]
     fn into_handle(self) -> JoinHandle<()> {
         self.inner.into_handle()
     }
@@ -772,22 +732,18 @@ where
     S: Send + 'static,
     R: Send + 'static,
 {
-    #[inline]
     fn as_sender(&self) -> &Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.as_sender()
     }
 
-    #[inline]
     fn as_sender_mut(&mut self) -> &mut Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.as_sender_mut()
     }
 
-    #[inline]
     fn into_sender(self) -> Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.into_sender()
     }
 
-    #[inline]
     fn clone_sender(&self) -> Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
         self.inner.clone_sender()
     }
@@ -799,17 +755,14 @@ where
     S: Send + 'static,
     R: Send + 'static,
 {
-    #[inline]
     fn as_receiver(&self) -> &Receiver<(Option<usize>, R)> {
         self.inner.as_receiver()
     }
 
-    #[inline]
     fn as_receiver_mut(&mut self) -> &mut Receiver<(Option<usize>, R)> {
         self.inner.as_receiver_mut()
     }
 
-    #[inline]
     fn into_receiver(self) -> Receiver<(Option<usize>, R)> {
         self.inner.into_receiver()
     }
