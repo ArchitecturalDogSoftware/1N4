@@ -124,6 +124,88 @@ pub trait AutocompleteCallable: Send + Sync {
     ) -> Result<Box<[CommandOptionChoice]>>;
 }
 
+/// Defines and matches for components.
+///
+/// # Examples
+///
+/// ```
+/// crate::define_components! {
+///     select => on_select_component,
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_components {
+    ($($name:ident => $call:ident),* $(,)?) => {
+        /// Defines the command's component callbacks.
+        #[allow(missing_docs)]
+        mod component {$(
+            pub mod $name {
+                pub(in super::super) use super::super::$call as callback;
+
+                /// The component's name.
+                pub const NAME: &::std::primitive::str = ::std::stringify!($name);
+            }
+        )*}
+
+        /// Executes the component.
+        ///
+        /// # Errors
+        ///
+        /// This function will return an error if the component could not be executed.
+        async fn on_component<'ap: 'ev, 'ev>(
+            entry: &$crate::command::registry::CommandEntry,
+            context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
+            custom_id: $crate::utility::types::id::CustomId,
+        ) -> $crate::client::event::EventResult {
+            match custom_id.kind() {
+                $(self::component::$name::NAME => self::component::$name::callback(entry, context, custom_id).await,)*
+                _ => ::anyhow::bail!("unknown or missing component"),
+            }
+        }
+    };
+}
+
+/// Defines and matches for modals.
+///
+/// # Examples
+///
+/// ```
+/// crate::define_modals! {
+///     select => on_select_modal,
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_modals {
+    ($($name:ident => $call:ident),* $(,)?) => {
+        /// Defines the command's modal callbacks.
+        #[allow(missing_docs)]
+        mod modal {$(
+            pub mod $name {
+                pub(in super::super) use super::super::$call as callback;
+
+                /// The modal's name.
+                pub const NAME: &::std::primitive::str = ::std::stringify!($name);
+            }
+        )*}
+
+        /// Executes the modal.
+        ///
+        /// # Errors
+        ///
+        /// This function will return an error if the modal could not be executed.
+        async fn on_modal<'ap: 'ev, 'ev>(
+            entry: &$crate::command::registry::CommandEntry,
+            context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
+            custom_id: $crate::utility::types::id::CustomId,
+        ) -> $crate::client::event::EventResult {
+            match custom_id.kind() {
+                $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id).await,)*
+                _ => ::anyhow::bail!("unknown or missing modal"),
+            }
+        }
+    };
+}
+
 /// Creates a command.
 ///
 /// # Examples

@@ -16,20 +16,21 @@
 
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
+use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 
 use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::command::registry::CommandEntry;
+use crate::utility::types::id::CustomId;
 
 /// The command's data.
 mod data;
-
-pub const SELECT_COMPONENT_NAME: &str = "select";
 
 crate::define_command!("role", CommandType::ChatInput, struct {
     allow_dms: true,
 }, struct {
     command: on_command,
+    component: on_component,
 }, struct {
     create: SubCommand {
         role: Role {
@@ -48,6 +49,10 @@ crate::define_command!("role", CommandType::ChatInput, struct {
     finish: SubCommand {},
 });
 
+crate::define_components! {
+    select => on_select_component,
+}
+
 /// Executes the command.
 ///
 /// # Errors
@@ -56,6 +61,19 @@ crate::define_command!("role", CommandType::ChatInput, struct {
 async fn on_command<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
+) -> EventResult {
+    todo!()
+}
+
+/// Executes the select component.
+///
+/// # Errors
+///
+/// This function will return an error if the component could not be executed.
+async fn on_select_component<'ap: 'ev, 'ev>(
+    entry: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    custom_id: CustomId,
 ) -> EventResult {
     todo!()
 }

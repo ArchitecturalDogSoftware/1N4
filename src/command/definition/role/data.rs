@@ -14,18 +14,18 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::ops::{Deref, DerefMut};
-
 use anyhow::Result;
 use ina_macro::Stored;
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
 use twilight_model::channel::message::component::{Button, ButtonStyle};
+use twilight_model::channel::message::Component;
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
 
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
+use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
 use crate::utility::types::id::CustomId;
 
 /// A role selector entry.
@@ -46,15 +46,14 @@ impl Entry {
     ///
     /// This function will return an error if the button could not be created.
     pub fn build(&self, entry: &CommandEntry, disabled: bool) -> Result<Button> {
-        let mut custom_id = CustomId::<Box<str>>::new(entry.name, super::SELECT_COMPONENT_NAME)?;
+        let custom_id = CustomId::<Box<str>>::new(entry.name, super::component::select::NAME)?;
 
-        custom_id.push(self.id.to_string())?;
-
-        let custom_id = Some(custom_id.to_string());
-        let emoji = Some(self.icon.as_emoji()?);
-        let label = Some(self.name.to_string());
-
-        Ok(Button { custom_id, disabled, emoji, label, style: ButtonStyle::Secondary, url: None })
+        Ok(ButtonBuilder::new(ButtonStyle::Secondary)
+            .custom_id(custom_id.with(self.id.to_string())?)?
+            .disabled(disabled)
+            .emoji(self.icon.as_emoji()?)?
+            .label(self.name.as_ref())?
+            .build())
     }
 }
 
@@ -64,23 +63,42 @@ impl Entry {
 #[data_path(fmt = "role/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
 pub struct SelectorList {
     /// The user identifier.
-    user_id: Id<UserMarker>,
+    pub user_id: Id<UserMarker>,
     /// The guild identifier.
-    guild_id: Id<GuildMarker>,
+    pub guild_id: Id<GuildMarker>,
     /// The inner list of selectors.
-    inner: Vec<Entry>,
+    pub inner: Vec<Entry>,
 }
 
-impl Deref for SelectorList {
-    type Target = Vec<Entry>;
+impl SelectorList {
+    /// Builds the selector entry list into a list of components.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if a button could not be created.
+    pub fn build(&self, entry: &CommandEntry, disabled: bool) -> Result<Box<[Component]>> {
+        let action_row_count = self.inner.len().div_ceil(5).min(5);
+        let mut action_rows = Vec::<Component>::with_capacity(action_row_count);
+        let mut action_row = ActionRowBuilder::new();
 
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
+        for (index, selector) in self.inner.iter().enumerate() {
+            if index % 5 == 0 {
+                action_rows.push(action_row.build().into());
 
-impl DerefMut for SelectorList {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+                action_row = ActionRowBuilder::new();
+            }
+
+            let button = selector.build(entry, disabled)?;
+
+            action_row = action_row.component(button)?;
+        }
+
+        let action_row = action_row.build();
+
+        if !action_row.components.is_empty() {
+            action_rows.push(action_row.into());
+        }
+
+        Ok(action_rows.into_boxed_slice())
     }
 }
