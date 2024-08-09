@@ -36,7 +36,7 @@ impl DataEncode for XMachina {
     type Error = Infallible;
 
     fn encode<T: Serialize>(&self, _: &T) -> Result<Arc<[u8]>, Self::Error> {
-        todo!("xmachina is not yet implemented")
+        unimplemented!("xmachina is not yet implemented")
     }
 }
 
@@ -44,6 +44,6 @@ impl DataDecode for XMachina {
     type Error = Infallible;
 
     fn decode<T: for<'de> Deserialize<'de>>(&self, _: &[u8]) -> Result<T, Self::Error> {
-        todo!("xmachina is not yet implemented")
+        unimplemented!("xmachina is not yet implemented")
     }
 }
