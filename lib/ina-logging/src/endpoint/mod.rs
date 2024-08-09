@@ -57,7 +57,6 @@ pub trait Endpoint: std::fmt::Debug + Send + Sync + 'static {
     async fn close(&mut self) -> Result<()>;
 
     /// Returns an invalid state error.
-    #[inline]
     fn invalid_state(&self) -> Error {
         Error::InvalidEndpointState(self.name())
     }

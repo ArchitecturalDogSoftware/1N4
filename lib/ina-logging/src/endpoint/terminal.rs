@@ -35,7 +35,6 @@ pub struct TerminalEndpoint {
 
 impl TerminalEndpoint {
     /// Creates a new [`TerminalEndpoint`].
-    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self { stdout: None, stderr: None }
@@ -44,7 +43,6 @@ impl TerminalEndpoint {
 
 #[async_trait::async_trait]
 impl Endpoint for TerminalEndpoint {
-    #[inline]
     fn name(&self) -> &'static str {
         "terminal"
     }

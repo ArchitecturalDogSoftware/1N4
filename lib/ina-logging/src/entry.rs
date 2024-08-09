@@ -26,14 +26,12 @@ pub struct Timestamp {
 
 impl Timestamp {
     /// Creates a new [`Timestamp`].
-    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self { time: OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc()) }
     }
 
     /// Returns a display implementation for this [`Timestamp`].
-    #[inline]
     #[must_use]
     pub const fn display(
         &self,
@@ -48,7 +46,6 @@ impl Timestamp {
 }
 
 impl Default for Timestamp {
-    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -98,7 +95,6 @@ impl<'lv> Level<'lv> {
     };
 
     /// Returns a display implementation for this [`Level`].
-    #[inline]
     #[must_use]
     pub const fn display(
         &self,
@@ -131,7 +127,6 @@ impl<'lv> Entry<'lv> {
     }
 
     /// Returns a display implementation for this [`Entry`].
-    #[inline]
     #[must_use]
     pub const fn display(
         &self,

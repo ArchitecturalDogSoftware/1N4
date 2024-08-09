@@ -43,7 +43,6 @@ pub struct FileEndpoint {
 
 impl FileEndpoint {
     /// Creates a new [`FileEndpoint`].
-    #[inline]
     #[must_use]
     pub const fn new() -> Self {
         Self { handle: None }
@@ -52,7 +51,6 @@ impl FileEndpoint {
 
 #[async_trait::async_trait]
 impl Endpoint for FileEndpoint {
-    #[inline]
     fn name(&self) -> &'static str {
         "file"
     }
