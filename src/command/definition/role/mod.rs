@@ -290,6 +290,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
     let components = selectors.build(entry, component::select::NAME, false)?;
 
     context.api.client.create_message(channel_id).components(&components).await?;
+    selectors.as_async_api().delete().await?;
 
     let text = localize!(async(try in locale) category::UI, "role-finished").await?;
 
