@@ -91,3 +91,5 @@ role-selector-limit = "Se ha alcanzado el número máximo de selectores."
 
 role-remove-emptied = "Se han eliminado todos los selectores de roles."
 role-remove-missing = "El rol seleccionado ya se ha eliminado."
+
+role-finished = "Finalizados los selectores de roles."
