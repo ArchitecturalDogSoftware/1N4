@@ -34,7 +34,6 @@ mod stored;
 ///     value: u64,
 /// }
 /// ```
-#[inline]
 #[proc_macro_derive(Stored, attributes(data_path, data_format))]
 pub fn stored(input: TokenStream) -> TokenStream {
     crate::stored::procedure(input)

@@ -128,12 +128,10 @@ pub fn procedure(input: TokenStream) -> TokenStream {
         {
             type PathArguments = (#(#path_arguments),*);
 
-            #[inline]
             fn data_format() -> impl ::ina_storage::format::DataFormat + ::std::marker::Send {
                 <#format_type as ::std::default::Default>::default()
             }
 
-            #[inline]
             fn data_path_for(
                 (#(#path_format_arguments),*): <Self as ::ina_storage::stored::Stored>::PathArguments
             ) -> impl ::std::convert::AsRef<::std::path::Path> + ::std::marker::Send
@@ -141,7 +139,6 @@ pub fn procedure(input: TokenStream) -> TokenStream {
                 ::std::format!(#path_format, #(#path_format_arguments),*)
             }
 
-            #[inline]
             fn data_path(&self) -> impl ::std::convert::AsRef<::std::path::Path> + ::std::marker::Send {
                 /// This impl allows type-level validation that the arguments are in proper type ordering.
                 struct TypeValidation<'lt>(#(&'lt #path_arguments),*);
