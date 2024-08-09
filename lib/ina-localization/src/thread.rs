@@ -76,19 +76,16 @@ where
     T: Deref<Target = str>,
 {
     /// Creates a new [`TranslationKey<T>`].
-    #[inline]
     pub const fn new(category: T, key: T) -> Self {
         Self(category, key)
     }
 
     /// Returns a reference to the category of this [`TranslationKey<T>`].
-    #[inline]
     pub fn category(&self) -> &str {
         &self.0
     }
 
     /// Returns a reference to the key of this [`TranslationKey<T>`].
-    #[inline]
     pub fn key(&self) -> &str {
         &self.1
     }
@@ -98,7 +95,6 @@ impl<T, S> From<(S, S)> for TranslationKey<T>
 where
     T: Deref<Target = str> + From<S>,
 {
-    #[inline]
     fn from((category, key): (S, S)) -> Self {
         Self(category.into(), key.into())
     }

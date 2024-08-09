@@ -184,14 +184,12 @@ impl FromStr for Locale {
 impl ValueParserFactory for Locale {
     type Parser = LocaleParser;
 
-    #[inline]
     fn value_parser() -> Self::Parser {
         LocaleParser
     }
 }
 
 impl Serialize for Locale {
-    #[inline]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -201,7 +199,6 @@ impl Serialize for Locale {
 }
 
 impl<'de> Deserialize<'de> for Locale {
-    #[inline]
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
