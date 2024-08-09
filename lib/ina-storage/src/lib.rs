@@ -95,25 +95,21 @@ pub struct Storage {
 
 impl DataSystem for Storage {
     #[allow(clippy::expect_used)]
-    #[inline]
     fn blocking_get() -> impl Deref<Target = Self> {
         RwLockReadGuard::map(STORAGE.blocking_read(), |v| v.as_ref().expect("the instance has not been initialized"))
     }
 
     #[allow(clippy::expect_used)]
-    #[inline]
     async fn get() -> impl Deref<Target = Self> {
         RwLockReadGuard::map(STORAGE.read().await, |v| v.as_ref().expect("the instance has not been initialized"))
     }
 
     #[allow(clippy::expect_used)]
-    #[inline]
     fn blocking_get_mut() -> impl DerefMut<Target = Self> {
         RwLockWriteGuard::map(STORAGE.blocking_write(), |v| v.as_mut().expect("the instance has not been initialized"))
     }
 
     #[allow(clippy::expect_used)]
-    #[inline]
     async fn get_mut() -> impl DerefMut<Target = Self> {
         RwLockWriteGuard::map(STORAGE.write().await, |v| v.as_mut().expect("the instance has not been initialized"))
     }

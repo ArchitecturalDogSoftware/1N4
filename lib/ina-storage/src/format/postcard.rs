@@ -26,7 +26,6 @@ use super::{DataDecode, DataEncode, DataFormat};
 pub struct Postcard;
 
 impl DataFormat for Postcard {
-    #[inline]
     fn extension(&self) -> impl AsRef<OsStr> {
         "card"
     }
@@ -45,7 +44,6 @@ impl DataEncode for Postcard {
 impl DataDecode for Postcard {
     type Error = postcard::Error;
 
-    #[inline]
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {
         postcard::from_bytes(bytes)
     }

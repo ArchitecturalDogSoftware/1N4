@@ -26,7 +26,6 @@ use super::{DataDecode, DataEncode, DataFormat};
 pub struct Messagepack;
 
 impl DataFormat for Messagepack {
-    #[inline]
     fn extension(&self) -> impl AsRef<OsStr> {
         "pack"
     }
@@ -35,7 +34,6 @@ impl DataFormat for Messagepack {
 impl DataEncode for Messagepack {
     type Error = rmp_serde::encode::Error;
 
-    #[inline]
     fn encode<T: Serialize>(&self, value: &T) -> Result<Arc<[u8]>, Self::Error> {
         rmp_serde::to_vec_named(value).map(Into::into)
     }
@@ -44,7 +42,6 @@ impl DataEncode for Messagepack {
 impl DataDecode for Messagepack {
     type Error = rmp_serde::decode::Error;
 
-    #[inline]
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {
         rmp_serde::from_slice(bytes)
     }

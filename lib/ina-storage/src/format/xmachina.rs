@@ -27,7 +27,6 @@ use super::{DataDecode, DataEncode, DataFormat};
 pub struct XMachina;
 
 impl DataFormat for XMachina {
-    #[inline]
     fn extension(&self) -> impl AsRef<OsStr> {
         "xmach"
     }
@@ -36,7 +35,6 @@ impl DataFormat for XMachina {
 impl DataEncode for XMachina {
     type Error = Infallible;
 
-    #[inline]
     fn encode<T: Serialize>(&self, _: &T) -> Result<Arc<[u8]>, Self::Error> {
         todo!("xmachina is not yet implemented")
     }
@@ -45,7 +43,6 @@ impl DataEncode for XMachina {
 impl DataDecode for XMachina {
     type Error = Infallible;
 
-    #[inline]
     fn decode<T: for<'de> Deserialize<'de>>(&self, _: &[u8]) -> Result<T, Self::Error> {
         todo!("xmachina is not yet implemented")
     }

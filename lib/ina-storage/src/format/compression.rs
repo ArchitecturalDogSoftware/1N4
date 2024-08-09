@@ -52,31 +52,26 @@ impl<F: Debug + DataFormat> Compress<F> {
     /// Creates a new [`Compress<F>`] format.
     ///
     /// The given level should be within the range `0..=9`.
-    #[inline]
     pub const fn new(inner: F, level: u8) -> Self {
         Self { inner, level: Compression::new(level as u32) }
     }
 
     /// Creates a new [`Compress<F>`] format with no compression.
-    #[inline]
     pub const fn new_none(inner: F) -> Self {
         Self::new(inner, 0)
     }
 
     /// Creates a new [`Compress<F>`] format using a fast level of compression.
-    #[inline]
     pub const fn new_fast(inner: F) -> Self {
         Self::new(inner, 1)
     }
 
     /// Creates a new [`Compress<F>`] format using the default level of compression.
-    #[inline]
     pub const fn new_default(inner: F) -> Self {
         Self::new(inner, 5)
     }
 
     /// Creates a new [`Compress<F>`] format using the best level of compression.
-    #[inline]
     pub const fn new_best(inner: F) -> Self {
         Self::new(inner, 9)
     }

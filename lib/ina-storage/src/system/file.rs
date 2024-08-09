@@ -30,22 +30,18 @@ static INSTANCE: RwLock<FileSystem> = RwLock::const_new(FileSystem);
 pub struct FileSystem;
 
 impl DataSystem for FileSystem {
-    #[inline]
     fn blocking_get() -> impl Deref<Target = Self> {
         INSTANCE.blocking_read()
     }
 
-    #[inline]
     async fn get() -> impl Deref<Target = Self> {
         INSTANCE.read().await
     }
 
-    #[inline]
     fn blocking_get_mut() -> impl DerefMut<Target = Self> {
         INSTANCE.blocking_write()
     }
 
-    #[inline]
     async fn get_mut() -> impl DerefMut<Target = Self> {
         INSTANCE.write().await
     }
@@ -54,32 +50,26 @@ impl DataSystem for FileSystem {
 impl DataReader for FileSystem {
     type Error = std::io::Error;
 
-    #[inline]
     fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
         std::fs::exists(path)
     }
 
-    #[inline]
     async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
         tokio::fs::try_exists(path).await
     }
 
-    #[inline]
     fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
         Ok(std::fs::metadata(path)?.len())
     }
 
-    #[inline]
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
         Ok(tokio::fs::metadata(path).await?.len())
     }
 
-    #[inline]
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         Ok(std::fs::read(path)?.into())
     }
 
-    #[inline]
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         Ok(tokio::fs::read(path).await?.into())
     }
@@ -120,12 +110,10 @@ impl DataWriter for FileSystem {
         tokio::fs::rename(from, into).await
     }
 
-    #[inline]
     fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         if path.is_dir() { std::fs::remove_dir(path) } else { std::fs::remove_file(path) }
     }
 
-    #[inline]
     async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         if path.is_dir() { tokio::fs::remove_dir(path).await } else { tokio::fs::remove_file(path).await }
     }

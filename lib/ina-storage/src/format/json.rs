@@ -26,7 +26,6 @@ use super::{DataDecode, DataEncode, DataFormat};
 pub struct Json;
 
 impl DataFormat for Json {
-    #[inline]
     fn extension(&self) -> impl AsRef<OsStr> {
         "json"
     }
@@ -35,7 +34,6 @@ impl DataFormat for Json {
 impl DataEncode for Json {
     type Error = serde_json::Error;
 
-    #[inline]
     fn encode<T: Serialize>(&self, value: &T) -> Result<Arc<[u8]>, Self::Error> {
         serde_json::to_vec_pretty(value).map(Into::into)
     }
@@ -44,7 +42,6 @@ impl DataEncode for Json {
 impl DataDecode for Json {
     type Error = serde_json::Error;
 
-    #[inline]
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {
         serde_json::from_slice(bytes)
     }
