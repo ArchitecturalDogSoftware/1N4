@@ -78,6 +78,11 @@ localizer-unknown = "Unknown locale"
 ping-start = "Calculating..."
 ping-finish = "Operation successful!"
 
+role-invalid-icon = "Role icon must be an emoticon."
+role-selector-added = "Added role selector."
+role-selector-duplicate = "The given role has already been added."
+role-selector-limit = "Maximum selector count reached."
+
 role-added = "Added role."
 role-removed = "Removed role."
 

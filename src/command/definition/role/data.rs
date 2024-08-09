@@ -30,7 +30,7 @@ use crate::utility::types::id::CustomId;
 
 /// A role selector entry.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Entry {
+pub struct Selector {
     /// The role's identifier.
     pub id: Id<RoleMarker>,
     /// The selector's icon.
@@ -39,7 +39,7 @@ pub struct Entry {
     pub name: Box<str>,
 }
 
-impl Entry {
+impl Selector {
     /// Builds the selector entry into a button.
     ///
     /// # Errors
@@ -67,10 +67,15 @@ pub struct SelectorList {
     /// The guild identifier.
     pub guild_id: Id<GuildMarker>,
     /// The inner list of selectors.
-    pub inner: Vec<Entry>,
+    pub inner: Vec<Selector>,
 }
 
 impl SelectorList {
+    /// Creates a new [`SelectorList`].
+    pub const fn new(guild_id: Id<GuildMarker>, user_id: Id<UserMarker>) -> Self {
+        Self { user_id, guild_id, inner: Vec::new() }
+    }
+
     /// Builds the selector entry list into a list of components.
     ///
     /// # Errors

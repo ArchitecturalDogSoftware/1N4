@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use anyhow::bail;
-use data::SelectorList;
+use anyhow::{anyhow, bail};
+use data::{Selector, SelectorList};
 use ina_localization::localize;
 use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
@@ -29,7 +29,7 @@ use crate::command::context::Context;
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
-use crate::utility::traits::convert::AsLocale;
+use crate::utility::traits::convert::{AsEmoji, AsLocale};
 use crate::utility::types::id::CustomId;
 
 /// The command's data.
@@ -74,11 +74,71 @@ crate::define_components! {
 ///
 /// This function will return an error if the command could not be executed.
 async fn on_create_command<'ap: 'ev, 'ev>(
-    entry: &CommandEntry,
+    _: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
     resolver: CommandOptionResolver<'ev>,
 ) -> EventResult {
-    todo!()
+    let Some(guild_id) = context.interaction.guild_id else {
+        bail!("this command must be used in a guild");
+    };
+    let Some(user_id) = context.interaction.author_id() else {
+        bail!("this command must be used by a user");
+    };
+    let role_id = resolver.get_role_id("role")?;
+    let icon = resolver.get_str("icon")?;
+
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    if icon.as_emoji().is_err() {
+        let title = localize!(async(try in locale) category::UI, "role-invalid-icon").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    };
+
+    let name = if let Some(role) = context.api.cache.role(*role_id) {
+        role.name.clone()
+    } else {
+        let roles = context.api.client.roles(guild_id).await?.model().await?;
+        let role = roles.into_iter().find_map(|r| (&r.id == role_id).then_some(r.name));
+
+        role.ok_or_else(|| anyhow!("invalid role identifier"))?
+    }
+    .into_boxed_str();
+
+    let selectors = SelectorList::async_api().read((guild_id, user_id)).await;
+    let mut selectors = selectors.unwrap_or_else(|_| SelectorList::new(guild_id, user_id));
+
+    if selectors.inner.iter().any(|s| &s.id == role_id) {
+        let title = localize!(async(try in locale) category::UI, "role-selector-duplicate").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+    if selectors.inner.len() >= 25 {
+        let title = localize!(async(try in locale) category::UI, "role-selector-limit").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+
+    selectors.inner.push(Selector { id: *role_id, name, icon: icon.into() });
+    selectors.as_async_api().write().await?;
+
+    let text = localize!(async(try in locale) category::UI, "role-selector-added").await?;
+
+    context.success(text, None::<&str>).await?;
+
+    crate::client::event::pass()
 }
 
 /// Executes the delete command.
