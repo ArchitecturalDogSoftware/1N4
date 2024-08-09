@@ -25,6 +25,12 @@ If you are running your own instance of 1N4, ensure that the following environme
 - `DEVELOPMENT_GUILD_ID` - The bot's 'development guild', which is where the bot will accept interactions from when not running in release mode.
 - `DEVELOPMENT_CHANNEL_ID` - The bot's 'development channel', which is where things like error logs are sent. 1N4 assumes that the given channel is within the guild specified by `DEVELOPMENT_GUILD_ID`
 
+## Contributing
+
+Contributions are always welcome! If you're interested in helping development, please read 1N4's [contribution guidelines](./doc/CONTRIBUTING.md).
+
+If you ever need help, feel free to contact me here or on Discord, and I will do my best to assist you <3
+
 ## License
 
 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
