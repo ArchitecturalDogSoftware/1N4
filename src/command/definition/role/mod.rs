@@ -14,13 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use anyhow::bail;
+use data::SelectorList;
+use ina_localization::localize;
+use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
+use twilight_model::id::marker::RoleMarker;
+use twilight_model::id::Id;
 
 use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::command::registry::CommandEntry;
+use crate::utility::category;
+use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::id::CustomId;
 
 /// The command's data.
@@ -51,6 +59,7 @@ crate::define_command!("role", CommandType::ChatInput, struct {
 
 crate::define_components! {
     select => on_select_component,
+    remove => on_remove_component,
 }
 
 /// Executes the command.
@@ -71,9 +80,129 @@ async fn on_command<'ap: 'ev, 'ev>(
 ///
 /// This function will return an error if the component could not be executed.
 async fn on_select_component<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    custom_id: CustomId,
+) -> EventResult {
+    let Some(guild_id) = context.interaction.guild_id else {
+        bail!("this command must be used in a guild");
+    };
+    let Some(user_id) = context.interaction.author_id() else {
+        bail!("this command must be used by a user");
+    };
+    let Some(role_id) = custom_id.data().first() else {
+        bail!("missing role identifier data");
+    };
+    let role_id: Id<RoleMarker> = role_id.parse()?;
+
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    let mut member = context.api.client.guild_member(guild_id, user_id).await?.model().await?;
+
+    member.roles.dedup(); // Do we even need to de-duplicate here?
+    member.roles.sort_unstable();
+
+    let title = if let Ok(index) = member.roles.binary_search(&role_id) {
+        member.roles.remove(index);
+
+        localize!(async(try in locale) category::UI, "role-removed").await?
+    } else {
+        member.roles.push(role_id);
+
+        localize!(async(try in locale) category::UI, "role-added").await?
+    };
+
+    context.api.client.update_guild_member(guild_id, user_id).roles(&member.roles).await?;
+    context.success(title, None::<&str>).await?;
+
+    todo!()
+}
+
+/// Executes the remove component.
+///
+/// # Errors
+///
+/// This function will return an error if the component could not be executed.
+async fn on_remove_component<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
     custom_id: CustomId,
 ) -> EventResult {
-    todo!()
+    let Some(guild_id) = context.interaction.guild_id else {
+        bail!("this component must be used in a guild");
+    };
+    let Some(channel_id) = context.interaction.channel.as_ref().map(|c| c.id) else {
+        bail!("this component must be used in a channel");
+    };
+    let Some(message_id) = context.interaction.message.as_ref().map(|m| m.id) else {
+        bail!("this component must be used on a message");
+    };
+    let Some(user_id) = context.interaction.author_id() else {
+        bail!("this component must be used by a user");
+    };
+    let Some(role_id) = custom_id.data().first() else {
+        bail!("missing role identifier data");
+    };
+    let role_id: Id<RoleMarker> = role_id.parse()?;
+
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+        let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+
+    let Ok(mut selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+        let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    };
+
+    if !selectors.inner.iter().any(|e| e.id == role_id) {
+        let title = localize!(async(try in locale) category::UI, "role-remove-missing").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+
+    selectors.inner.retain(|e| e.id != role_id);
+
+    if selectors.inner.is_empty() {
+        selectors.as_async_api().delete().await?;
+
+        let title = localize!(async(try in locale) category::UI, "role-remove-emptied").await?;
+
+        context.success(title, None::<&str>).await?;
+    } else {
+        selectors.as_async_api().write().await?;
+
+        let components = selectors.build(entry, component::remove::NAME, false)?;
+
+        crate::follow_up_response!(context, struct {
+            components: &components,
+        })
+        .await?;
+    }
+
+    context.api.client.delete_message(channel_id, message_id).await?;
+
+    crate::client::event::pass()
 }

@@ -7,6 +7,8 @@ localizer-name = "localizer"
 localizer-description = "Provides access to the bot's localizer."
 ping-name = "ping"
 ping-description = "Calculates the bot's approximate response time."
+role-name = "role"
+role-description = "Create and manage role selectors."
 
 [command-option]
 echo-content-name = "content"
@@ -25,6 +27,19 @@ localizer-category-name = "category"
 localizer-category-description = "The translation category."
 localizer-key-name = "key"
 localizer-key-description = "The translation key."
+
+role-create-name = "create"
+role-create-description = "Create a new role selector."
+role-role-name = "role"
+role-role-description = "The role to add to the user."
+role-icon-name = "icon"
+role-icon-description = "The emoji icon of the selector."
+role-delete-name = "delete"
+role-delete-description = "Delete role selector(s)."
+role-preview-name = "preview"
+role-preview-description = "Preview all created role selectors."
+role-finish-name = "finish"
+role-finish-description = "Finish and send all added role selectors."
 
 [command-choice]
 echo-format-plain = "Plaintext"
@@ -62,3 +77,11 @@ localizer-unknown = "Unknown locale"
 
 ping-start = "Calculating..."
 ping-finish = "Operation successful!"
+
+role-added = "Added role."
+role-removed = "Removed role."
+
+role-load-failed = "Failed to load list of role selectors."
+role-load-missing = "You have not added any role selectors."
+role-remove-emptied = "All role selectors were removed."
+role-remove-missing = "The role was already removed."

@@ -45,8 +45,8 @@ impl Entry {
     /// # Errors
     ///
     /// This function will return an error if the button could not be created.
-    pub fn build(&self, entry: &CommandEntry, disabled: bool) -> Result<Button> {
-        let custom_id = CustomId::<Box<str>>::new(entry.name, super::component::select::NAME)?;
+    pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Button> {
+        let custom_id = CustomId::<Box<str>>::new(entry.name, kind)?;
 
         Ok(ButtonBuilder::new(ButtonStyle::Secondary)
             .custom_id(custom_id.with(self.id.to_string())?)?
@@ -76,7 +76,7 @@ impl SelectorList {
     /// # Errors
     ///
     /// This function will return an error if a button could not be created.
-    pub fn build(&self, entry: &CommandEntry, disabled: bool) -> Result<Box<[Component]>> {
+    pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Box<[Component]>> {
         let action_row_count = self.inner.len().div_ceil(5).min(5);
         let mut action_rows = Vec::<Component>::with_capacity(action_row_count);
         let mut action_row = ActionRowBuilder::new();
@@ -88,7 +88,7 @@ impl SelectorList {
                 action_row = ActionRowBuilder::new();
             }
 
-            let button = selector.build(entry, disabled)?;
+            let button = selector.build(entry, kind, disabled)?;
 
             action_row = action_row.component(button)?;
         }
