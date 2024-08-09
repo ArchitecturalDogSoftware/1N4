@@ -16,7 +16,7 @@
 
 use std::collections::HashSet;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use ina_localization::{localize, Locale};
 use ina_logging::{info, warn};
 use twilight_model::application::command::{
@@ -54,30 +54,11 @@ crate::define_command!("localizer", CommandType::ChatInput, struct {
     },
 });
 
-/// Executes the command.
-///
-/// # Errors
-///
-/// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
-    context.defer(true).await?;
-
-    let locale = match context.as_locale() {
-        Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
-        Err(error) => return Err(error.into()),
-    };
-
-    let resolver = CommandOptionResolver::new(context.state);
-
-    if resolver.get_subcommand("reload").is_ok() {
-        return self::on_reload_command(&mut context, locale).await;
+crate::define_commands! {
+    self => {
+        reload => on_reload_command;
+        localize => on_localize_command;
     }
-    if let Ok(resolver) = resolver.get_subcommand("localize") {
-        return self::on_localize_command(resolver, locale, context).await;
-    }
-
-    bail!("unknown or missing subcommand")
 }
 
 /// Executes the reload command.
@@ -86,9 +67,18 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
 ///
 /// This function will return an error if the command could not be executed.
 async fn on_reload_command<'ap: 'ev, 'ev>(
-    context: &mut Context<'ap, 'ev, &CommandData>,
-    locale: Option<Locale>,
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &CommandData>,
+    _: CommandOptionResolver<'ev>,
 ) -> EventResult {
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
     info!(async "reloading localization thread").await?;
 
     // Do we want to clear here? It may cause concurrent commands to fail to localize.
@@ -118,10 +108,18 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
 ///
 /// This function will return an error if the command could not be executed.
 async fn on_localize_command<'ap: 'ev, 'ev>(
-    resolver: CommandOptionResolver<'ev>,
-    locale: Option<Locale>,
+    _: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
 ) -> EventResult {
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
     let category = resolver.get_str("category")?;
     let key = resolver.get_str("key")?;
 
