@@ -27,6 +27,7 @@ use twilight_model::id::Id;
 use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::command::registry::CommandEntry;
+use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::id::CustomId;
@@ -48,28 +49,73 @@ crate::define_command!("role", CommandType::ChatInput, struct {
             required: true,
         },
     },
-    delete: SubCommand {
-        role: Role {
-            required: true,
-        }
-    },
+    delete: SubCommand {},
     preview: SubCommand {},
     finish: SubCommand {},
 });
 
-crate::define_components! {
-    select => on_select_component,
-    remove => on_remove_component,
+crate::define_commands! {
+    self => {
+        create => on_create_command;
+        delete => on_delete_command;
+        preview => on_preview_command;
+        finish => on_finish_command;
+    }
 }
 
-/// Executes the command.
+crate::define_components! {
+    select => on_select_component;
+    remove => on_remove_component;
+}
+
+/// Executes the create command.
 ///
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(
+async fn on_create_command<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
+) -> EventResult {
+    todo!()
+}
+
+/// Executes the delete command.
+///
+/// # Errors
+///
+/// This function will return an error if the command could not be executed.
+async fn on_delete_command<'ap: 'ev, 'ev>(
+    entry: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
+) -> EventResult {
+    todo!()
+}
+
+/// Executes the preview command.
+///
+/// # Errors
+///
+/// This function will return an error if the command could not be executed.
+async fn on_preview_command<'ap: 'ev, 'ev>(
+    entry: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
+) -> EventResult {
+    todo!()
+}
+
+/// Executes the finish command.
+///
+/// # Errors
+///
+/// This function will return an error if the command could not be executed.
+async fn on_finish_command<'ap: 'ev, 'ev>(
+    entry: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
 ) -> EventResult {
     todo!()
 }

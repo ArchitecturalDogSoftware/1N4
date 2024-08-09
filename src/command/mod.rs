@@ -124,6 +124,80 @@ pub trait AutocompleteCallable: Send + Sync {
     ) -> Result<Box<[CommandOptionChoice]>>;
 }
 
+/// Defines and matches for commands.
+///
+/// # Examples
+///
+/// ```
+/// crate::define_commands! {
+///     self => {
+///         invoke => on_invoke_command;
+///     }
+///
+///     group => {
+///         invoke => on_group_invoke_command;
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_commands {
+    (
+        self => {
+            $($name:ident => $callback:ident;)*
+        }
+        $($group:ident => {
+            $($group_name:ident => $group_callback:ident;)*
+        })*
+    ) => {
+        /// Defines the command's command callbacks.
+        #[allow(missing_docs)]
+        mod command {
+            $(pub mod $name {
+                pub(in super::super) use super::super::$callback as callback;
+
+                /// The command's name.
+                pub const NAME: &::std::primitive::str = ::std::stringify!($name);
+            })*
+
+            $(pub mod $group {
+                /// The group's name.
+                pub const NAME: &::std::primitive::str = ::std::stringify!($group);
+
+                $(pub mod $group_name {
+                    pub(in super::super::super) use super::super::super::$group_callback as callback;
+
+                    /// The command's name.
+                    pub const NAME: &::std::primitive::str = ::std::stringify!($group_name);
+                })*
+            })*
+        }
+
+        /// Executes the command.
+        ///
+        /// # Errors
+        ///
+        /// This function will return an error if the command could not be executed.
+        async fn on_command<'ap: 'ev, 'ev>(
+            entry: &$crate::command::registry::CommandEntry,
+            context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
+        ) -> $crate::client::event::EventResult {
+            let resolver = $crate::command::resolver::CommandOptionResolver::new(context.state);
+
+            $(if let Ok(resolver) = resolver.get_subcommand(self::command::$name::NAME) {
+                return self::command::$name::callback(entry, context, resolver).await;
+            })else*
+
+            $(if let Ok(resolver) = resolver.get_subcommand_group(self::command::$group::NAME) {
+                $(if let Ok(resolver) = resolver.get_subcommand(self::command::$group::$group_name::NAME) {
+                    return self::command::$group::$group_name::callback(entry, context, resolver).await;
+                })*
+            })else*
+
+            ::anyhow::bail!("unknown or missing subcommand")
+        }
+    };
+}
+
 /// Defines and matches for components.
 ///
 /// # Examples
@@ -135,7 +209,7 @@ pub trait AutocompleteCallable: Send + Sync {
 /// ```
 #[macro_export]
 macro_rules! define_components {
-    ($($name:ident => $call:ident),* $(,)?) => {
+    ($($name:ident => $call:ident;)*) => {
         /// Defines the command's component callbacks.
         #[allow(missing_docs)]
         mod component {$(
@@ -176,7 +250,7 @@ macro_rules! define_components {
 /// ```
 #[macro_export]
 macro_rules! define_modals {
-    ($($name:ident => $call:ident),* $(,)?) => {
+    ($($name:ident => $call:ident;)*) => {
         /// Defines the command's modal callbacks.
         #[allow(missing_docs)]
         mod modal {$(
