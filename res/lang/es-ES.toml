@@ -7,6 +7,8 @@ localizer-name = "traductor"
 localizer-description = "Proporciona acceso al traductor del bot."
 ping-name = "ping"
 ping-description = "Calcula el tiempo de respuesta aproximado del bot."
+role-name = "rol"
+role-description = "Crear y administrar selectores de roles."
 
 [command-option]
 echo-content-name = "contento"
@@ -25,6 +27,19 @@ localizer-category-name = "categoría"
 localizer-category-description = "La categoría de traducción."
 localizer-key-name = "clave"
 localizer-key-description = "La clave de traducción."
+
+role-create-name = "crear"
+role-create-description = "Crear un nuevo selector de roles."
+role-role-name = "rol"
+role-role-description = "El rol que se va a agregar al usario."
+role-icon-name = "icono"
+role-icon-description = "El icono de emoji del selector."
+role-delete-name = "eliminar"
+role-delete-description = "Eliminar selectores de roles."
+role-preview-name = "vista_previa"
+role-preview-description = "Vista previa de todos los selectores de roles creados."
+role-finish-name = "finalizar"
+role-finish-description = "Finalizar y enviar todos los selectores de roles agregados."
 
 [command-choice]
 echo-format-plain = "Texto sin formato"
@@ -62,3 +77,17 @@ localizer-unknown = "Configuración regional desconocida"
 
 ping-start = "Calculando..."
 ping-finish = "Operación exitosa!"
+
+role-load-failed = "No se pudo cargar a lista de selectores de roles."
+role-load-missing = "No ha agregado ningún selector de roles."
+
+role-added = "Se ha añadido el rol."
+role-removed = "Se ha eliminado el rol."
+
+role-invalid-icon = "El icono de rol debe ser un emoticono."
+role-selector-added = "Se ha añadido un selector de roles."
+role-selector-duplicate = "El rol dado ya se ha añadido."
+role-selector-limit = "Se ha alcanzado el número máximo de selectores."
+
+role-remove-emptied = "Se han eliminado todos los selectores de roles."
+role-remove-missing = "El rol seleccionado ya se ha eliminado."

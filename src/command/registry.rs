@@ -156,6 +156,7 @@ pub async fn initialize() -> Result<()> {
     registry.register(super::definition::help::entry())?;
     registry.register(super::definition::localizer::entry())?;
     registry.register(super::definition::ping::entry())?;
+    registry.register(super::definition::role::entry())?;
 
     drop(registry);
 
