@@ -78,15 +78,16 @@ localizer-unknown = "Unknown locale"
 ping-start = "Calculating..."
 ping-finish = "Operation successful!"
 
+role-load-failed = "Failed to load list of role selectors."
+role-load-missing = "You have not added any role selectors."
+
+role-added = "Added role."
+role-removed = "Removed role."
+
 role-invalid-icon = "Role icon must be an emoticon."
 role-selector-added = "Added role selector."
 role-selector-duplicate = "The given role has already been added."
 role-selector-limit = "Maximum selector count reached."
 
-role-added = "Added role."
-role-removed = "Removed role."
-
-role-load-failed = "Failed to load list of role selectors."
-role-load-missing = "You have not added any role selectors."
 role-remove-emptied = "All role selectors were removed."
 role-remove-missing = "The role was already removed."

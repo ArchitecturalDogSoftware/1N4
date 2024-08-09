@@ -149,9 +149,47 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 async fn on_delete_command<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
-    resolver: CommandOptionResolver<'ev>,
+    _: CommandOptionResolver<'ev>,
 ) -> EventResult {
-    todo!()
+    let Some(guild_id) = context.interaction.guild_id else {
+        bail!("this command must be used in a guild");
+    };
+    let Some(user_id) = context.interaction.author_id() else {
+        bail!("this command must be used by a user");
+    };
+
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+        let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+
+    let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+        let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    };
+
+    let components = selectors.build(entry, component::remove::NAME, false)?;
+
+    crate::follow_up_response!(context, struct {
+        components: &components,
+    })
+    .await?;
+
+    crate::client::event::pass()
 }
 
 /// Executes the preview command.
@@ -162,9 +200,47 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
 async fn on_preview_command<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
-    resolver: CommandOptionResolver<'ev>,
+    _: CommandOptionResolver<'ev>,
 ) -> EventResult {
-    todo!()
+    let Some(guild_id) = context.interaction.guild_id else {
+        bail!("this command must be used in a guild");
+    };
+    let Some(user_id) = context.interaction.author_id() else {
+        bail!("this command must be used by a user");
+    };
+
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+        let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+
+    let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+        let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    };
+
+    let components = selectors.build(entry, component::select::NAME, true)?;
+
+    crate::follow_up_response!(context, struct {
+        components: &components,
+    })
+    .await?;
+
+    crate::client::event::pass()
 }
 
 /// Executes the finish command.
@@ -175,9 +251,51 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
 async fn on_finish_command<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
-    resolver: CommandOptionResolver<'ev>,
+    _: CommandOptionResolver<'ev>,
 ) -> EventResult {
-    todo!()
+    let Some(guild_id) = context.interaction.guild_id else {
+        bail!("this command must be used in a guild");
+    };
+    let Some(channel_id) = context.interaction.channel.as_ref().map(|c| c.id) else {
+        bail!("this component must be used in a channel");
+    };
+    let Some(user_id) = context.interaction.author_id() else {
+        bail!("this command must be used by a user");
+    };
+
+    context.defer(true).await?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+        let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    }
+
+    let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+        let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
+
+        context.failure(title, None::<&str>).await?;
+
+        return crate::client::event::pass();
+    };
+
+    let components = selectors.build(entry, component::select::NAME, false)?;
+
+    context.api.client.create_message(channel_id).components(&components).await?;
+
+    let text = localize!(async(try in locale) category::UI, "role-finished").await?;
+
+    context.success(text, None::<&str>).await?;
+
+    crate::client::event::pass()
 }
 
 /// Executes the select component.
