@@ -40,12 +40,6 @@ impl Api {
     pub const fn as_ref(&self) -> ApiRef {
         ApiRef { client: &self.client, cache: &self.cache }
     }
-
-    /// Returns a reference to this [`Api`].
-    #[must_use]
-    pub fn as_mut(&mut self) -> ApiMut {
-        ApiMut { client: &mut self.client, cache: &mut self.cache }
-    }
 }
 
 /// Contains a reference to the HTTP API and its cache.
@@ -59,29 +53,6 @@ pub struct ApiRef<'api> {
 
 impl<'api> ApiRef<'api> {
     /// Returns a cloned version of this [`ApiRef`].
-    #[must_use]
-    pub fn as_owned(&self) -> Api {
-        Api { client: Arc::clone(self.client), cache: Arc::clone(self.cache) }
-    }
-}
-
-/// Contains a mutable reference to the HTTP API and its cache.
-#[derive(Debug)]
-pub struct ApiMut<'api> {
-    /// A mutable reference to the HTTP client.
-    pub client: &'api mut Arc<Client>,
-    /// A mutable reference to the cache.
-    pub cache: &'api mut Arc<DefaultInMemoryCache>,
-}
-
-impl<'api> ApiMut<'api> {
-    /// Returns a demoted reference to this [`ApiMut`].
-    #[must_use]
-    pub const fn as_ref(&self) -> ApiRef {
-        ApiRef { client: self.client, cache: self.cache }
-    }
-
-    /// Returns a cloned version of this [`ApiMut`].
     #[must_use]
     pub fn as_owned(&self) -> Api {
         Api { client: Arc::clone(self.client), cache: Arc::clone(self.cache) }
