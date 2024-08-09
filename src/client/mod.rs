@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use clap::Args;
-use ina_logging::{debug, warn};
+use ina_logging::{debug, error, warn};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
@@ -225,12 +225,13 @@ impl Instance {
 
         let timeout = Duration::from_millis(connection.session_start_limit.reset_after);
         let refills = connection.shards / connection.session_start_limit.remaining;
+        let sessions = u64::from(connection.session_start_limit.total);
         let buckets = (connection.shards as f32) / f32::from(connection.session_start_limit.max_concurrency);
         let buckets = buckets.round() as u64;
 
         timeout * u32::from(refills > 0)
             + (1 .. refills).map(|_| DAY).sum::<Duration>()
-            + Duration::from_secs(5 * buckets % u64::from(connection.session_start_limit.total))
+            + Duration::from_secs(5 * buckets % sessions)
     }
 
     /// Attempts to re-shard this [`Instance`].
@@ -263,12 +264,12 @@ impl Instance {
         })
         .await;
 
-        // Attempt to identify to make the swap cleaner.
+        // Attempt to identify early to make the swap cleaner.
         let mut identified = vec![false; shards.len()].into_boxed_slice();
         let mut shard_stream = shards.iter_mut().map(|s| (s.id(), s)).collect::<StreamMap<_, _>>();
 
         loop {
-            let identified_count = identified.iter().copied().map(usize::from).sum::<usize>();
+            let identified_count = identified.iter().filter(|b| **b).count();
 
             tokio::select! {
                 // Exit early if we time out and at least 75% of the shards are identified.
@@ -276,10 +277,10 @@ impl Instance {
                 Some((shard_id, result)) = shard_stream.next() => {
                     if let Err(error) = result {
                         warn!(async "failed to identify shard: {error}").await?;
+
                         continue;
                     }
 
-                    #[allow(clippy::expect_used)]
                     let shard = shard_stream.values().find(|s| s.id() == shard_id).unwrap_or_else(|| unreachable!());
                     let is_identified = shard.state().is_identified();
 
@@ -303,6 +304,7 @@ impl Instance {
 
             for shard in self.shards {
                 senders.push(shard.sender());
+
                 tasks.spawn(Self::run_shard(self.api.clone(), shard));
             }
 
@@ -318,8 +320,10 @@ impl Instance {
                     // If the reshard is complete, restart the process loop.
                     shards = shards.as_mut() => {
                         self.shards = shards?;
+
                         break;
                     }
+                    // Update the bot's status if the interval has elapsed.
                     _ = status_interval.tick() => {
                         let payload = if let Some(ref status) = self.status {
                             Self::get_status(status.random())?
@@ -339,15 +343,17 @@ impl Instance {
                         debug!(async "updated client presence").await?;
                     }
                     // If a task finishes and indicates that we should exit, return early.
-                    Some(should_exit) = tasks.join_next() => match should_exit {
+                    Some(result) = tasks.join_next() => match result {
+                        // Just keep polling if instructed to pass.
+                        Ok(Ok(EventOutput::Pass)) => continue,
                         // If we should exit, return early.
                         Ok(Ok(EventOutput::Exit)) => return Ok(()),
                         // If the task returns an error, return it.
                         Ok(Err(error)) => return Err(error),
                         // If the task fails to join from a panic, indicate an error.
                         Err(error) if error.is_panic() => return Err(error.into()),
-                        // Otherwise, just keep polling.
-                        _ => continue,
+                        // If the task fails to join from a panic, indicate an error.
+                        Err(error) => error!(async "shard task failed to join: {error}").await?,
                     },
                 }
             }
@@ -368,30 +374,45 @@ impl Instance {
             tokio::select! {
                 // If an event is given, handle it.
                 event = shard.next_event(EventTypeFlags::all()) => match event {
-                    // If no events are left, gracefully exit.
-                    None => break,
-                    // If an error occurs, log it.
-                    Some(Err(error)) => warn!(async "error receiving event: {error}").await?,
                     // If an event is given, handle it.
                     Some(Ok(event)) => drop(tasks.spawn(self::event::on_event(api.clone(), event, shard.id()))),
+                    // If an error occurs, log it.
+                    Some(Err(error)) => warn!(async "error receiving event: {error}").await?,
+                    // If no events are left, gracefully exit.
+                    None => break,
                 },
                 // If a task finishes and indicates that we should exit, return early.
-                Some(should_exit) = tasks.join_next() => match should_exit {
+                Some(result) = tasks.join_next() => match result {
+                    // Just keep polling if instructed to pass.
+                    Ok(Ok(EventOutput::Pass)) => continue,
                     // If we should exit, return early.
                     Ok(Ok(EventOutput::Exit)) => return Ok(EventOutput::Exit),
                     // If the task returns an error, return it.
                     Ok(Err(error)) => return Err(error),
                     // If the task fails to join from a panic, indicate an error.
                     Err(error) if error.is_panic() => return Err(error.into()),
-                    // Otherwise, just keep polling.
-                    _ => {},
+                    // If the task fails to join from a panic, indicate an error.
+                    Err(error) => error!(async "event task failed to join: {error}").await?,
                 },
             }
         }
 
-        // Wait for all tasks to join.
-        while tasks.join_next().await.is_some() {}
+        // Wait for all tasks to join naturally.
+        while let Some(result) = tasks.join_next().await {
+            match result {
+                // Just keep polling if instructed to pass.
+                Ok(Ok(EventOutput::Pass)) => continue,
+                // If we should exit, return early.
+                Ok(Ok(EventOutput::Exit)) => return Ok(EventOutput::Exit),
+                // If the task returns an error, return it.
+                Ok(Err(error)) => return Err(error),
+                // If the task fails to join from a panic, indicate an error.
+                Err(error) if error.is_panic() => return Err(error.into()),
+                // If the task fails to join from a panic, indicate an error.
+                Err(error) => error!(async "event task failed to join: {error}").await?,
+            };
+        }
 
-        Ok(EventOutput::Pass)
+        self::event::pass()
     }
 }
