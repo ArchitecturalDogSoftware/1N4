@@ -35,7 +35,7 @@ use crate::utility::types::id::CustomId;
 /// The command's data.
 mod data;
 
-crate::define_command!("role", CommandType::ChatInput, struct {
+crate::define_entry!("role", CommandType::ChatInput, struct {
     allow_dms: true,
 }, struct {
     command: on_command,

@@ -33,7 +33,7 @@ use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::{category, color};
 
-crate::define_command!("help", CommandType::ChatInput, struct {
+crate::define_entry!("help", CommandType::ChatInput, struct {
     allow_dms: true,
 }, struct {
     command: on_command,

@@ -27,7 +27,7 @@ use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
 use crate::utility::traits::convert::AsLocale;
 
-crate::define_command!("echo", CommandType::ChatInput, struct {
+crate::define_entry!("echo", CommandType::ChatInput, struct {
     allow_dms: true,
     permissions: Permissions::ADMINISTRATOR,
 }, struct {

@@ -26,7 +26,7 @@ use crate::utility::traits::convert::AsLocale;
 use crate::utility::traits::extension::IdExt;
 use crate::utility::{category, color};
 
-crate::define_command!("ping", CommandType::ChatInput, struct {
+crate::define_entry!("ping", CommandType::ChatInput, struct {
     allow_dms: true,
 }, struct {
     command: on_command,

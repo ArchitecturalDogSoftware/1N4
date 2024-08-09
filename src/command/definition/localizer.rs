@@ -32,7 +32,7 @@ use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::{category, color, fuzzy_contains, Strictness};
 
-crate::define_command!("localizer", CommandType::ChatInput, struct {
+crate::define_entry!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
 }, struct {
     command: on_command,
