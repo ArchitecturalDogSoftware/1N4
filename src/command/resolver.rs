@@ -51,13 +51,11 @@ pub struct CommandOptionResolver<'ev> {
 
 impl<'ev> CommandOptionResolver<'ev> {
     /// Creates a new [`CommandOptionResolver`].
-    #[inline]
     pub fn new(data: &'ev CommandData) -> Self {
         Self::new_with_options(data, &data.options)
     }
 
     /// Creates a new [`CommandOptionResolver`] using the given option list.
-    #[inline]
     fn new_with_options(data: &'ev CommandData, options: impl IntoIterator<Item = &'ev CommandDataOption>) -> Self {
         Self { data, options: options.into_iter().map(|o| (&(*o.name), &o.value)).collect() }
     }
@@ -204,7 +202,6 @@ pub struct ModalFieldResolver<'ev> {
 
 impl<'ev> ModalFieldResolver<'ev> {
     /// Creates a new [`ModalFieldResolver`].
-    #[inline]
     pub fn new(data: &'ev ModalInteractionData) -> Self {
         Self::new_with_fields(data, &data.components)
     }

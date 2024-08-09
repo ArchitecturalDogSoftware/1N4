@@ -44,7 +44,6 @@ pub struct ActionRowBuilder(ActionRow);
 
 impl ActionRowBuilder {
     /// Creates a new [`ActionRowBuilder`].
-    #[inline]
     pub const fn new() -> Self {
         Self(ActionRow { components: Vec::new() })
     }
@@ -67,7 +66,6 @@ impl ActionRowBuilder {
     }
 
     /// Builds the completed action row.
-    #[inline]
     #[must_use]
     pub fn build(self) -> ActionRow {
         self.0
@@ -75,28 +73,24 @@ impl ActionRowBuilder {
 }
 
 impl From<ActionRowBuilder> for ActionRow {
-    #[inline]
     fn from(value: ActionRowBuilder) -> Self {
         value.build()
     }
 }
 
 impl From<ActionRowBuilder> for Component {
-    #[inline]
     fn from(value: ActionRowBuilder) -> Self {
         Self::ActionRow(value.build())
     }
 }
 
 impl<I: Into<Component>> FromIterator<I> for ActionRowBuilder {
-    #[inline]
     fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
         Self(ActionRow { components: iter.into_iter().take(5).map(Into::into).collect() })
     }
 }
 
 impl Default for ActionRowBuilder {
-    #[inline]
     fn default() -> Self {
         Self::new()
     }
@@ -197,7 +191,6 @@ impl ButtonBuilder {
     }
 
     /// Builds the completed button.
-    #[inline]
     #[must_use]
     pub fn build(self) -> Button {
         self.0
@@ -205,14 +198,12 @@ impl ButtonBuilder {
 }
 
 impl From<ButtonBuilder> for Button {
-    #[inline]
     fn from(value: ButtonBuilder) -> Self {
         value.build()
     }
 }
 
 impl From<ButtonBuilder> for Component {
-    #[inline]
     fn from(value: ButtonBuilder) -> Self {
         Self::Button(value.build())
     }
@@ -397,7 +388,6 @@ impl SelectMenuBuilder {
     }
 
     /// Builds the completed selection menu.
-    #[inline]
     #[must_use]
     pub fn build(self) -> SelectMenu {
         self.0
@@ -405,14 +395,12 @@ impl SelectMenuBuilder {
 }
 
 impl From<SelectMenuBuilder> for SelectMenu {
-    #[inline]
     fn from(value: SelectMenuBuilder) -> Self {
         value.build()
     }
 }
 
 impl From<SelectMenuBuilder> for Component {
-    #[inline]
     fn from(value: SelectMenuBuilder) -> Self {
         Self::SelectMenu(value.build())
     }
@@ -482,7 +470,6 @@ impl SelectMenuOptionBuilder {
     }
 
     /// Builds the completed selection menu option.
-    #[inline]
     #[must_use]
     pub fn build(self) -> SelectMenuOption {
         self.0
@@ -490,7 +477,6 @@ impl SelectMenuOptionBuilder {
 }
 
 impl From<SelectMenuOptionBuilder> for SelectMenuOption {
-    #[inline]
     fn from(value: SelectMenuOptionBuilder) -> Self {
         value.build()
     }
@@ -619,7 +605,6 @@ impl TextInputBuilder {
     }
 
     /// Builds the completed text input.
-    #[inline]
     #[must_use]
     pub fn build(self) -> TextInput {
         self.0
@@ -627,14 +612,12 @@ impl TextInputBuilder {
 }
 
 impl From<TextInputBuilder> for TextInput {
-    #[inline]
     fn from(value: TextInputBuilder) -> Self {
         value.build()
     }
 }
 
 impl From<TextInputBuilder> for Component {
-    #[inline]
     fn from(value: TextInputBuilder) -> Self {
         Self::TextInput(value.build())
     }

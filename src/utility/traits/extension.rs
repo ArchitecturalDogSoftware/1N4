@@ -102,12 +102,10 @@ pub trait GuildExt {
 macro_rules! guild_ext_impl {
     ($($type:ty)*) => {$(
         impl GuildExt for $type {
-            #[inline]
             fn name(&self) -> &str {
                 &self.name
             }
 
-            #[inline]
             fn icon_hash(&self) -> Option<&ImageHash> {
                 self.icon.as_ref()
             }
@@ -118,24 +116,20 @@ macro_rules! guild_ext_impl {
 guild_ext_impl!(CurrentUserGuild Guild GuildInfo GuildPreview PartialGuild);
 
 impl GuildExt for CachedGuild {
-    #[inline]
     fn name(&self) -> &str {
         self.name()
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<&ImageHash> {
         self.icon()
     }
 }
 
 impl GuildExt for TemplateGuild {
-    #[inline]
     fn name(&self) -> &str {
         &self.name
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<&ImageHash> {
         self.icon_hash.as_ref()
     }
@@ -169,7 +163,6 @@ pub struct UserNameDisplay<'us> {
 }
 
 impl<'us> Display for UserNameDisplay<'us> {
-    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.nick.map_or(self.name.map_or(self.user, identity), identity))
     }
@@ -196,73 +189,60 @@ impl<'us> Display for UserTagDisplay<'us> {
 }
 
 impl UserExt for CachedMember {
-    #[inline]
     fn display_name(&self) -> UserNameDisplay {
         UserNameDisplay { nick: self.nick(), name: None, user: "unknown" }
     }
 
-    #[inline]
     fn display_tag(&self) -> UserTagDisplay {
         UserTagDisplay { user: "unknown", tag: None }
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<ImageHash> {
         self.avatar()
     }
 
-    #[inline]
     fn banner_hash(&self) -> Option<ImageHash> {
         None
     }
 }
 
 impl UserExt for CurrentUser {
-    #[inline]
     fn display_name(&self) -> UserNameDisplay {
         UserNameDisplay { nick: None, name: None, user: &self.name }
     }
 
-    #[inline]
     fn display_tag(&self) -> UserTagDisplay {
         UserTagDisplay { user: &self.name, tag: NonZeroU16::new(self.discriminator) }
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<ImageHash> {
         self.avatar
     }
 
-    #[inline]
     fn banner_hash(&self) -> Option<ImageHash> {
         self.banner
     }
 }
 
 impl UserExt for Member {
-    #[inline]
     fn display_name(&self) -> UserNameDisplay {
         UserNameDisplay { nick: self.nick.as_deref(), name: self.user.global_name.as_deref(), user: &self.user.name }
     }
 
-    #[inline]
     fn display_tag(&self) -> UserTagDisplay {
         UserTagDisplay { user: &self.user.name, tag: NonZeroU16::new(self.user.discriminator) }
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<ImageHash> {
         self.avatar.or(self.user.avatar)
     }
 
-    #[inline]
     fn banner_hash(&self) -> Option<ImageHash> {
         self.user.banner
     }
 }
 
 impl UserExt for PartialMember {
-    #[inline]
     fn display_name(&self) -> UserNameDisplay {
         UserNameDisplay {
             nick: self.nick.as_deref(),
@@ -271,7 +251,6 @@ impl UserExt for PartialMember {
         }
     }
 
-    #[inline]
     fn display_tag(&self) -> UserTagDisplay {
         UserTagDisplay {
             user: self.user.as_ref().map_or("unknown", |u| &(*u.name)),
@@ -279,56 +258,46 @@ impl UserExt for PartialMember {
         }
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<ImageHash> {
         self.avatar.or_else(|| self.user.as_ref().and_then(|u| u.avatar))
     }
 
-    #[inline]
     fn banner_hash(&self) -> Option<ImageHash> {
         self.user.as_ref().and_then(|u| u.banner)
     }
 }
 
 impl UserExt for PartialUser {
-    #[inline]
     fn display_name(&self) -> UserNameDisplay {
         UserNameDisplay { nick: None, name: None, user: &self.username }
     }
 
-    #[inline]
     fn display_tag(&self) -> UserTagDisplay {
         UserTagDisplay { user: &self.username, tag: NonZeroU16::new(self.discriminator) }
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<ImageHash> {
         self.avatar
     }
 
-    #[inline]
     fn banner_hash(&self) -> Option<ImageHash> {
         None
     }
 }
 
 impl UserExt for User {
-    #[inline]
     fn display_name(&self) -> UserNameDisplay {
         UserNameDisplay { nick: None, name: self.global_name.as_deref(), user: &self.name }
     }
 
-    #[inline]
     fn display_tag(&self) -> UserTagDisplay {
         UserTagDisplay { user: &self.name, tag: NonZeroU16::new(self.discriminator) }
     }
 
-    #[inline]
     fn icon_hash(&self) -> Option<ImageHash> {
         self.avatar
     }
 
-    #[inline]
     fn banner_hash(&self) -> Option<ImageHash> {
         self.banner
     }

@@ -40,34 +40,29 @@ pub struct CommandRegistry {
 
 impl CommandRegistry {
     /// Creates a new [`CommandRegistry`].
-    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self { inner: HashMap::new() }
     }
 
     /// Returns whether this [`CommandRegistry`] contains a command with the given name.
-    #[inline]
     #[must_use]
     pub fn contains(&self, name: &str) -> bool {
         self.inner.contains_key(name)
     }
 
     /// Returns the command assigned to the given name from within this [`CommandRegistry`].
-    #[inline]
     #[must_use]
     pub fn command(&self, name: &str) -> Option<&CommandEntry> {
         self.inner.get(name)
     }
 
     /// Returns an iterator over references to the entries within this [`CommandRegistry`].
-    #[inline]
     pub fn iter(&self) -> impl Iterator<Item = &CommandEntry> {
         self.inner.values()
     }
 
     /// Returns an iterator over mutable references to the entries within this [`CommandRegistry`].
-    #[inline]
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut CommandEntry> {
         self.inner.values_mut()
     }
@@ -111,7 +106,6 @@ impl IntoIterator for CommandRegistry {
     type IntoIter = std::collections::hash_map::IntoValues<&'static str, Self::Item>;
     type Item = CommandEntry;
 
-    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.inner.into_values()
     }

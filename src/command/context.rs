@@ -56,25 +56,21 @@ where
     T: Send,
 {
     /// Creates a new [`Context<T>`].
-    #[inline]
     pub const fn new(api: ApiRef<'ar>, interaction: &'ev Interaction, state: T) -> Self {
         Self { api, interaction, state, is_deferred: false, is_ephemeral: false, is_completed: false }
     }
 
     /// Returns whether this interaction has been deferred.
-    #[inline]
     pub const fn is_deferred(&self) -> bool {
         self.is_deferred
     }
 
     /// Returns whether this interaction is marked as ephemeral.
-    #[inline]
     pub const fn is_ephemeral(&self) -> bool {
         self.is_ephemeral
     }
 
     /// Returns whether this interaction has been completed.
-    #[inline]
     pub const fn is_completed(&self) -> bool {
         self.is_completed
     }
@@ -117,7 +113,6 @@ where
     ///
     /// This function will return an error if the context fails to defer the interaction response, or if this is called
     /// on an invalid interaction type.
-    #[inline]
     pub async fn defer(&mut self, ephemeral: bool) -> Result<()> {
         self.defer_any(ephemeral, InteractionResponseType::DeferredChannelMessageWithSource).await
     }
@@ -128,7 +123,6 @@ where
     ///
     /// This function will return an error if the context fails to defer the interaction response, or if this is called
     /// on an invalid interaction type.
-    #[inline]
     pub async fn defer_update(&mut self, ephemeral: bool) -> Result<()> {
         ensure!(
             matches!(self.interaction.kind, InteractionType::MessageComponent | InteractionType::ModalSubmit),
@@ -247,7 +241,6 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    #[inline]
     pub async fn success<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,
@@ -262,7 +255,6 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    #[inline]
     pub async fn failure<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,

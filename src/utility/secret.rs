@@ -26,7 +26,6 @@ use twilight_model::id::Id;
 /// # Errors
 ///
 /// This function will return an error if the environment variable is not defined.
-#[inline]
 fn get(key: &str) -> Result<Arc<str>> {
     Ok(std::env::var(key)?.into())
 }
@@ -36,7 +35,6 @@ fn get(key: &str) -> Result<Arc<str>> {
 /// # Errors
 ///
 /// This function will return an error if the environment variable is not defined, or if it is an invalid identifier.
-#[inline]
 fn get_id<T>(key: &str) -> Result<Id<T>> {
     Ok(std::env::var(key)?.parse::<NonZeroU64>()?.into())
 }
@@ -48,7 +46,6 @@ fn get_id<T>(key: &str) -> Result<Id<T>> {
 /// # Errors
 ///
 /// This function will return an error if the environment variable is not defined.
-#[inline]
 pub fn discord_token() -> Result<Arc<str>> {
     self::get("DISCORD_TOKEN")
 }
@@ -60,7 +57,6 @@ pub fn discord_token() -> Result<Arc<str>> {
 /// # Errors
 ///
 /// This function will return an error if the environment variable is not defined.
-#[inline]
 pub fn development_guild_id() -> Result<Id<GuildMarker>> {
     self::get_id("DEVELOPMENT_GUILD_ID")
 }
@@ -72,7 +68,6 @@ pub fn development_guild_id() -> Result<Id<GuildMarker>> {
 /// # Errors
 ///
 /// This function will return an error if the environment variable is not defined.
-#[inline]
 pub fn development_channel_id() -> Result<Id<ChannelMarker>> {
     self::get_id("DEVELOPMENT_CHANNEL_ID")
 }

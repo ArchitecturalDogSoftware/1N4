@@ -300,7 +300,6 @@ macro_rules! define_command {
         $(
             #[::async_trait::async_trait]
             impl $crate::command::CommandCallable for Impl {
-                #[inline]
                 async fn on_command<'ap: 'ev, 'ev>(
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
@@ -315,7 +314,6 @@ macro_rules! define_command {
         $(
             #[::async_trait::async_trait]
             impl $crate::command::ComponentCallable for Impl {
-                #[inline]
                 async fn on_component<'ap: 'ev, 'ev>(
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
@@ -331,7 +329,6 @@ macro_rules! define_command {
         $(
             #[::async_trait::async_trait]
             impl $crate::command::ModalCallable for Impl {
-                #[inline]
                 async fn on_modal<'ap: 'ev, 'ev>(
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
@@ -347,7 +344,6 @@ macro_rules! define_command {
         $(
             #[::async_trait::async_trait]
             impl $crate::command::AutocompleteCallable for Impl {
-                #[inline]
                 async fn on_autocomplete<'ap: 'ev, 'ev>(
                     &self,
                     entry: &$crate::command::registry::CommandEntry,

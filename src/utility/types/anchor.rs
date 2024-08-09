@@ -42,7 +42,6 @@ pub struct Anchor {
 
 impl Anchor {
     /// Creates a new guild channel [`Anchor`].
-    #[inline]
     #[must_use]
     pub const fn new_guild(
         guild_id: Id<GuildMarker>,
@@ -53,14 +52,12 @@ impl Anchor {
     }
 
     /// Creates a new private channel [`Anchor`].
-    #[inline]
     #[must_use]
     pub const fn new_private(channel_id: Id<ChannelMarker>, message_id: Id<MessageMarker>) -> Self {
         Self { guild_id: None, channel_id, message_id, message_exists: None }
     }
 
     /// Returns a display implementation for this [`Anchor`]'s link.
-    #[inline]
     pub const fn display_link(&self) -> AnchorLinkDisplay {
         AnchorLinkDisplay(self)
     }
@@ -117,7 +114,6 @@ impl Anchor {
 }
 
 impl From<Message> for Anchor {
-    #[inline]
     fn from(value: Message) -> Self {
         <Self as From<&Message>>::from(&value)
     }

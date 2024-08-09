@@ -82,19 +82,16 @@ where
     }
 
     /// Returns a reference to the command name of this [`CustomId<I>`].
-    #[inline]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// Returns a reference to the component name of this [`CustomId<I>`].
-    #[inline]
     pub fn kind(&self) -> &str {
         &self.kind
     }
 
     /// Returns a reference to the data of this [`CustomId<I>`].
-    #[inline]
     pub fn data(&self) -> &[Box<str>] {
         &self.data
     }
@@ -142,7 +139,6 @@ where
     /// # Errors
     ///
     /// This function will return an error if the changed identifier is invalid.
-    #[inline]
     pub fn with(mut self, data: impl AsRef<str>) -> Result<Self, Error> {
         self.push(data).map(move |()| self)
     }
@@ -152,7 +148,6 @@ impl<I> From<CustomId<I>> for String
 where
     I: Deref<Target = str> + for<'s> From<&'s str>,
 {
-    #[inline]
     fn from(value: CustomId<I>) -> Self {
         value.to_string()
     }
@@ -177,7 +172,6 @@ where
 {
     type Error = <Self as FromStr>::Err;
 
-    #[inline]
     fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
         <Self as FromStr>::from_str(&value)
     }
@@ -189,7 +183,6 @@ where
 {
     type Error = <Self as FromStr>::Err;
 
-    #[inline]
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         <Self as FromStr>::from_str(value)
     }

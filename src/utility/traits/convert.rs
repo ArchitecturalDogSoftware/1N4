@@ -60,7 +60,6 @@ pub trait AsEmbedAuthor {
     /// # Errors
     ///
     /// This function will return an error if the value could not be converted.
-    #[inline]
     fn as_embed_author(&self) -> Result<EmbedAuthor, Self::Error> {
         self.as_embed_author_builder().map(EmbedAuthorBuilder::build)
     }
@@ -93,7 +92,6 @@ fn user_as_embed_author_builder<U: UserExt + AsImageSource>(value: &U) -> Result
 impl AsEmbedAuthor for CachedGuild {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
     }
@@ -102,7 +100,6 @@ impl AsEmbedAuthor for CachedGuild {
 impl AsEmbedAuthor for CurrentUser {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder(self)
     }
@@ -111,7 +108,6 @@ impl AsEmbedAuthor for CurrentUser {
 impl AsEmbedAuthor for CurrentUserGuild {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
     }
@@ -120,7 +116,6 @@ impl AsEmbedAuthor for CurrentUserGuild {
 impl AsEmbedAuthor for Guild {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
     }
@@ -129,7 +124,6 @@ impl AsEmbedAuthor for Guild {
 impl AsEmbedAuthor for GuildInfo {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
     }
@@ -138,7 +132,6 @@ impl AsEmbedAuthor for GuildInfo {
 impl AsEmbedAuthor for GuildPreview {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
     }
@@ -147,7 +140,6 @@ impl AsEmbedAuthor for GuildPreview {
 impl AsEmbedAuthor for PartialGuild {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
     }
@@ -156,7 +148,6 @@ impl AsEmbedAuthor for PartialGuild {
 impl AsEmbedAuthor for User {
     type Error = <Self as AsImageSource>::Error;
 
-    #[inline]
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder(self)
     }
@@ -179,7 +170,6 @@ pub trait AsEmbedAuthorWith<T> {
     /// # Errors
     ///
     /// This function will return an error if the value could not be converted.
-    #[inline]
     fn as_embed_author_with(&self, value: T) -> Result<EmbedAuthor, Self::Error> {
         self.as_embed_author_builder_with(value).map(EmbedAuthorBuilder::build)
     }
@@ -203,7 +193,6 @@ fn user_as_embed_author_builder_with<U: UserExt + AsImageSourceWith<T>, T>(
 impl AsEmbedAuthorWith<Id<GuildMarker>> for CachedMember {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_embed_author_builder_with(&self, value: Id<GuildMarker>) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder_with(self, value)
     }
@@ -212,7 +201,6 @@ impl AsEmbedAuthorWith<Id<GuildMarker>> for CachedMember {
 impl AsEmbedAuthorWith<Id<GuildMarker>> for Member {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_embed_author_builder_with(&self, value: Id<GuildMarker>) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder_with(self, value)
     }
@@ -221,7 +209,6 @@ impl AsEmbedAuthorWith<Id<GuildMarker>> for Member {
 impl AsEmbedAuthorWith<Id<GuildMarker>> for PartialMember {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_embed_author_builder_with(&self, value: Id<GuildMarker>) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder_with(self, value)
     }
@@ -243,7 +230,6 @@ pub trait AsEmoji {
 impl AsEmoji for char {
     type Error = Infallible;
 
-    #[inline]
     fn as_emoji(&self) -> Result<EmojiReactionType, Self::Error> {
         Ok(EmojiReactionType::Unicode { name: self.to_string() })
     }
@@ -297,7 +283,6 @@ macro_rules! as_id_impl {
         $type:ty as $marker:ty $(= $field:ident)? $(=> $call:ident)? $(=> { $($body:tt)* })?;
     )*) => {$(
         impl AsId<$marker> for $type {
-            #[inline]
             fn as_id(&self) -> Id<$marker> {
                 self.$($field)?$($call())?$($($body)*)?
             }
@@ -370,7 +355,6 @@ fn user_as_image_source<U: UserExt + AsId<UserMarker>>(value: &U) -> anyhow::Res
 impl AsImageSource for CachedGuild {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::guild_as_image_source(self)
     }
@@ -379,7 +363,6 @@ impl AsImageSource for CachedGuild {
 impl AsImageSource for CurrentUser {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::user_as_image_source(self)
     }
@@ -388,7 +371,6 @@ impl AsImageSource for CurrentUser {
 impl AsImageSource for CurrentUserGuild {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::guild_as_image_source(self)
     }
@@ -434,7 +416,6 @@ impl AsImageSource for EmojiReactionType {
 impl AsImageSource for Guild {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::guild_as_image_source(self)
     }
@@ -443,7 +424,6 @@ impl AsImageSource for Guild {
 impl AsImageSource for GuildInfo {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::guild_as_image_source(self)
     }
@@ -452,7 +432,6 @@ impl AsImageSource for GuildInfo {
 impl AsImageSource for GuildPreview {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::guild_as_image_source(self)
     }
@@ -461,7 +440,6 @@ impl AsImageSource for GuildPreview {
 impl AsImageSource for PartialGuild {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::guild_as_image_source(self)
     }
@@ -470,7 +448,6 @@ impl AsImageSource for PartialGuild {
 impl AsImageSource for PartialUser {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::user_as_image_source(self)
     }
@@ -501,7 +478,6 @@ impl AsImageSource for Sticker {
 impl AsImageSource for User {
     type Error = anyhow::Error;
 
-    #[inline]
     fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
         self::user_as_image_source(self)
     }
@@ -589,7 +565,6 @@ pub trait AsLocale {
 impl AsLocale for CachedGuild {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.preferred_locale().parse()
     }
@@ -598,7 +573,6 @@ impl AsLocale for CachedGuild {
 impl AsLocale for CurrentUser {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.locale.as_deref().ok_or(ina_localization::Error::MissingLocale)?.parse()
     }
@@ -607,7 +581,6 @@ impl AsLocale for CurrentUser {
 impl AsLocale for Guild {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.preferred_locale.parse()
     }
@@ -616,7 +589,6 @@ impl AsLocale for Guild {
 impl AsLocale for Interaction {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.locale.as_deref().ok_or(ina_localization::Error::MissingLocale)?.parse()
     }
@@ -625,7 +597,6 @@ impl AsLocale for Interaction {
 impl AsLocale for Member {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.user.as_locale()
     }
@@ -634,7 +605,6 @@ impl AsLocale for Member {
 impl AsLocale for PartialMember {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.user.as_ref().ok_or(ina_localization::Error::MissingLocale)?.as_locale()
     }
@@ -643,7 +613,6 @@ impl AsLocale for PartialMember {
 impl AsLocale for TemplateGuild {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.preferred_locale.parse()
     }
@@ -652,7 +621,6 @@ impl AsLocale for TemplateGuild {
 impl AsLocale for User {
     type Error = <Locale as FromStr>::Err;
 
-    #[inline]
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.locale.as_deref().ok_or(ina_localization::Error::MissingLocale)?.parse()
     }
