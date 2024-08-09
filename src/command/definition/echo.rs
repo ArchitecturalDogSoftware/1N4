@@ -48,10 +48,7 @@ crate::define_command!("echo", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(
-    entry: &CommandEntry,
-    mut context: Context<'ap, 'ev, &'ev CommandData>,
-) -> EventResult {
+async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
     let Some(ref channel) = context.interaction.channel else {
         bail!("this command must be used in a channel");
     };
