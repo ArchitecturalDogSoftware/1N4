@@ -395,7 +395,7 @@ macro_rules! follow_up_response {
     ($client:expr, $interaction:expr, struct { $($arguments:tt)* }) => {
         $crate::follow_up_response!(@new(
             $client.interaction($interaction.application_id),
-            $interaction.token,
+            &$interaction.token,
             { $($arguments)* }
         ))
     };

@@ -15,18 +15,24 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::bail;
-use ina_logging::{debug, info, warn};
+use ina_localization::localize;
+use ina_logging::{debug, error, info, warn};
+use rand::{thread_rng, Rng};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
+use twilight_model::channel::message::MessageFlags;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, Ready};
 use twilight_model::http::interaction::InteractionResponseType;
+use twilight_util::builder::embed::EmbedBuilder;
 
-use super::api::Api;
+use super::api::{Api, ApiRef};
 use crate::command::context::Context;
 use crate::command::registry::registry;
 use crate::command::resolver::find_focused_option;
+use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::traits::extension::InteractionExt;
 use crate::utility::types::id::CustomId;
+use crate::utility::{category, color};
 
 /// A result returned by an event handler.
 pub type EventResult = std::result::Result<EventOutput, anyhow::Error>;
@@ -157,10 +163,10 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
     info!(async "shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
 
     let result: EventResult = match event.kind {
-        InteractionType::ApplicationCommand => self::on_command(api, &event).await,
-        InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api, &event).await,
-        InteractionType::MessageComponent => self::on_component(api, &event).await,
-        InteractionType::ModalSubmit => self::on_modal(api, &event).await,
+        InteractionType::ApplicationCommand => self::on_command(api.as_ref(), &event).await,
+        InteractionType::MessageComponent => self::on_component(api.as_ref(), &event).await,
+        InteractionType::ModalSubmit => self::on_modal(api.as_ref(), &event).await,
+        InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api.as_ref(), &event).await,
         _ => self::pass(),
     };
 
@@ -168,7 +174,7 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
     if let Err(ref error) = result {
         warn!(async "shard #{} failed interaction {} - {error}", shard_id.number(), event.display_label()).await?;
 
-        self::pass()
+        self::on_error(api.as_ref(), &event, error).await
     } else {
         info!(async "shard #{} succeeded interaction {}", shard_id.number(), event.display_label()).await?;
 
@@ -181,7 +187,7 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_command(api: Api, event: &Interaction) -> EventResult {
+pub async fn on_command(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
         bail!("missing command data");
     };
@@ -195,7 +201,7 @@ pub async fn on_command(api: Api, event: &Interaction) -> EventResult {
         bail!("missing command callback for '{}'", data.name);
     };
 
-    callable.on_command(command, Context::new(api.as_ref(), event, data)).await
+    callable.on_command(command, Context::new(api, event, data)).await
 }
 
 /// Handles a component [`Interaction`] event.
@@ -203,7 +209,7 @@ pub async fn on_command(api: Api, event: &Interaction) -> EventResult {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_component(api: Api, event: &Interaction) -> EventResult {
+pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(InteractionData::MessageComponent(ref data)) = event.data else {
         bail!("missing component data");
     };
@@ -218,7 +224,7 @@ pub async fn on_component(api: Api, event: &Interaction) -> EventResult {
         bail!("missing component callback for '{}'", data_id.name());
     };
 
-    callable.on_component(command, Context::new(api.as_ref(), event, data), data_id).await
+    callable.on_component(command, Context::new(api, event, data), data_id).await
 }
 
 /// Handles a modal [`Interaction`] event.
@@ -226,7 +232,7 @@ pub async fn on_component(api: Api, event: &Interaction) -> EventResult {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_modal(api: Api, event: &Interaction) -> EventResult {
+pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
         bail!("missing modal data");
     };
@@ -241,7 +247,7 @@ pub async fn on_modal(api: Api, event: &Interaction) -> EventResult {
         bail!("missing component callback for '{}'", data_id.name());
     };
 
-    callback.on_modal(command, Context::new(api.as_ref(), event, data), data_id).await
+    callback.on_modal(command, Context::new(api, event, data), data_id).await
 }
 
 /// Handles an autocomplete [`Interaction`] event.
@@ -249,7 +255,7 @@ pub async fn on_modal(api: Api, event: &Interaction) -> EventResult {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
+pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(InteractionData::ApplicationCommand(ref data)) = event.data else {
         bail!("missing command data");
     };
@@ -266,7 +272,7 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
         bail!("missing focused option for '{}'", data.name);
     };
 
-    let context = Context::new(api.as_ref(), event, &(**data));
+    let context = Context::new(api, event, &(**data));
     let mut choices = callback.on_autocomplete(command, context, name, text, kind).await?.to_vec();
 
     choices.dedup_by_key(|c| c.value.clone());
@@ -275,6 +281,96 @@ pub async fn on_autocomplete(api: Api, event: &Interaction) -> EventResult {
     crate::create_response!(api.client, event, struct {
         kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
         choices: choices.into_iter().take(10),
+    })
+    .await?;
+
+    self::pass()
+}
+
+/// Gracefully handles an interaction error.
+///
+/// # Errors
+///
+/// This function will return an error if the logger fails to output an error log.
+pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
+    if let Err(error) = self::on_error_notify_channel(api, event, error).await {
+        error!(async "failed to output error to channel: {error}").await?;
+    }
+
+    if let Err(error) = self::on_error_inform_user(api, event).await {
+        error!(async "failed to inform interaction user of error: {error}").await?;
+    }
+
+    self::pass()
+}
+
+/// Notifies the configured developer channel when an error occurs.
+///
+/// # Errors
+///
+/// This function will return an error if the channel could not be notified.
+pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
+    let Ok(channel_id) = crate::utility::secret::development_channel_id() else {
+        warn!(async "skipping channel error notification as no channel has been configured").await?;
+
+        return self::pass();
+    };
+
+    let titles = localize!(async category::UI, "error-titles").await?.to_string();
+    let titles = titles.lines().collect::<Box<[_]>>();
+    let index = thread_rng().gen_range(0 .. titles.len());
+    let error = format!("`{}`\n\n```json\n{error}\n```", event.display_label());
+
+    let mut embed = EmbedBuilder::new().color(color::FAILURE).title(titles[index]).description(error);
+
+    if let Some(user) = event.author() {
+        embed = embed.author(user.as_embed_author()?);
+    }
+
+    api.client.create_message(channel_id).embeds(&[embed.build()]).flags(MessageFlags::SUPPRESS_NOTIFICATIONS).await?;
+
+    self::pass()
+}
+
+/// Notifies the interaction's author when an error occurs.
+///
+/// # Errors
+///
+/// This function will return an error if the author could not be notified.
+pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> EventResult {
+    let Some(user) = event.author() else {
+        info!(async "skipping user error notification as not author is present").await?;
+
+        return self::pass();
+    };
+
+    if matches!(event.kind, InteractionType::ApplicationCommandAutocomplete) {
+        info!(async "skipping user error notification for autocompletion event").await?;
+
+        return self::pass();
+    }
+
+    let locale = match user.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localization::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
+    let description = localize!(async(try in locale) category::UI, "error-inform-description").await?;
+    let description = format!("{description}: `{}`", event.display_label());
+    let embed = EmbedBuilder::new().color(color::FAILURE).title(title).description(description);
+
+    // Do our best to ensure that this is handled ephemerally.
+    let _ = crate::create_response!(api.client, event, struct {
+        kind: InteractionResponseType::DeferredChannelMessageWithSource,
+        flags: MessageFlags::EPHEMERAL,
+    })
+    .await;
+
+    crate::follow_up_response!(api.client, event, struct {
+        embeds: &[embed.build()],
+        flags: MessageFlags::EPHEMERAL,
     })
     .await?;
 

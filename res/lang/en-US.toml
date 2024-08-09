@@ -49,6 +49,21 @@ echo-format-decimal = "Decimal (0-9)"
 echo-format-hexadecimal = "Hexadecimal (0-F)"
 
 [ui]
+error-inform-title = "An error has occured."
+error-inform-description = "The following identifier can be used for more information"
+error-titles = """\
+Encountered an error.
+System malfunctioning.
+Off-by-one.
+Your warranty is two years out of date.
+Encountered an unexpected exception.
+Return to Arden Inc.
+Panicking.
+Assertion failed.
+Deadlocked.
+Miscalculated.\
+"""
+
 echo-done = "Message echoed."
 
 help-title = "1N4 Command Listing"

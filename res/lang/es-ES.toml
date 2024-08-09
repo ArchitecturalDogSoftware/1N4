@@ -49,6 +49,21 @@ echo-format-decimal = "Decimal (0-9)"
 echo-format-hexadecimal = "Hexadecimal (0-F)"
 
 [ui]
+error-inform-title = "Se ha producio un error."
+error-inform-description = "El siguiente identificador se puede utilizar para obtener más información"
+error-titles = """\
+Se encontró un error.
+Mal functionamiento del sistema.
+Apagado por uno.
+Su garantía está desactualizada desde hace dos años.
+Se encontró con una excepción inesperada.
+Volver a Arden Inc.
+Bloqueando.
+Error de aserción.
+Estanqué.
+Calculé mal.\
+"""
+
 echo-done = "Mensaje resonante."
 
 help-title = "Listado de Comandos de 1N4"
