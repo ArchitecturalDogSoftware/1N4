@@ -63,6 +63,8 @@ pub mod traits {
 pub mod types {
     /// A reference to an existing message.
     pub mod anchor;
+    /// Provides various builders for model types.
+    pub mod builder;
     /// A type that defines custom identifiers.
     pub mod id;
     /// A type that defines modal data.
