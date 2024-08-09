@@ -36,7 +36,7 @@ use crate::utility::types::id::CustomId;
 mod data;
 
 crate::define_entry!("role", CommandType::ChatInput, struct {
-    allow_dms: true,
+    allow_dms: false,
 }, struct {
     command: on_command,
     component: on_component,
