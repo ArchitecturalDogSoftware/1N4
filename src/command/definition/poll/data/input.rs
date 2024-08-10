@@ -14,37 +14,38 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::num::NonZeroU8;
+
 use serde::{Deserialize, Serialize};
 use twilight_model::channel::message::EmojiReactionType;
 
-use super::poll::PollType;
+/// Defines input count limits.
+pub mod limit {
+    /// The maximum number of allowed multiple choice inputs.
+    pub const MULTIPLE_CHOICE: usize = 20;
+    /// The maximum number of allowed open response inputs.
+    pub const OPEN_RESPONSE: usize = 20;
+    /// The maximum number of allowed hybrid multiple choice inputs.
+    pub const HYBRID_MULTIPLE_CHOICE: usize = MULTIPLE_CHOICE - 1;
+    /// The maximum number of allowed hybrid open response inputs.
+    pub const HYBRID_OPEN_RESPONSE: usize = OPEN_RESPONSE;
+    /// The maximum number of allowed raffle inputs.
+    pub const RAFFLE: usize = 5;
+}
 
 /// A poll's input.
 #[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum PollInput {
-    /// A multiple-choice poll.
+    /// A multiple-choice poll input.
     MultipleChoice(MultipleChoiceInputData),
-    /// An open-response poll.
-    OpenResponse,
-    /// A multiple-choice poll with an open-ended option.
-    Hybrid,
-    /// A raffle poll.
-    Raffle,
-}
-
-impl PollInput {
-    /// Returns the type of this [`PollInput`].
-    #[must_use]
-    pub const fn kind(&self) -> PollType {
-        match self {
-            Self::MultipleChoice(_) => PollType::MultipleChoice,
-            Self::OpenResponse => PollType::OpenResponse,
-            Self::Hybrid => PollType::Hybrid,
-            Self::Raffle => PollType::Raffle,
-        }
-    }
+    /// An open-response poll input.
+    OpenResponse(OpenResponseInputData),
+    /// An input for a multiple-choice poll with an open-ended option.
+    Hybrid(HybridInputData),
+    /// A raffle poll input.
+    Raffle(RaffleInputData),
 }
 
 /// Defines multiple choice input data.
@@ -63,4 +64,20 @@ pub struct OpenResponseInputData {
     pub name: Box<str>,
     /// The input's description.
     pub description: Option<Box<str>>,
+}
+
+/// Defines hybrid input data.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HybridInputData {
+    /// A multiple choice input.
+    MultipleChoice(MultipleChoiceInputData),
+    /// An open response input.
+    OpenResponse(OpenResponseInputData),
+}
+
+/// Defines raffle input data.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RaffleInputData {
+    /// The number of members that can win this raffle.
+    pub winners: NonZeroU8,
 }

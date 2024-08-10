@@ -37,19 +37,6 @@ pub enum PollType {
     Raffle,
 }
 
-impl PollType {
-    /// Returns the stringified name of the poll type.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::MultipleChoice => "multiple-choice",
-            Self::OpenResponse => "open-response",
-            Self::Hybrid => "hybrid",
-            Self::Raffle => "raffle",
-        }
-    }
-}
-
 /// Builds a poll.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PollBuilder {
