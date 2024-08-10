@@ -23,6 +23,8 @@ mod data {
     pub mod input;
     /// Defines poll data.
     pub mod poll;
+    /// Defines response data.
+    pub mod response;
 }
 
 crate::define_entry!("poll", CommandType::ChatInput, struct {
