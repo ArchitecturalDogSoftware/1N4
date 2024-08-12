@@ -16,7 +16,7 @@
 
 use std::num::NonZeroU64;
 
-use ina_macro::Stored;
+use ina_macro::{AsTranslation, Stored};
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -25,19 +25,26 @@ use twilight_model::id::Id;
 
 use super::input::PollInput;
 use super::response::PollResponse;
+use crate::utility::category;
 
 /// A poll's type.
 #[non_exhaustive]
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, AsTranslation)]
 #[serde(rename_all = "kebab-case")]
+#[localizer_category(category::UI)]
 pub enum PollType {
     /// A multiple-choice poll.
+    #[localizer_key("multiple-choice")]
     MultipleChoice,
     /// An open-response poll.
+    #[localizer_key("open-response")]
     OpenResponse,
     /// A multiple-choice poll with an open-ended option.
+    #[localizer_key("hybrid")]
     Hybrid,
     /// A raffle poll.
+    #[localizer_key("raffle")]
     Raffle,
 }
 

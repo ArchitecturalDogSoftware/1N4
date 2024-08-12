@@ -637,10 +637,10 @@ where
     >;
 
     /// Returns this value's localizer category.
-    fn localizer_category(&self) -> &str;
+    fn localizer_category(&self) -> impl Into<Box<str>>;
 
     /// Returns this value's localizer key.
-    fn localizer_key(&self) -> &str;
+    fn localizer_key(&self) -> impl Into<Box<str>>;
 
     /// Fallibly localizes this value.
     ///
