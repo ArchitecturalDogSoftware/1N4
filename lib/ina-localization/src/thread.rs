@@ -358,6 +358,7 @@ where
 }
 
 impl From<Error<Infallible>> for Error<(Option<usize>, (Arc<RwLock<Localizer>>, Request))> {
+    #[allow(unreachable_patterns, reason = "potential false-positive? removing these patterns gives errors.")]
     fn from(value: Error<Infallible>) -> Self {
         match value {
             Error::FromToml(error) => Self::FromToml(error),
