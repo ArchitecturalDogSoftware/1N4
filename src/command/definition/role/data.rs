@@ -60,7 +60,7 @@ impl Selector {
 
 /// A list of role selector entries.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Stored)]
-#[data_format(Compress<Messagepack>)]
+#[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
 #[data_path(fmt = "role/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
 pub struct SelectorList {
     /// The user identifier.

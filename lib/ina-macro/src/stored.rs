@@ -18,14 +18,15 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{bracketed, parse_macro_input, Attribute, DeriveInput, Error, Ident, LitStr, Result, Token, Type};
+use syn::{bracketed, parse_macro_input, Attribute, DeriveInput, Error, Expr, Ident, LitStr, Result, Token, Type};
 
 /// The `data_format` attribute.
-#[repr(transparent)]
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct StoredFormatAttribute {
     /// The format type.
     pub kind: Type,
+    /// The format callback path.
+    pub call: Option<Expr>,
 }
 
 impl StoredFormatAttribute {
@@ -35,7 +36,31 @@ impl StoredFormatAttribute {
     ///
     /// This function will return an error if the attribute fails to be parsed.
     pub fn parse(attribute: &Attribute) -> Result<Self> {
-        attribute.parse_args_with(|input: ParseStream| Ok(Self { kind: input.parse()? }))
+        mod kw {
+            use syn::custom_keyword;
+
+            custom_keyword!(from);
+            custom_keyword!(kind);
+        }
+
+        attribute.parse_args_with(|input: ParseStream| {
+            if !input.peek(kw::kind) {
+                return Ok(Self { kind: input.parse()?, call: None });
+            }
+
+            input.parse::<kw::kind>()?;
+            input.parse::<Token![=]>()?;
+
+            let kind = input.parse::<Type>()?;
+
+            input.parse::<Token![,]>()?;
+            input.parse::<kw::from>()?;
+            input.parse::<Token![=]>()?;
+
+            let call = Some(input.parse::<Expr>()?);
+
+            Ok(Self { kind, call })
+        })
     }
 }
 
@@ -103,8 +128,8 @@ pub fn procedure(input: TokenStream) -> TokenStream {
     let Some(format_attribute) = attributes.iter().find(|a| a.path().is_ident("data_format")) else {
         return Error::new(identifier.span(), "missing `data_format` attribute").into_compile_error().into();
     };
-    let format_type = match StoredFormatAttribute::parse(format_attribute) {
-        Ok(StoredFormatAttribute { kind }) => kind,
+    let (format_type, format_call) = match StoredFormatAttribute::parse(format_attribute) {
+        Ok(StoredFormatAttribute { kind, call }) => (kind, call),
         Err(error) => return error.into_compile_error().into(),
     };
 
@@ -120,6 +145,8 @@ pub fn procedure(input: TokenStream) -> TokenStream {
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let path_format_arguments = (0 .. path_arguments.len()).map(|n| format_ident!("_{n}")).collect::<Box<[_]>>();
+    let format_fn = format_call
+        .map_or_else(|| quote! { <#format_type as ::std::default::Default>::default() }, |call| quote! { #call });
 
     quote! {
         #[automatically_derived]
@@ -129,7 +156,7 @@ pub fn procedure(input: TokenStream) -> TokenStream {
             type PathArguments = (#(#path_arguments),*);
 
             fn data_format() -> impl ::ina_storage::format::DataFormat + ::std::marker::Send {
-                <#format_type as ::std::default::Default>::default()
+                #format_fn
             }
 
             fn data_path_for(
