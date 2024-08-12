@@ -25,9 +25,23 @@ mod stored;
 ///
 /// # Examples
 ///
+/// Simple derive:
+///
 /// ```
-/// #[derive(Stored)]
-/// #[data_format(ina_storage::format::MessagePack)]
+/// #[derive(Serialize, Deserialize, Stored)]
+/// #[data_format(Compress<MessagePack>)] // this will use `Compress::default()`
+/// #[data_path(fmt = "dir/{}", args = [String], from = [name])]
+/// struct DataStructure {
+///     name: String,
+///     value: u64,
+/// }
+/// ```
+///
+/// Derive with custom format creation method:
+///
+/// ```
+/// #[derive(Serialize, Deserialize, Stored)]
+/// #[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
 /// #[data_path(fmt = "dir/{}", args = [String], from = [name])]
 /// struct DataStructure {
 ///     name: String,
