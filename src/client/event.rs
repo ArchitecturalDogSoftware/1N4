@@ -72,7 +72,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
         Event::Ready(event) => self::on_ready(api, *event, shard_id).await,
         Event::InteractionCreate(event) => self::on_interaction(api, *event, shard_id).await,
         Event::Resumed => {
-            info!(async "shard #{id} successfully resumed").await?;
+            debug!(async "shard #{id} successfully resumed").await?;
 
             self::pass()
         }
@@ -87,12 +87,12 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
             self::pass()
         }
         Event::GatewayHello(event) => {
-            info!(async "shard #{id} connecting to gateway ({}ms)", event.heartbeat_interval).await?;
+            debug!(async "shard #{id} connecting to gateway ({}ms)", event.heartbeat_interval).await?;
 
             self::pass()
         }
         Event::GatewayClose(None) => {
-            warn!(async "shard #{id} disconnected from gateway").await?;
+            debug!(async "shard #{id} disconnected from gateway").await?;
 
             self::pass()
         }
@@ -102,7 +102,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
             self::pass()
         }
         Event::GatewayReconnect => {
-            info!(async "shard #{id} reconnecting to gateway").await?;
+            debug!(async "shard #{id} reconnecting to gateway").await?;
 
             self::pass()
         }
