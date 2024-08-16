@@ -19,9 +19,16 @@ use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
 
+#[cfg(feature = "system-file")]
+pub use self::file::FileSystem;
+#[cfg(feature = "system-memory")]
+pub use self::memory::MemorySystem;
+
 /// A file-based system.
+#[cfg(feature = "system-file")]
 pub mod file;
 /// A memory-based system. This should only ever be used for testing.
+#[cfg(feature = "system-memory")]
 pub mod memory;
 
 /// A value that reads and writes generic data.

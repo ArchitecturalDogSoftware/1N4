@@ -25,12 +25,10 @@ use std::sync::Arc;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
-use system::memory::MemorySystem;
-use system::{DataReader, DataSystem, DataWriter};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::system::file::FileSystem;
+use crate::system::{DataReader, DataSystem, DataWriter};
 
 /// Defines data storage formats.
 pub mod format;
@@ -124,17 +122,22 @@ impl DataSystem for Storage {
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 pub enum System {
     /// The file system.
+    #[cfg(feature = "system-file")]
     #[default]
     File,
     /// The memory system. This should only be used for testing, as data does not persist between runs.
+    #[cfg(feature = "system-memory")]
+    #[cfg_attr(not(feature = "system-file"), default)]
     Memory,
 }
 
 macro_rules! system_call {
     (match $system:expr, $($header:ident)* => $($call:tt)*) => {
         match $system {
-            System::File => system_call!($($header)* FileSystem => $($call)*),
-            System::Memory => system_call!($($header)* MemorySystem => $($call)*),
+            #[cfg(feature = "system-file")]
+            System::File => system_call!($($header)* $crate::system::FileSystem => $($call)*),
+            #[cfg(feature = "system-memory")]
+            System::Memory => system_call!($($header)* $crate::system::MemorySystem => $($call)*),
         }
     };
     (async ref $type:ty => $($call:tt)*) => {
