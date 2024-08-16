@@ -53,7 +53,7 @@ ina-localization = { version = "*", path = "./lib/ina-localization/" }
 ina-logging = { version = "*", path = "./lib/ina-logging/" }
 ina-macro = { version = "*", path = "./lib/ina-macro/" }
 ina-threading = { version = "*", path = "./lib/ina-threading" }
-ina-storage = { version = "*", path = "./lib/ina-storage", features = ["full"] }
+ina-storage = { version = "*", path = "./lib/ina-storage", features = ["format-compression", "format-messagepack"] }
 rand = { version = "0.8", features = ["nightly"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
