@@ -75,7 +75,7 @@ pub enum Error<S = Infallible> {
 #[group(id = "DataSettings")]
 pub struct Settings {
     /// The storage system to use to read and write data.
-    #[arg(long = "data-system", default_value = "filesystem")]
+    #[arg(long = "data-system", default_value = "file")]
     pub system: System,
 
     /// The directory within which to manage data files.
