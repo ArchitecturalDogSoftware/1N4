@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 //! Provides data storage solutions for 1N4.
+#![feature(impl_trait_in_fn_trait_return)]
 
 use std::convert::Infallible;
 use std::num::NonZeroUsize;
@@ -24,9 +25,12 @@ use std::sync::Arc;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
+use system::memory::MemorySystem;
 use system::{DataReader, DataSystem, DataWriter};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+use crate::system::file::FileSystem;
 
 /// Defines data storage formats.
 pub mod format;
@@ -115,43 +119,75 @@ impl DataSystem for Storage {
     }
 }
 
+/// The preference for the storage backend system.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+pub enum System {
+    /// The file system.
+    #[default]
+    File,
+    /// The memory system. This should only be used for testing, as data does not persist between runs.
+    Memory,
+}
+
+macro_rules! system_call {
+    (match $system:expr, $($header:ident)* => $($call:tt)*) => {
+        match $system {
+            System::File => system_call!($($header)* FileSystem => $($call)*),
+            System::Memory => system_call!($($header)* MemorySystem => $($call)*),
+        }
+    };
+    (async ref $type:ty => $($call:tt)*) => {
+        <$type>::get().await$($call)*.await.map_err(Into::into)
+    };
+    (async mut $type:ty => $($call:tt)*) => {
+        <$type>::get_mut().await$($call)*.await.map_err(Into::into)
+    };
+    (ref $type:ty => $($call:tt)*) => {
+        <$type>::blocking_get()$($call)*.map_err(Into::into)
+    };
+    (mut $type:ty => $($call:tt)*) => {
+        <$type>::blocking_get_mut()$($call)*.map_err(Into::into)
+    };
+}
+
 impl DataReader for Storage {
     type Error = anyhow::Error;
 
     fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.blocking_get().blocking_exists(&path).map_err(Into::into)
+        system_call!(match self.settings.system, ref => .blocking_exists(&path))
     }
 
     async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.get().await.exists(&path).await.map_err(Into::into)
+        system_call!(match self.settings.system, async ref => .exists(&path))
     }
 
     fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.blocking_get().blocking_size(&path).map_err(Into::into)
+        system_call!(match self.settings.system, ref => .blocking_size(&path))
     }
 
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.get().await.size(&path).await.map_err(Into::into)
+        system_call!(match self.settings.system, async ref => .size(&path))
     }
 
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.blocking_get().blocking_read(&path).map_err(Into::into)
+        system_call!(match self.settings.system, ref => .blocking_read(&path))
     }
 
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.get().await.read(&path).await.map_err(Into::into)
+        system_call!(match self.settings.system, async ref => .read(&path))
     }
 }
 
@@ -161,91 +197,38 @@ impl DataWriter for Storage {
     fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.blocking_get_mut().blocking_write(&path, bytes).map_err(Into::into)
+        system_call!(match self.settings.system, mut => .blocking_write(&path, bytes))
     }
 
     async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.get_mut().await.write(&path, bytes).await.map_err(Into::into)
+        system_call!(match self.settings.system, async mut => .write(&path, bytes))
     }
 
     fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         let from = self.settings.file_directory.join(from);
         let into = self.settings.file_directory.join(into);
 
-        self.settings.system.blocking_get_mut().blocking_rename(&from, &into).map_err(Into::into)
+        system_call!(match self.settings.system, mut => .blocking_rename(&from, &into))
     }
 
     async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         let from = self.settings.file_directory.join(from);
         let into = self.settings.file_directory.join(into);
 
-        self.settings.system.get_mut().await.rename(&from, &into).await.map_err(Into::into)
+        system_call!(match self.settings.system, async mut => .rename(&from, &into))
     }
 
     fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.blocking_get_mut().blocking_delete(&path).map_err(Into::into)
+        system_call!(match self.settings.system, mut => .blocking_delete(&path))
     }
 
     async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         let path = self.settings.file_directory.join(path);
 
-        self.settings.system.get_mut().await.delete(&path).await.map_err(Into::into)
-    }
-}
-
-/// The preference for the storage backend system.
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
-pub enum System {
-    /// The file system.
-    #[default]
-    Filesystem,
-}
-
-impl System {
-    /// Returns a reference to the instance of this system.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    #[must_use]
-    pub fn blocking_get(self) -> impl Deref<Target = impl DataSystem> {
-        match self {
-            Self::Filesystem => crate::system::file::FileSystem::blocking_get(),
-        }
-    }
-
-    /// Returns a reference to the instance of this system.
-    pub async fn get(self) -> impl Deref<Target = impl DataSystem> {
-        match self {
-            Self::Filesystem => crate::system::file::FileSystem::get().await,
-        }
-    }
-
-    /// Returns a mutable reference to the instance of this system.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    #[must_use]
-    pub fn blocking_get_mut(self) -> impl DerefMut<Target = impl DataSystem> {
-        match self {
-            Self::Filesystem => crate::system::file::FileSystem::blocking_get_mut(),
-        }
-    }
-
-    /// Returns a mutable reference to the instance of this system.
-    pub async fn get_mut(self) -> impl DerefMut<Target = impl DataSystem> {
-        match self {
-            Self::Filesystem => crate::system::file::FileSystem::get_mut().await,
-        }
+        system_call!(match self.settings.system, async mut => .delete(&path))
     }
 }

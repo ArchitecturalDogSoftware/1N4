@@ -21,6 +21,8 @@ use std::sync::Arc;
 
 /// A file-based system.
 pub mod file;
+/// A memory-based system. This should only ever be used for testing.
+pub mod memory;
 
 /// A value that reads and writes generic data.
 pub trait DataSystem: DataReader + DataWriter + 'static {
