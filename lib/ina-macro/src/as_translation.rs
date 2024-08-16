@@ -20,8 +20,8 @@ use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{
-    bracketed, parse_macro_input, Attribute, Data, DataEnum, DataStruct, DeriveInput, Error, Expr, Fields, FieldsNamed,
-    Generics, Ident, LitStr, Result, Token, Variant,
+    bracketed, parse_macro_input, Attribute, Data, DataEnum, DataStruct, DeriveInput, Error, Expr, Fields, Generics,
+    Ident, LitStr, Result, Token, Variant,
 };
 
 /// The `localizer_category` attribute.
