@@ -17,19 +17,26 @@
 //! Provides concurrency solutions for 1N4.
 
 use std::convert::Infallible;
-use std::ops::{Deref, DerefMut};
 use std::thread::{Builder, JoinHandle};
 
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-pub use crate::statics::*;
-pub use crate::threads::*;
-
+/// Provides utilities for automatically joining threads.
+pub mod join;
 /// Provides utilities for static threads.
-mod statics;
+pub mod statics;
 /// Provides definitions for custom threads.
-mod threads;
+pub mod threads {
+    /// Defines threads that consume values.
+    pub mod consumer;
+    /// Defines threads that consume and produce values.
+    pub mod exchanger;
+    /// Defines threads that can be called like functions.
+    pub mod invoker;
+    /// Defines threads that produce values.
+    pub mod producer;
+}
 
 /// A result alias with a defaulted error type.
 pub type Result<T, S = Infallible> = std::result::Result<T, Error<S>>;
@@ -143,94 +150,5 @@ where
 
     fn into_handle(self) -> JoinHandle<T> {
         self.inner
-    }
-}
-
-/// A thread that is automatically joined when dropped.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Join<H, T>
-where
-    H: HandleHolder<T>,
-    T: Send + 'static,
-{
-    /// The inner thread handle.
-    inner: Option<H>,
-    /// A function that is called before the thread is joined.
-    clean_up_handle: Option<fn(&mut H)>,
-    /// A function that is called after the thread is joined.
-    clean_up_result: Option<fn(T)>,
-}
-
-impl<H, T> Join<H, T>
-where
-    H: HandleHolder<T>,
-    T: Send + 'static,
-{
-    /// Creates a new [`Join<H, T>`] thread.
-    pub(crate) const fn new(inner: H, clean_up_handle: Option<fn(&mut H)>, clean_up_result: Option<fn(T)>) -> Self {
-        Self { inner: Some(inner), clean_up_handle, clean_up_result }
-    }
-
-    /// Thinly wraps the given handle.
-    pub const fn wrap(inner: H) -> Self {
-        Self::new(inner, None, None)
-    }
-
-    /// Wraps the given handle and runs the given function before the thread is joined.
-    pub const fn clean_up_handle(inner: H, f: fn(&mut H)) -> Self {
-        Self::new(inner, Some(f), None)
-    }
-
-    /// Wraps the given handle and runs the given function after the thread is joined.
-    pub const fn clean_up_result(inner: H, f: fn(T)) -> Self {
-        Self::new(inner, None, Some(f))
-    }
-
-    /// Wraps the given handle and runs the given function after the thread is joined.
-    pub const fn clean_up_all(inner: H, handle: fn(&mut H), result: fn(T)) -> Self {
-        Self::new(inner, Some(handle), Some(result))
-    }
-}
-
-impl<H, T> Deref for Join<H, T>
-where
-    H: HandleHolder<T>,
-    T: Send + 'static,
-{
-    type Target = H;
-
-    #[allow(clippy::expect_used)]
-    fn deref(&self) -> &Self::Target {
-        self.inner.as_ref().expect("the thread has already been joined")
-    }
-}
-
-impl<H, T> DerefMut for Join<H, T>
-where
-    H: HandleHolder<T>,
-    T: Send + 'static,
-{
-    #[allow(clippy::expect_used)]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.inner.as_mut().expect("the thread has already been joined")
-    }
-}
-
-impl<H, T> Drop for Join<H, T>
-where
-    H: HandleHolder<T>,
-    T: Send + 'static,
-{
-    #[allow(clippy::unwrap_used)]
-    fn drop(&mut self) {
-        let Some(mut thread) = self.inner.take() else { return };
-
-        if let Some(clean_up_handle) = self.clean_up_handle {
-            clean_up_handle(&mut thread);
-        }
-
-        let result = thread.into_handle().join().unwrap();
-
-        self.clean_up_result.unwrap_or(drop)(result);
     }
 }

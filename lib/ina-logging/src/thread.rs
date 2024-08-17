@@ -16,7 +16,10 @@
 
 use std::fmt::Display;
 
-use ina_threading::{Consumer, ConsumingThread, Join, JoinStatic};
+use ina_threading::join::Join;
+use ina_threading::statics::JoinStatic;
+use ina_threading::threads::consumer::Consumer;
+use ina_threading::ConsumingThread;
 use tokio::sync::mpsc::Receiver;
 
 use crate::endpoint::Endpoint;

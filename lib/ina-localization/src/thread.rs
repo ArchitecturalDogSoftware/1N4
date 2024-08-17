@@ -18,7 +18,8 @@ use std::convert::Infallible;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ina_threading::{StatefulInvoker, Static};
+use ina_threading::statics::Static;
+use ina_threading::threads::invoker::StatefulInvoker;
 use tokio::sync::RwLock;
 
 use crate::{Error, Locale, Localizer, OwnedTranslation, Result, Settings};
