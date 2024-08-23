@@ -48,7 +48,20 @@ pub enum PollType {
     Raffle,
 }
 
+impl PollType {
+    /// Returns the emoji that represents this poll type.
+    pub const fn emoji(self) -> char {
+        match self {
+            Self::MultipleChoice => '🔢',
+            Self::OpenResponse => '📝',
+            Self::Hybrid => '🔠',
+            Self::Raffle => '🎲',
+        }
+    }
+}
+
 /// Builds a poll.
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Stored)]
 #[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
 #[data_path(fmt = "poll/builder/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
@@ -73,6 +86,7 @@ pub struct PollBuilder {
 }
 
 /// Tracks an active poll's state.
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Stored)]
 #[data_format(kind = Compress<Messagepack>, from = Compress::new_default(Messagepack))]
 #[data_path(fmt = "poll/state/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
