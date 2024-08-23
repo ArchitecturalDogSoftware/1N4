@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+/// Provides utilities for searching strings.
+pub mod search;
 /// Provides getters for client secrets.
 pub mod secret;
 
@@ -69,46 +71,6 @@ pub mod types {
     pub mod id;
     /// A type that defines modal data.
     pub mod modal;
-}
-
-/// Determines how strict a contains search is.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Strictness {
-    /// All parts of the string must be found within the base string.
-    Loose(bool),
-    /// String must match fairly well, ignoring non-alphanumeric characters.
-    Firm(bool),
-    /// String must nearly match exactly.
-    Strict(bool),
-}
-
-/// Returns whether `find` is roughly contained within `base`.
-pub fn fuzzy_contains(strictness: Strictness, base: impl AsRef<str>, find: impl AsRef<str>) -> bool {
-    match strictness {
-        Strictness::Loose(ignore_casing) => {
-            let mut base = base.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
-            let mut find = find.as_ref().replace(|c: char| !(c.is_alphanumeric() || c.is_whitespace()), "");
-
-            if ignore_casing {
-                base = base.to_lowercase();
-                find = find.to_lowercase();
-            }
-
-            find.trim().split(char::is_whitespace).all(|s| base.contains(s))
-        }
-        Strictness::Firm(ignore_casing) => {
-            let base = base.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
-            let find = find.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
-
-            if ignore_casing { base.to_lowercase().contains(&find.to_lowercase()) } else { base.contains(&find) }
-        }
-        Strictness::Strict(ignore_casing) => {
-            let base = base.as_ref();
-            let find = find.as_ref();
-
-            if ignore_casing { base.to_lowercase().contains(&find.to_lowercase()) } else { base.contains(find) }
-        }
-    }
 }
 
 /// Defines localization category constants within their own 'category' module.

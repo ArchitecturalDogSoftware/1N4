@@ -30,8 +30,9 @@ use crate::client::event::EventResult;
 use crate::command::context::Context;
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
+use crate::utility::search::{fuzzy_contains, Strictness};
 use crate::utility::traits::convert::AsLocale;
-use crate::utility::{category, color, fuzzy_contains, Strictness};
+use crate::utility::{category, color};
 
 crate::define_entry!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
