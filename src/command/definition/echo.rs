@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::bail;
-use ina_localization::localize;
+use ina_localizing::localize;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::Permissions;
@@ -55,7 +55,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 

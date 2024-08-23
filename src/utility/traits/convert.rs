@@ -18,11 +18,11 @@ use std::convert::Infallible;
 use std::future::Future;
 use std::ops::Deref;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use anyhow::{bail, ensure};
-use ina_localization::{localize, Locale, Localizer, OwnedTranslation};
-use tokio::sync::RwLock;
+use ina_localizing::locale::Locale;
+use ina_localizing::localize;
+use ina_localizing::text::Text;
 use twilight_cache_inmemory::model::{CachedEmoji, CachedGuild, CachedMember, CachedMessage, CachedSticker};
 use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::embed::EmbedAuthor;
@@ -571,10 +571,10 @@ impl AsLocale for CachedGuild {
 }
 
 impl AsLocale for CurrentUser {
-    type Error = <Locale as FromStr>::Err;
+    type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
-        self.locale.as_deref().ok_or(ina_localization::Error::MissingLocale)?.parse()
+        self.locale.as_deref().ok_or(ina_localizing::Error::MissingLocale)?.parse().map_err(Into::into)
     }
 }
 
@@ -587,15 +587,15 @@ impl AsLocale for Guild {
 }
 
 impl AsLocale for Interaction {
-    type Error = <Locale as FromStr>::Err;
+    type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
-        self.locale.as_deref().ok_or(ina_localization::Error::MissingLocale)?.parse()
+        self.locale.as_deref().ok_or(ina_localizing::Error::MissingLocale)?.parse().map_err(Into::into)
     }
 }
 
 impl AsLocale for Member {
-    type Error = <Locale as FromStr>::Err;
+    type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.user.as_locale()
@@ -603,10 +603,10 @@ impl AsLocale for Member {
 }
 
 impl AsLocale for PartialMember {
-    type Error = <Locale as FromStr>::Err;
+    type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
-        self.user.as_ref().ok_or(ina_localization::Error::MissingLocale)?.as_locale()
+        self.user.as_ref().ok_or(ina_localizing::Error::MissingLocale)?.as_locale().map_err(Into::into)
     }
 }
 
@@ -619,22 +619,20 @@ impl AsLocale for TemplateGuild {
 }
 
 impl AsLocale for User {
-    type Error = <Locale as FromStr>::Err;
+    type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
-        self.locale.as_deref().ok_or(ina_localization::Error::MissingLocale)?.parse()
+        self.locale.as_deref().ok_or(ina_localizing::Error::MissingLocale)?.parse().map_err(Into::into)
     }
 }
 
 /// Converts the implementing type into an owned translation.
-pub trait AsTranslation<I = ina_localization::thread::Inner>
+pub trait AsTranslation<I = ina_localizing::text::TextInner>
 where
     I: Deref<Target = str> + for<'s> From<&'s str>,
 {
     /// The error that may be returned when converting.
-    type Error: From<
-        ina_localization::Error<(Option<usize>, (Arc<RwLock<Localizer>>, ina_localization::thread::Request))>,
-    >;
+    type Error: From<ina_localizing::Error>;
 
     /// Returns this value's localizer category.
     fn localizer_category(&self) -> impl Into<Box<str>>;
@@ -647,18 +645,15 @@ where
     /// # Errors
     ///
     /// This function will return an error if the value could not be localized.
-    fn as_translation(
-        &self,
-        locale: Option<Locale>,
-    ) -> impl Future<Output = Result<OwnedTranslation<I>, Self::Error>> + Send
+    fn as_translation(&self, locale: Option<Locale>) -> impl Future<Output = Result<Text<I>, Self::Error>> + Send
     where
         Self: Sync,
     {
         async move {
-            let category = self.localizer_category();
-            let key = self.localizer_key();
+            let category = self.localizer_category().into();
+            let key = self.localizer_key().into();
 
-            Ok(localize!(async(try in locale) category, key).await?.cast())
+            Ok(localize!(async(try in locale) category, key).await?.cast_inner())
         }
     }
 
@@ -673,10 +668,10 @@ where
     /// # Errors
     ///
     /// This function will return an error if the value could not be localized.
-    fn blocking_as_translation(&self, locale: Option<Locale>) -> Result<OwnedTranslation<I>, Self::Error> {
-        let category = self.localizer_category();
-        let key = self.localizer_key();
+    fn blocking_as_translation(&self, locale: Option<Locale>) -> Result<Text<I>, Self::Error> {
+        let category = self.localizer_category().into();
+        let key = self.localizer_key().into();
 
-        Ok(localize!((try in locale) category, key)?.cast())
+        Ok(localize!((try in locale) category, key)?.cast_inner())
     }
 }

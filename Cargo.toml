@@ -49,7 +49,7 @@ anyhow = "1.0"
 async-trait = "0.1"
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
 dotenvy = { version = "0.15", optional = true }
-ina-localization = { version = "*", path = "./lib/ina-localization/" }
+ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
 ina-logging = { version = "*", path = "./lib/ina-logging/" }
 ina-macro = { version = "*", path = "./lib/ina-macro/" }
 ina-threading = { version = "*", path = "./lib/ina-threading" }

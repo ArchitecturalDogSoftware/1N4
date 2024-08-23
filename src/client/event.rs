@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::bail;
-use ina_localization::localize;
+use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
 use rand::{thread_rng, Rng};
 use twilight_gateway::{Event, ShardId};
@@ -352,7 +352,7 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
 
     let locale = match user.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 

@@ -15,10 +15,9 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Display;
-use std::str::FromStr;
 
 use anyhow::{ensure, Result};
-use ina_localization::Locale;
+use ina_localizing::locale::Locale;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::channel::message::{Embed, MessageFlags};
@@ -268,7 +267,7 @@ impl<'ar: 'ev, 'ev, T> AsLocale for Context<'ar, 'ev, T>
 where
     T: Send,
 {
-    type Error = <Locale as FromStr>::Err;
+    type Error = ina_localizing::Error;
 
     // Check in the following order:
     // 1. interaction locale
@@ -280,8 +279,8 @@ where
             .as_deref()
             .or_else(|| self.interaction.author().and_then(|u| u.locale.as_deref()))
             .or(self.interaction.guild_locale.as_deref())
-            .map(str::parse)
-            .ok_or(ina_localization::Error::MissingLocale)?
+            .map(|s| s.parse().map_err(Into::into))
+            .ok_or(ina_localizing::Error::MissingLocale)?
     }
 }
 

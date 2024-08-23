@@ -46,7 +46,7 @@ pub struct Arguments {
     /// The localization thread's settings.
     #[command(flatten)]
     #[serde(rename = "localizer")]
-    pub lang_settings: ina_localization::Settings,
+    pub lang_settings: ina_localizing::settings::Settings,
     /// The logging thread's settings.
     #[command(flatten)]
     #[serde(rename = "logger")]
@@ -94,11 +94,11 @@ pub fn main() -> Result<()> {
 pub async fn async_main(arguments: Arguments) -> Result<()> {
     info!(async "entered asynchronous runtime").await?;
 
-    ina_localization::thread::start(arguments.lang_settings).await?;
+    ina_localizing::thread::start(arguments.lang_settings).await?;
 
     info!(async "initialized localization thread").await?;
 
-    let loaded_locales = ina_localization::thread::load(None).await?;
+    let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
 
     info!(async "loaded {loaded_locales} localization locales").await?;
 
@@ -126,7 +126,7 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
         },
     }?;
 
-    ina_localization::thread::close().await;
+    ina_localizing::thread::close().await;
 
     info!(async "closed localization thread").await?;
 

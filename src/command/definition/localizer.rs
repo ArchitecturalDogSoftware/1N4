@@ -17,7 +17,8 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use ina_localization::{localize, Locale};
+use ina_localizing::locale::Locale;
+use ina_localizing::localize;
 use ina_logging::{info, warn};
 use twilight_model::application::command::{
     CommandOptionChoice, CommandOptionChoiceValue, CommandOptionType, CommandType,
@@ -75,23 +76,23 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
     info!(async "reloading localization thread").await?;
 
     // Do we want to clear here? It may cause concurrent commands to fail to localize.
-    ina_localization::thread::clear().await?;
+    ina_localizing::thread::clear(None::<[_; 0]>).await?;
 
-    let loaded_locales = ina_localization::thread::load(None).await?;
+    let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
 
     info!(async "loaded {loaded_locales} localization locales").await?;
 
     let title = localize!(async(try in locale) category::UI, "localizer-reloaded").await?;
     let locales = localize!(async(try in locale) category::UI, "localizer-locales").await?;
 
-    let list = ina_localization::thread::list().await?;
+    let list = ina_localizing::thread::list().await?;
     let list = list.iter().map(|l| format!("`{l}`"));
     let locales = format!("{locales}:\n> {}", list.collect::<Box<[_]>>().join(", "));
 
@@ -116,7 +117,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
@@ -172,7 +173,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
 ///
 /// This function will return an error if the autocompletion could not be executed.
 async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoice]>> {
-    let mut locales = ina_localization::thread::list().await?.to_vec();
+    let mut locales = ina_localizing::thread::list().await?.to_vec();
 
     locales.retain(|l| fuzzy_contains(Strictness::Firm(true), l.to_string(), current));
 

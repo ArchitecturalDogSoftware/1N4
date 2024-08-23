@@ -16,7 +16,7 @@
 
 use anyhow::{anyhow, bail};
 use data::{Selector, SelectorList};
-use ina_localization::localize;
+use ina_localizing::localize;
 use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::application_command::CommandData;
@@ -91,7 +91,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
@@ -162,7 +162,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
@@ -213,7 +213,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
@@ -267,7 +267,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
@@ -324,7 +324,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
@@ -374,7 +374,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 

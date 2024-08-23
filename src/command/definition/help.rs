@@ -17,7 +17,8 @@
 use std::fmt::Write;
 
 use anyhow::Result;
-use ina_localization::{localize, Locale};
+use ina_localizing::locale::Locale;
+use ina_localizing::localize;
 use rand::{thread_rng, Rng};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::application_command::CommandData;
@@ -49,7 +50,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
-        Err(ina_localization::Error::MissingLocale) => None,
+        Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
