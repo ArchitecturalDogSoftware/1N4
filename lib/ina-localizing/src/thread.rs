@@ -73,7 +73,7 @@ pub enum Response {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    assert!(THREAD.async_api().has().await, "the thread has already been initialized");
+    assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
     let localizer = Localizer::new(settings);
@@ -93,7 +93,7 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    assert!(THREAD.sync_api().has(), "the thread has already been initialized");
+    assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
     let localizer = Localizer::new(settings);

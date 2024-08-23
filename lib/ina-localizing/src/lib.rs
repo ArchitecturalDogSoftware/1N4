@@ -174,6 +174,9 @@ impl Localizer {
             if !metadata.is_file() {
                 continue;
             }
+
+            let path = entry.path();
+
             let Some(name) = path.file_stem() else {
                 continue;
             };

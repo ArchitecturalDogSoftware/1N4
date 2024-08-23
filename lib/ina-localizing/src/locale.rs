@@ -20,6 +20,7 @@ use std::str::FromStr;
 
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{Arg, Command};
+use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 
 /// An error that may be returned when using this library.
@@ -47,7 +48,7 @@ pub enum Error {
 }
 
 /// A regional linguistic locale.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct Locale {
     /// The locale's language code.
     language: [char; 2],
@@ -144,6 +145,41 @@ impl ValueParserFactory for Locale {
 
     fn value_parser() -> Self::Parser {
         LocaleValueParser
+    }
+}
+
+impl Serialize for Locale {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Locale {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct LocaleVisitor;
+
+        impl Visitor<'_> for LocaleVisitor {
+            type Value = Locale;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a valid locale string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                v.parse().map_err(|_| E::invalid_value(Unexpected::Str(v), &self))
+            }
+        }
+
+        deserializer.deserialize_str(LocaleVisitor)
     }
 }
 
