@@ -27,6 +27,7 @@ use twilight_model::id::Id;
 use crate::client::api::ApiRef;
 
 /// A reference to an existing message.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Anchor {
     /// The guild identifier.

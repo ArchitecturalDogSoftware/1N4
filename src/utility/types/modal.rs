@@ -42,6 +42,7 @@ pub enum Error {
 }
 
 /// A modal's basic data.
+#[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModalData {
     /// The modal's custom identifier.
@@ -77,6 +78,7 @@ impl ModalData {
 }
 
 /// Builds a modal's basic data.
+#[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct ModalDataBuilder {
     /// The modal's custom identifier.

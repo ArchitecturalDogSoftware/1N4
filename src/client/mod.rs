@@ -77,6 +77,7 @@ pub struct Settings {
 }
 
 /// The bot's status definition schema.
+#[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StatusList {
     /// The bot's testing status definitions.
@@ -96,6 +97,7 @@ impl StatusList {
 }
 
 /// A status definition.
+#[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StatusDefinition {
     /// The status.
@@ -120,6 +122,7 @@ impl Default for StatusDefinition {
 }
 
 /// The bot's instance.
+#[non_exhaustive]
 #[derive(Debug)]
 pub struct Instance {
     /// The canonical API instance.

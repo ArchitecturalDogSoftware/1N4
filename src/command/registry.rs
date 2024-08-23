@@ -32,6 +32,7 @@ static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::defau
 
 /// The command registry.
 #[repr(transparent)]
+#[non_exhaustive]
 #[derive(Default)]
 pub struct CommandRegistry {
     /// The inner command list.
@@ -112,6 +113,7 @@ impl IntoIterator for CommandRegistry {
 }
 
 /// An entry within the command registry.
+#[non_exhaustive]
 pub struct CommandEntry {
     /// The command's literal name.
     pub name: &'static str,
@@ -122,6 +124,7 @@ pub struct CommandEntry {
 }
 
 /// The callback functions of a [`CommandEntry`].
+#[non_exhaustive]
 #[derive(Default)]
 pub struct CommandEntryCallbacks {
     /// The command callback.

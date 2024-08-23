@@ -30,6 +30,7 @@ use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::modal::ModalData;
 
 /// An interaction context.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
 pub struct Context<'ar: 'ev, 'ev, T>
 where

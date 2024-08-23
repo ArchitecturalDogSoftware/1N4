@@ -51,6 +51,7 @@ pub enum Error {
 }
 
 /// A custom identifier that supports arbitrary data storage.
+#[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CustomId<I = Inner>
 where

@@ -20,6 +20,7 @@ use twilight_cache_inmemory::DefaultInMemoryCache;
 use twilight_http::Client;
 
 /// Contains the HTTP API and its cache.
+#[non_exhaustive]
 #[derive(Clone, Debug)]
 pub struct Api {
     /// The HTTP client.
@@ -43,6 +44,7 @@ impl Api {
 }
 
 /// Contains a reference to the HTTP API and its cache.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
 pub struct ApiRef<'api> {
     /// A reference to the HTTP client.

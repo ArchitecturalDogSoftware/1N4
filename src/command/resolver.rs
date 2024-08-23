@@ -41,6 +41,7 @@ pub enum Error {
 
 /// Resolves and caches a command's defined options.
 #[must_use = "this type should be used to resolve command options"]
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq)]
 pub struct CommandOptionResolver<'ev> {
     /// The command's data.
@@ -192,6 +193,7 @@ command_option_resolver_getters! {
 
 /// Resolves and caches a modal's defined fields.
 #[must_use = "this type should be used to resolve modal fields"]
+#[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModalFieldResolver<'ev> {
     /// The modal's data.
