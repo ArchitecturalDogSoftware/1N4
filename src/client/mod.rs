@@ -15,12 +15,10 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::future::Future;
-use std::num::{NonZeroU32, NonZeroU64};
-use std::path::Path;
+use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use clap::Args;
 use ina_logging::{debug, error, warn};
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -36,11 +34,14 @@ use twilight_model::gateway::OpCode;
 
 use self::api::Api;
 use self::event::{EventOutput, EventResult};
+use self::settings::Settings;
 
 /// Provides an API structure to be passed between functions.
 pub mod api;
 /// Provides an API for handling events.
 pub mod event;
+/// Defines the client's settings.
+pub mod settings;
 
 /// The bot's gateway intentions.
 pub const INTENTS: Intents = Intents::empty()
@@ -53,28 +54,6 @@ pub const INTENTS: Intents = Intents::empty()
     .union(Intents::GUILD_SCHEDULED_EVENTS)
     .union(Intents::GUILD_MESSAGE_REACTIONS)
     .union(Intents::MESSAGE_CONTENT);
-
-/// The bot's settings.
-#[non_exhaustive]
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-#[group(id = "BotSettings")]
-pub struct Settings {
-    /// The location of the file that determines the bot's status.
-    #[arg(long = "status-file", default_value = "./res/status.toml")]
-    pub status_file: Box<Path>,
-    /// The interval at which to refresh the bot's status in minutes.
-    #[arg(short = 'S', long = "status-interval", default_value = "30")]
-    pub status_interval: NonZeroU64,
-
-    /// The number of shards to spawn.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[arg(short = 's', long = "shards")]
-    pub shards: Option<NonZeroU32>,
-    /// The interval at which to reshard in hours.
-    #[arg(short = 'r', long = "reshard-interval", default_value = "8")]
-    pub reshard_interval: NonZeroU64,
-}
 
 /// The bot's status definition schema.
 #[non_exhaustive]

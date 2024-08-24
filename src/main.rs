@@ -38,11 +38,11 @@ pub struct Arguments {
     /// The bot's settings.
     #[command(flatten)]
     #[serde(rename = "client")]
-    pub bot_settings: self::client::Settings,
+    pub bot_settings: crate::client::settings::Settings,
     /// The storage instance's settings.
     #[command(flatten)]
     #[serde(rename = "storage")]
-    pub data_settings: ina_storage::Settings,
+    pub data_settings: ina_storage::settings::Settings,
     /// The localization thread's settings.
     #[command(flatten)]
     #[serde(rename = "localizer")]

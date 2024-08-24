@@ -14,36 +14,34 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::num::NonZeroUsize;
+use std::path::{Path, PathBuf};
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
 
-/// The logger's settings.
+use crate::System;
+
+/// The storage instance's settings.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[group(id = "LogSettings")]
+#[group(id = "DataSettings")]
 pub struct Settings {
-    /// Disables logger output.
-    #[arg(short = 'q', long = "quiet")]
+    /// The storage system to use to read and write data.
+    #[arg(long = "data-system", default_value = "file")]
     #[serde(default)]
-    pub quiet: bool,
+    pub system: System,
 
-    /// The logger's file output directory.
-    #[cfg(feature = "file")]
-    #[arg(id = "LOG_DIR", long = "log-directory", default_value = "./log/")]
+    /// The directory within which to manage data files.
+    #[arg(id = "DATA_DIRECTORY", long = "data-directory", default_value = "./res/data/")]
     #[serde(default = "default_directory")]
-    pub directory: Box<std::path::Path>,
+    pub directory: Box<Path>,
 
-    /// The capacity of the logger's queue. If set to '1', no buffering will occur.
-    #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity", default_value = "8")]
+    /// The storage thread's output queue capacity. If set to '1', no buffering will be done.
+    #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity", default_value = "8")]
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
-    /// The duration in milliseconds that the logger's queue should retain entries for before flushing.
-    #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration", default_value = "5")]
-    #[serde(default = "default_queue_duration")]
-    pub queue_duration: NonZeroU64,
 }
 
 /// Returns the default queue capacity.
@@ -53,15 +51,7 @@ const fn default_queue_capacity() -> NonZeroUsize {
     capacity
 }
 
-/// Returns the default queue duration.
-const fn default_queue_duration() -> NonZeroU64 {
-    let Some(duration) = NonZeroU64::new(10) else { unreachable!() };
-
-    duration
-}
-
-/// Returns the default log directory.
-#[cfg(feature = "file")]
-fn default_directory() -> Box<std::path::Path> {
-    std::path::PathBuf::from("./log/").into_boxed_path()
+/// Returns the default data directory.
+fn default_directory() -> Box<Path> {
+    PathBuf::from("./res/data/").into_boxed_path()
 }

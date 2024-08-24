@@ -18,20 +18,22 @@
 #![feature(impl_trait_in_fn_trait_return)]
 
 use std::convert::Infallible;
-use std::num::NonZeroUsize;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
 
-use clap::{Args, ValueEnum};
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+use crate::settings::Settings;
 use crate::system::{DataReader, DataSystem, DataWriter};
 
 /// Defines data storage formats.
 pub mod format;
+/// Defines the storage system's settings.
+pub mod settings;
 /// Defines a trait for stored values.
 pub mod stored;
 /// Defines data storage systems.
@@ -66,26 +68,6 @@ pub enum Error<S = Infallible> {
     /// A sending error.
     #[error(transparent)]
     Send(#[from] SendError<S>),
-}
-
-/// The storage instance's settings.
-#[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-#[group(id = "DataSettings")]
-pub struct Settings {
-    /// The storage system to use to read and write data.
-    #[arg(long = "data-system", default_value = "file")]
-    pub system: System,
-
-    /// The directory within which to manage data files.
-    #[arg(id = "DATA_DIRECTORY", long = "data-directory", default_value = "./res/data/")]
-    #[serde(rename = "directory")]
-    pub file_directory: Box<Path>,
-
-    /// The storage thread's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity", default_value = "8")]
-    pub queue_capacity: NonZeroUsize,
 }
 
 /// A storage instance.
@@ -158,37 +140,37 @@ impl DataReader for Storage {
     type Error = anyhow::Error;
 
     fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, ref => .blocking_exists(&path))
     }
 
     async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, async ref => .exists(&path))
     }
 
     fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, ref => .blocking_size(&path))
     }
 
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, async ref => .size(&path))
     }
 
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, ref => .blocking_read(&path))
     }
 
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, async ref => .read(&path))
     }
@@ -198,39 +180,39 @@ impl DataWriter for Storage {
     type Error = anyhow::Error;
 
     fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, mut => .blocking_write(&path, bytes))
     }
 
     async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, async mut => .write(&path, bytes))
     }
 
     fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        let from = self.settings.file_directory.join(from);
-        let into = self.settings.file_directory.join(into);
+        let from = self.settings.directory.join(from);
+        let into = self.settings.directory.join(into);
 
         system_call!(match self.settings.system, mut => .blocking_rename(&from, &into))
     }
 
     async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        let from = self.settings.file_directory.join(from);
-        let into = self.settings.file_directory.join(into);
+        let from = self.settings.directory.join(from);
+        let into = self.settings.directory.join(into);
 
         system_call!(match self.settings.system, async mut => .rename(&from, &into))
     }
 
     fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, mut => .blocking_delete(&path))
     }
 
     async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        let path = self.settings.file_directory.join(path);
+        let path = self.settings.directory.join(path);
 
         system_call!(match self.settings.system, async mut => .delete(&path))
     }

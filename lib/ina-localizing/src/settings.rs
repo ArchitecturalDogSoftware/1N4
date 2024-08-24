@@ -27,6 +27,7 @@ use crate::{Error, Result};
 /// The localizer's settings.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 #[group(id = "LangSettings")]
 pub struct Settings {
     /// The localizer's default locale.
@@ -52,7 +53,7 @@ pub struct Settings {
 
 /// The behavior to follow when the localizer is unable to translate a key.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum MissingBehavior {
     /// Returns the missing text.
     #[default]
@@ -82,7 +83,7 @@ const fn default_queue_capacity() -> NonZeroUsize {
     capacity
 }
 
-/// Returns the default log directory.
+/// Returns the default language file directory.
 fn default_directory() -> Box<Path> {
     std::path::PathBuf::from("./res/lang/").into_boxed_path()
 }
