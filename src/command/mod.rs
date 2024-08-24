@@ -185,12 +185,12 @@ macro_rules! define_commands {
         ) -> $crate::client::event::EventResult {
             let resolver = $crate::command::resolver::CommandOptionResolver::new(context.state);
 
-            $(if let Ok(resolver) = resolver.get_subcommand(self::command::$name::NAME) {
+            $(if let Ok(resolver) = resolver.subcommand(self::command::$name::NAME) {
                 return self::command::$name::callback(entry, context, resolver).await;
             })else*
 
-            $(if let Ok(resolver) = resolver.get_subcommand_group(self::command::$group::NAME) {
-                $(if let Ok(resolver) = resolver.get_subcommand(self::command::$group::$group_name::NAME) {
+            $(if let Ok(resolver) = resolver.subcommand_group(self::command::$group::NAME) {
+                $(if let Ok(resolver) = resolver.subcommand(self::command::$group::$group_name::NAME) {
                     return self::command::$group::$group_name::callback(entry, context, resolver).await;
                 })*
             })else*

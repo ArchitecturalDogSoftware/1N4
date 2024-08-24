@@ -135,7 +135,7 @@ async fn run(localizer: Arc<RwLock<Localizer>>, input: Request) -> Response {
             let locale = locale.unwrap_or_else(|| localizer.settings.default_locale);
 
             match localizer.get(locale, &category, &key) {
-                Ok(text) => Response::Text(text.as_owned()),
+                Ok(text) => Response::Text(text.into_owned()),
                 Err(error) => Response::Error(error),
             }
         }

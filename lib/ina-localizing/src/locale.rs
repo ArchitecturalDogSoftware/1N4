@@ -56,6 +56,12 @@ pub struct Locale {
     territory: Option<Territory>,
 }
 
+impl Default for Locale {
+    fn default() -> Self {
+        Self { language: ['e', 'n'], territory: Some(Territory::Alpha2(['U', 'S'])) }
+    }
+}
+
 impl Locale {
     /// Creates a new [`Locale`].
     ///

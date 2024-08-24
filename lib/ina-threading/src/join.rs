@@ -39,28 +39,32 @@ where
     T: Send + 'static,
 {
     /// Creates a new [`Join<H, T>`] thread.
-    pub(crate) const fn new(inner: H, clean_up_handle: Option<fn(&mut H)>, clean_up_result: Option<fn(T)>) -> Self {
+    pub(crate) const fn from_raw_parts(
+        inner: H,
+        clean_up_handle: Option<fn(&mut H)>,
+        clean_up_result: Option<fn(T)>,
+    ) -> Self {
         Self { inner: Some(inner), clean_up_handle, clean_up_result }
     }
 
     /// Thinly wraps the given handle.
-    pub const fn wrap(inner: H) -> Self {
-        Self::new(inner, None, None)
+    pub const fn new(inner: H) -> Self {
+        Self::from_raw_parts(inner, None, None)
     }
 
     /// Wraps the given handle and runs the given function before the thread is joined.
-    pub const fn clean_up_handle(inner: H, f: fn(&mut H)) -> Self {
-        Self::new(inner, Some(f), None)
+    pub const fn with_handle_handler(inner: H, f: fn(&mut H)) -> Self {
+        Self::from_raw_parts(inner, Some(f), None)
     }
 
     /// Wraps the given handle and runs the given function after the thread is joined.
-    pub const fn clean_up_result(inner: H, f: fn(T)) -> Self {
-        Self::new(inner, None, Some(f))
+    pub const fn with_result_handler(inner: H, f: fn(T)) -> Self {
+        Self::from_raw_parts(inner, None, Some(f))
     }
 
     /// Wraps the given handle and runs the given function after the thread is joined.
-    pub const fn clean_up_all(inner: H, handle: fn(&mut H), result: fn(T)) -> Self {
-        Self::new(inner, Some(handle), Some(result))
+    pub const fn with_handlers(inner: H, handle: fn(&mut H), result: fn(T)) -> Self {
+        Self::from_raw_parts(inner, Some(handle), Some(result))
     }
 }
 

@@ -53,11 +53,11 @@ pub struct CommandOptionResolver<'ev> {
 impl<'ev> CommandOptionResolver<'ev> {
     /// Creates a new [`CommandOptionResolver`].
     pub fn new(data: &'ev CommandData) -> Self {
-        Self::new_with_options(data, &data.options)
+        Self::with_options(data, &data.options)
     }
 
     /// Creates a new [`CommandOptionResolver`] using the given option list.
-    fn new_with_options(data: &'ev CommandData, options: impl IntoIterator<Item = &'ev CommandDataOption>) -> Self {
+    fn with_options(data: &'ev CommandData, options: impl IntoIterator<Item = &'ev CommandDataOption>) -> Self {
         Self { data, options: options.into_iter().map(|o| (&(*o.name), &o.value)).collect() }
     }
 
@@ -66,7 +66,7 @@ impl<'ev> CommandOptionResolver<'ev> {
     /// # Errors
     ///
     /// This function will return an error if the option does not exist.
-    pub fn get_any(&'ev self, name: impl AsRef<str>) -> Result<&'ev CommandOptionValue, Error> {
+    pub fn any(&'ev self, name: impl AsRef<str>) -> Result<&'ev CommandOptionValue, Error> {
         let name = name.as_ref();
 
         self.options.get(name).copied().ok_or_else(|| Error::MissingOption(name.into()))
@@ -79,11 +79,11 @@ impl<'ev> CommandOptionResolver<'ev> {
     ///
     /// This function will return an error if the subcommand does not exist, or if the associated option is not a
     /// subcommand.
-    pub fn get_subcommand(&'ev self, name: impl AsRef<str>) -> Result<Self, Error> {
+    pub fn subcommand(&'ev self, name: impl AsRef<str>) -> Result<Self, Error> {
         let name = name.as_ref();
 
-        match self.get_any(name)? {
-            CommandOptionValue::SubCommand(ref options) => Ok(Self::new_with_options(self.data, options)),
+        match self.any(name)? {
+            CommandOptionValue::SubCommand(ref options) => Ok(Self::with_options(self.data, options)),
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommand, other.kind())),
         }
     }
@@ -95,11 +95,11 @@ impl<'ev> CommandOptionResolver<'ev> {
     ///
     /// This function will return an error if the subcommand group does not exist, or if the associated option is not a
     /// subcommand group.
-    pub fn get_subcommand_group(&'ev self, name: impl AsRef<str>) -> Result<Self, Error> {
+    pub fn subcommand_group(&'ev self, name: impl AsRef<str>) -> Result<Self, Error> {
         let name = name.as_ref();
 
-        match self.get_any(name)? {
-            CommandOptionValue::SubCommandGroup(ref options) => Ok(Self::new_with_options(self.data, options)),
+        match self.any(name)? {
+            CommandOptionValue::SubCommandGroup(ref options) => Ok(Self::with_options(self.data, options)),
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommandGroup, other.kind())),
         }
     }
@@ -112,7 +112,7 @@ macro_rules! command_option_resolver_getters {
             pub fn $name(&'ev self, name: impl AsRef<str>) -> Result<$return, Error> {
                 let name = name.as_ref();
 
-                match self.get_any(name)? {
+                match self.any(name)? {
                     CommandOptionValue::$type(ref value) => Ok(value),
                     other => Err(Error::InvalidOption(name.into(), CommandOptionType::$type, other.kind())),
                 }
@@ -128,14 +128,14 @@ command_option_resolver_getters! {
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not an
     /// attachment identifier.
-    get_attachment_id as Attachment -> &'ev Id<AttachmentMarker>;
+    attachment_id as Attachment -> &'ev Id<AttachmentMarker>;
 
     /// Returns a reference to the stored boolean associated with the given name.
     ///
     /// # Errors
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
-    get_bool as Boolean -> &'ev bool;
+    boolean as Boolean -> &'ev bool;
 
     /// Returns a reference to the stored channel identifier associated with the given name.
     ///
@@ -143,21 +143,21 @@ command_option_resolver_getters! {
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a channel
     /// identifier.
-    get_channel_id as Channel -> &'ev Id<ChannelMarker>;
+    channel_id as Channel -> &'ev Id<ChannelMarker>;
 
     /// Returns a reference to the stored float associated with the given name.
     ///
     /// # Errors
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a float.
-    get_f64 as Number -> &'ev f64;
+    float as Number -> &'ev f64;
 
     /// Returns a reference to the stored integer associated with the given name.
     ///
     /// # Errors
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not an integer.
-    get_i64 as Integer -> &'ev i64;
+    integer as Integer -> &'ev i64;
 
     /// Returns a reference to the stored mentionable identifier associated with the given name.
     ///
@@ -165,7 +165,7 @@ command_option_resolver_getters! {
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a
     /// mentionable identifier.
-    get_mentionable_id as Mentionable -> &'ev Id<GenericMarker>;
+    mentionable_id as Mentionable -> &'ev Id<GenericMarker>;
 
     /// Returns a reference to the stored role identifier associated with the given name.
     ///
@@ -173,14 +173,14 @@ command_option_resolver_getters! {
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a role
     /// identifier.
-    get_role_id as Role -> &'ev Id<RoleMarker>;
+    role_id as Role -> &'ev Id<RoleMarker>;
 
     /// Returns a reference to the stored string associated with the given name.
     ///
     /// # Errors
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a string.
-    get_str as String -> &'ev str;
+    string as String -> &'ev str;
 
     /// Returns a reference to the stored user identifier associated with the given name.
     ///
@@ -188,7 +188,7 @@ command_option_resolver_getters! {
     ///
     /// This function will return an error if the option does not exist, or if the associated option is not a user
     /// identifier.
-    get_user_id as User -> &'ev Id<UserMarker>;
+    user_id as User -> &'ev Id<UserMarker>;
 }
 
 /// Resolves and caches a modal's defined fields.
@@ -205,11 +205,11 @@ pub struct ModalFieldResolver<'ev> {
 impl<'ev> ModalFieldResolver<'ev> {
     /// Creates a new [`ModalFieldResolver`].
     pub fn new(data: &'ev ModalInteractionData) -> Self {
-        Self::new_with_fields(data, &data.components)
+        Self::with_fields(data, &data.components)
     }
 
     /// Creates a new [`ModalFieldResolver`] using the given field list.
-    fn new_with_fields(
+    fn with_fields(
         data: &'ev ModalInteractionData,
         fields: impl IntoIterator<Item = &'ev ModalInteractionDataActionRow>,
     ) -> Self {

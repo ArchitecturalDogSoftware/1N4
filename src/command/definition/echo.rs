@@ -60,8 +60,8 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     };
 
     let resolver = CommandOptionResolver::new(context.state);
-    let message = resolver.get_str("content")?;
-    let message: Box<[_]> = match resolver.get_i64("format").copied().unwrap_or(0) {
+    let message = resolver.string("content")?;
+    let message: Box<[_]> = match resolver.integer("format").copied().unwrap_or(0) {
         1 => message.chars().map(|c| format!("0b{:b}", u32::from(c))).collect(),
         2 => message.chars().map(|c| format!("0o{:o}", u32::from(c))).collect(),
         3 => message.chars().map(|c| format!("0d{}", u32::from(c))).collect(),

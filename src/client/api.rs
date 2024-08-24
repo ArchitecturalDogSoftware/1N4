@@ -56,7 +56,7 @@ pub struct ApiRef<'api> {
 impl<'api> ApiRef<'api> {
     /// Returns a cloned version of this [`ApiRef`].
     #[must_use]
-    pub fn as_owned(&self) -> Api {
+    pub fn into_owned(&self) -> Api {
         Api { client: Arc::clone(self.client), cache: Arc::clone(self.cache) }
     }
 }

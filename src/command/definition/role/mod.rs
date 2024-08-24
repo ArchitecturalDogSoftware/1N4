@@ -84,8 +84,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     let Some(user_id) = context.interaction.author_id() else {
         bail!("this command must be used by a user");
     };
-    let role_id = resolver.get_role_id("role")?;
-    let icon = resolver.get_str("icon")?;
+    let role_id = resolver.role_id("role")?;
+    let icon = resolver.string("icon")?;
 
     context.defer(true).await?;
 

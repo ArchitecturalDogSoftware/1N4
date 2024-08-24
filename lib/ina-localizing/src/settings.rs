@@ -31,30 +31,31 @@ use crate::{Error, Result};
 pub struct Settings {
     /// The localizer's default locale.
     #[arg(short = 'l', long = "default-locale", default_value = "en-US")]
-    #[serde(rename = "default-locale")]
+    #[serde(default)]
     pub default_locale: Locale,
 
     /// The directory within which to read language files.
     #[arg(id = "LANG_DIRECTORY", long = "lang-directory", default_value = "./res/lang/")]
-    #[serde(rename = "directory")]
-    pub file_directory: Box<Path>,
+    #[serde(default = "default_directory")]
+    pub directory: Box<Path>,
 
     /// The behavior that the localizer will exhibit when it fails to translate a key.
     #[arg(long = "lang-miss-behavior", default_value = "return")]
-    #[serde(rename = "miss-behavior")]
+    #[serde(default)]
     pub miss_behavior: MissingBehavior,
 
     /// The localizing thread's output queue capacity. If set to '1', no buffering will be done.
     #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value = "8")]
-    #[serde(rename = "queue-capacity")]
+    #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
 }
 
 /// The behavior to follow when the localizer is unable to translate a key.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MissingBehavior {
     /// Returns the missing text.
+    #[default]
     Return,
     /// Returns an error.
     Error,
@@ -72,4 +73,16 @@ impl MissingBehavior {
             Self::Error => Err(Error::MissingText(category.into(), key.into())),
         }
     }
+}
+
+/// Returns the default queue capacity.
+const fn default_queue_capacity() -> NonZeroUsize {
+    let Some(capacity) = NonZeroUsize::new(8) else { unreachable!() };
+
+    capacity
+}
+
+/// Returns the default log directory.
+fn default_directory() -> Box<Path> {
+    std::path::PathBuf::from("./res/lang/").into_boxed_path()
 }

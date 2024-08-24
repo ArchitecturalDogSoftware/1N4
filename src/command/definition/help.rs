@@ -213,6 +213,7 @@ async fn get_member_permissions<'ap: 'ev, 'ev>(
     } else {
         context.api.client.guild(guild_id).await?.model().await?.owner_id
     };
+
     let guild_roles = context.api.client.roles(guild_id).await?.model().await?;
     let everyone_role = get_role_permissions(&guild_roles, guild_id.cast());
     let member_roles: Box<[_]> = if let Some(member) = member {

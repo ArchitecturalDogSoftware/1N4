@@ -118,7 +118,7 @@ impl Localizer {
     ///
     /// This function will return an error if the file does not exist or the operation fails.
     pub async fn load_locale(&mut self, locale: Locale) -> Result<()> {
-        let path = self.settings.file_directory.join(locale.to_string()).with_extension("toml");
+        let path = self.settings.directory.join(locale.to_string()).with_extension("toml");
 
         if !tokio::fs::try_exists(&path).await? {
             return Err(Error::MissingFile(locale));
@@ -159,7 +159,7 @@ impl Localizer {
     ///
     /// This function will return an error if the directory is missing or any of the operations fail.
     pub async fn load_directory(&mut self) -> Result<usize> {
-        let path = &(*self.settings.file_directory);
+        let path = &(*self.settings.directory);
 
         if !tokio::fs::try_exists(path).await? {
             return Err(Error::MissingDir(path.into()));

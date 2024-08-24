@@ -122,10 +122,10 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    let category = resolver.get_str("category")?;
-    let key = resolver.get_str("key")?;
+    let category = resolver.string("category")?;
+    let key = resolver.string("key")?;
 
-    let translated = if let Ok(locale_str) = resolver.get_str("locale") {
+    let translated = if let Ok(locale_str) = resolver.string("locale") {
         let Ok(locale) = locale_str.parse::<Locale>() else {
             let title = localize!(async(try in locale) category::UI, "localize-unknown").await?;
 

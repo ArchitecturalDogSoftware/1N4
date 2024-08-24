@@ -97,8 +97,10 @@ impl<'tx: 'fc, 'fc> TextRef<'tx, 'fc> {
     }
 
     /// Returns an owned version of this [`TextRef`].
+    ///
+    /// This may be a cheap or expensive conversion depending on the typing of the `I` generic.
     #[must_use]
-    pub fn as_owned<I>(self) -> Text<I>
+    pub fn into_owned<I>(self) -> Text<I>
     where
         I: Deref<Target = str> + for<'a> From<&'a str>,
     {

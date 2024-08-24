@@ -45,7 +45,7 @@ where
     }
 
     /// Creates a new [`Static<H, T>`] containing the given handle.
-    pub const fn new_with(handle: H) -> Self {
+    pub const fn with_handle(handle: H) -> Self {
         Self { inner: RwLock::const_new(Some(handle)), _marker: PhantomData }
     }
 
@@ -92,7 +92,7 @@ where
     }
 
     /// Creates a new [`JoinStatic<H, T>`] containing the given handle.
-    pub const fn new_with(handle: Join<H, T>) -> Self {
+    pub const fn with_handle(handle: Join<H, T>) -> Self {
         Self { inner: RwLock::const_new(Some(handle)) }
     }
 
