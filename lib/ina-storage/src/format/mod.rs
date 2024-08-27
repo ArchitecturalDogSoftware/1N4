@@ -27,8 +27,6 @@ pub use self::json::Json;
 pub use self::messagepack::Messagepack;
 #[cfg(feature = "format-postcard")]
 pub use self::postcard::Postcard;
-#[cfg(feature = "format-xmachina")]
-pub use self::xmachina::XMachina;
 
 /// The compression format.
 #[cfg(feature = "format-compression")]
@@ -42,9 +40,6 @@ pub mod messagepack;
 /// The Postcard format.
 #[cfg(feature = "format-postcard")]
 pub mod postcard;
-/// The xmachina format.
-#[cfg(feature = "format-xmachina")]
-pub mod xmachina;
 
 /// A value that encodes and decodes generic data.
 pub trait DataFormat: DataDecode + DataEncode {

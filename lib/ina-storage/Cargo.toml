@@ -21,18 +21,9 @@ format-compression = ["dep:flate2"]
 format-json = ["dep:serde_json"]
 format-messagepack = ["dep:rmp-serde"]
 format-postcard = ["dep:postcard"]
-format-xmachina = []
 system-file = ["tokio/fs"]
 system-memory = []
-full = [
-    "format-compression",
-    "format-json",
-    "format-messagepack",
-    "format-postcard",
-    "format-xmachina",
-    "system-file",
-    "system-memory",
-]
+full = ["format-compression", "format-json", "format-messagepack", "format-postcard", "system-file", "system-memory"]
 
 [dependencies]
 anyhow = "1.0"
