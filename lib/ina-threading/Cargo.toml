@@ -20,4 +20,4 @@ default = []
 
 [dependencies]
 thiserror = "1.0"
-tokio = { version = "1.39", features = ["rt", "sync", "time"] }
+tokio = { version = "1.40", features = ["rt", "sync", "time"] }
