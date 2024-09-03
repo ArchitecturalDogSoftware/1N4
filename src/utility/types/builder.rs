@@ -20,6 +20,8 @@ use twilight_model::channel::message::component::{
 };
 use twilight_model::channel::message::{Component, EmojiReactionType};
 use twilight_model::channel::ChannelType;
+use twilight_model::id::marker::SkuMarker;
+use twilight_model::id::Id;
 
 /// An error that may be returned when interacting with builders.
 #[non_exhaustive]
@@ -105,7 +107,7 @@ pub struct ButtonBuilder(Button);
 impl ButtonBuilder {
     /// Creates a new [`ButtonBuilder`].
     pub const fn new(style: ButtonStyle) -> Self {
-        Self(Button { custom_id: None, disabled: false, emoji: None, label: None, style, url: None })
+        Self(Button { custom_id: None, disabled: false, emoji: None, label: None, style, url: None, sku_id: None })
     }
 
     /// Sets the button's custom identifier.
@@ -115,7 +117,7 @@ impl ButtonBuilder {
     /// This function will return an error if the custom identifier is too long, or if this is used on a link or premium
     /// button.
     pub fn custom_id(mut self, custom_id: impl Into<String>) -> Result<Self, Error> {
-        if matches!(self.0.style, ButtonStyle::Link | ButtonStyle::Unknown(6)) {
+        if matches!(self.0.style, ButtonStyle::Link | ButtonStyle::Premium) {
             return Err(Error::InvalidType("custom_id"));
         }
 
@@ -143,7 +145,7 @@ impl ButtonBuilder {
     ///
     /// This functionn will return an error if this is used on a premium button.
     pub fn emoji(mut self, emoji: impl Into<EmojiReactionType>) -> Result<Self, Error> {
-        if matches!(self.0.style, ButtonStyle::Unknown(6)) {
+        if matches!(self.0.style, ButtonStyle::Premium) {
             return Err(Error::InvalidType("emoji"));
         }
 
@@ -160,7 +162,7 @@ impl ButtonBuilder {
     pub fn label(mut self, label: impl Into<String>) -> Result<Self, Error> {
         const MAX_LENGTH: usize = 80;
 
-        if matches!(self.0.style, ButtonStyle::Unknown(6)) {
+        if matches!(self.0.style, ButtonStyle::Premium) {
             return Err(Error::InvalidType("label"));
         }
 
@@ -186,6 +188,21 @@ impl ButtonBuilder {
         }
 
         self.0.url = Some(url.into());
+
+        Ok(self)
+    }
+
+    /// Sets the button's SKU identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the button is not a premium button.
+    pub fn sku_id(mut self, id: Id<SkuMarker>) -> Result<Self, Error> {
+        if !matches!(self.0.style, ButtonStyle::Premium) {
+            return Err(Error::InvalidType("sku_id"));
+        }
+
+        self.0.sku_id = Some(id);
 
         Ok(self)
     }
