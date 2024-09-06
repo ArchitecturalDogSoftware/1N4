@@ -167,7 +167,7 @@ pub fn procedure(input: TokenStream) -> TokenStream {
             }
 
             fn data_path(&self) -> impl ::std::convert::AsRef<::std::path::Path> + ::std::marker::Send {
-                /// This impl allows type-level validation that the arguments are in proper type ordering.
+                /// This `impl` allows type-level validation that the arguments are in proper type ordering.
                 struct TypeValidation<'lt>(#(&'lt #path_arguments),*);
 
                 impl<'lt> ::std::convert::From<&'lt #identifier> for TypeValidation<'lt> {
