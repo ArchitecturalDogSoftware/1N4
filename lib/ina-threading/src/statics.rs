@@ -129,7 +129,7 @@ where
     inner: &'s RwLock<Option<T>>,
 }
 
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized")]
 impl<'s, T> AsyncStaticApi<'s, T>
 where
     T: Send + Sync,
@@ -185,7 +185,7 @@ pub struct SyncStaticApi<'s, T> {
     inner: &'s RwLock<Option<T>>,
 }
 
-#[allow(clippy::expect_used)]
+#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized")]
 impl<'s, T> SyncStaticApi<'s, T> {
     /// Returns whether the inner thread is initialized.
     ///

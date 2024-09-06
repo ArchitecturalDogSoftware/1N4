@@ -28,6 +28,13 @@ use tokio::sync::RwLock;
 use super::exchanger::Exchanger;
 use crate::{ConsumingThread, Error, HandleHolder, ProducingThread, Result};
 
+/// A value with a nonce for tracking within an invoker.
+pub type Nonce<T> = (Option<usize>, T);
+/// A stateful invoker's state argument.
+pub type State<T> = Arc<RwLock<T>>;
+/// A result returned from a stateful invoker.
+pub type StatefulResult<I, T, S> = Result<I, Nonce<(State<T>, S)>>;
+
 /// A thread that consumes and produces values like a function.
 #[derive(Debug)]
 pub struct Invoker<S, R>
@@ -36,8 +43,7 @@ where
     R: Send + 'static,
 {
     /// The inner exchanger thread.
-    #[allow(clippy::type_complexity)]
-    inner: Exchanger<(Option<usize>, S), (Option<usize>, R), ()>,
+    inner: Exchanger<Nonce<S>, Nonce<R>, ()>,
     /// A map of missed results.
     produced: RwLock<BTreeMap<usize, R>>,
     /// A sequence counter for each input.
@@ -54,12 +60,12 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self, (Option<usize>, S)>
+    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self, Nonce<S>>
     where
         N: AsRef<str>,
         F: Fn(S) -> R + Send + 'static,
     {
-        let call = move |sender: Sender<(Option<usize>, R)>, mut receiver: Receiver<(Option<usize>, S)>| {
+        let call = move |sender: Sender<Nonce<R>>, mut receiver: Receiver<Nonce<S>>| {
             loop {
                 let Some((sequence, input)) = receiver.blocking_recv() else {
                     break;
@@ -85,15 +91,15 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[allow(clippy::missing_panics_doc)] // This doesn't actually *panic*, it just causes the thread to fail.
-    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, (Option<usize>, S)>
+    #[expect(clippy::missing_panics_doc, reason = "false-positive; the thread will just exit immediately, not panic")]
+    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, Nonce<S>>
     where
         N: AsRef<str>,
         F: Fn(S) -> O + Send + 'static,
         O: Future<Output = R> + Send,
     {
-        let call = move |sender: Sender<(Option<usize>, R)>, mut receiver: Receiver<(Option<usize>, S)>| {
-            #[allow(clippy::expect_used)] // If this can't spawn, we can't execute anything.
+        let call = move |sender: Sender<Nonce<R>>, mut receiver: Receiver<Nonce<S>>| {
+            #[expect(clippy::expect_used, reason = "if the runtime fails to spawn, we can't execute any code")]
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move {
@@ -120,7 +126,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    pub async fn invoke(&mut self, input: S) -> Result<R, (Option<usize>, S)> {
+    pub async fn invoke(&mut self, input: S) -> Result<R, Nonce<S>> {
         let sequence = *self.sequence.read().await;
 
         *self.sequence.write().await = sequence.wrapping_add(1);
@@ -161,7 +167,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (Option<usize>, S)> {
+    pub fn blocking_invoke(&mut self, input: S) -> Result<R, Nonce<S>> {
         const DURATION: Duration = Duration::from_millis(5);
 
         let sequence = *self.sequence.blocking_read();
@@ -206,7 +212,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, S)> {
+    pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), Nonce<S>> {
         self.as_sender().send((None, input)).await.map_err(Into::into)
     }
 
@@ -221,7 +227,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, S)> {
+    pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), Nonce<S>> {
         self.as_sender().blocking_send((None, input)).map_err(Into::into)
     }
 }
@@ -244,42 +250,42 @@ where
     }
 }
 
-impl<S, R> ConsumingThread<(Option<usize>, S)> for Invoker<S, R>
+impl<S, R> ConsumingThread<Nonce<S>> for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_sender(&self) -> &Sender<(Option<usize>, S)> {
+    fn as_sender(&self) -> &Sender<Nonce<S>> {
         self.inner.as_sender()
     }
 
-    fn as_sender_mut(&mut self) -> &mut Sender<(Option<usize>, S)> {
+    fn as_sender_mut(&mut self) -> &mut Sender<Nonce<S>> {
         self.inner.as_sender_mut()
     }
 
-    fn into_sender(self) -> Sender<(Option<usize>, S)> {
+    fn into_sender(self) -> Sender<Nonce<S>> {
         self.inner.into_sender()
     }
 
-    fn clone_sender(&self) -> Sender<(Option<usize>, S)> {
+    fn clone_sender(&self) -> Sender<Nonce<S>> {
         self.inner.clone_sender()
     }
 }
 
-impl<S, R> ProducingThread<(Option<usize>, R)> for Invoker<S, R>
+impl<S, R> ProducingThread<Nonce<R>> for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_receiver(&self) -> &Receiver<(Option<usize>, R)> {
+    fn as_receiver(&self) -> &Receiver<Nonce<R>> {
         self.inner.as_receiver()
     }
 
-    fn as_receiver_mut(&mut self) -> &mut Receiver<(Option<usize>, R)> {
+    fn as_receiver_mut(&mut self) -> &mut Receiver<Nonce<R>> {
         self.inner.as_receiver_mut()
     }
 
-    fn into_receiver(self) -> Receiver<(Option<usize>, R)> {
+    fn into_receiver(self) -> Receiver<Nonce<R>> {
         self.inner.into_receiver()
     }
 }
@@ -293,9 +299,9 @@ where
     R: Send + 'static,
 {
     /// The inner invoker thread.
-    inner: Invoker<(Arc<RwLock<T>>, S), R>,
+    inner: Invoker<(State<T>, S), R>,
     /// The constant state.
-    state: Arc<RwLock<T>>,
+    state: State<T>,
 }
 
 impl<T, S, R> StatefulInvoker<T, S, R>
@@ -309,11 +315,10 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[allow(clippy::type_complexity)]
-    pub fn spawn<N, F>(name: N, state: T, call: F, size: usize) -> Result<Self, (Option<usize>, (Arc<RwLock<T>>, S))>
+    pub fn spawn<N, F>(name: N, state: T, call: F, size: usize) -> StatefulResult<Self, T, S>
     where
         N: AsRef<str>,
-        F: Fn(Arc<RwLock<T>>, S) -> R + Send + 'static,
+        F: Fn(State<T>, S) -> R + Send + 'static,
     {
         let state = Arc::new(RwLock::new(state));
 
@@ -325,16 +330,10 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[allow(clippy::missing_panics_doc, clippy::type_complexity)] // This doesn't actually *panic*, it just causes the thread to fail.
-    pub fn spawn_with_runtime<N, F, O>(
-        name: N,
-        state: T,
-        call: F,
-        size: usize,
-    ) -> Result<Self, (Option<usize>, (Arc<RwLock<T>>, S))>
+    pub fn spawn_with_runtime<N, F, O>(name: N, state: T, call: F, size: usize) -> StatefulResult<Self, T, S>
     where
         N: AsRef<str>,
-        F: Fn(Arc<RwLock<T>>, S) -> O + Send + 'static,
+        F: Fn(State<T>, S) -> O + Send + 'static,
         O: Future<Output = R> + Send,
     {
         let state = Arc::new(RwLock::new(state));
@@ -347,8 +346,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    #[allow(clippy::type_complexity)]
-    pub async fn invoke(&mut self, input: S) -> Result<R, (Option<usize>, (Arc<RwLock<T>>, S))> {
+    pub async fn invoke(&mut self, input: S) -> StatefulResult<R, T, S> {
         self.inner.invoke((Arc::clone(&self.state), input)).await
     }
 
@@ -363,8 +361,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    #[allow(clippy::type_complexity)]
-    pub fn blocking_invoke(&mut self, input: S) -> Result<R, (Option<usize>, (Arc<RwLock<T>>, S))> {
+    pub fn blocking_invoke(&mut self, input: S) -> StatefulResult<R, T, S> {
         self.inner.blocking_invoke((Arc::clone(&self.state), input))
     }
 
@@ -373,8 +370,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    #[allow(clippy::type_complexity)]
-    pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, (Arc<RwLock<T>>, S))> {
+    pub async fn invoke_and_forget(&mut self, input: S) -> StatefulResult<(), T, S> {
         self.inner.invoke_and_forget((Arc::clone(&self.state), input)).await
     }
 
@@ -389,8 +385,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
-    #[allow(clippy::type_complexity)]
-    pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), (Option<usize>, (Arc<RwLock<T>>, S))> {
+    pub fn blocking_invoke_and_forget(&mut self, input: S) -> StatefulResult<(), T, S> {
         self.inner.blocking_invoke_and_forget((Arc::clone(&self.state), input))
     }
 }
@@ -414,44 +409,44 @@ where
     }
 }
 
-impl<T, S, R> ConsumingThread<(Option<usize>, (Arc<RwLock<T>>, S))> for StatefulInvoker<T, S, R>
+impl<T, S, R> ConsumingThread<Nonce<(State<T>, S)>> for StatefulInvoker<T, S, R>
 where
     T: Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_sender(&self) -> &Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
+    fn as_sender(&self) -> &Sender<Nonce<(State<T>, S)>> {
         self.inner.as_sender()
     }
 
-    fn as_sender_mut(&mut self) -> &mut Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
+    fn as_sender_mut(&mut self) -> &mut Sender<Nonce<(State<T>, S)>> {
         self.inner.as_sender_mut()
     }
 
-    fn into_sender(self) -> Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
+    fn into_sender(self) -> Sender<Nonce<(State<T>, S)>> {
         self.inner.into_sender()
     }
 
-    fn clone_sender(&self) -> Sender<(Option<usize>, (Arc<RwLock<T>>, S))> {
+    fn clone_sender(&self) -> Sender<Nonce<(State<T>, S)>> {
         self.inner.clone_sender()
     }
 }
 
-impl<T, S, R> ProducingThread<(Option<usize>, R)> for StatefulInvoker<T, S, R>
+impl<T, S, R> ProducingThread<Nonce<R>> for StatefulInvoker<T, S, R>
 where
     T: Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_receiver(&self) -> &Receiver<(Option<usize>, R)> {
+    fn as_receiver(&self) -> &Receiver<Nonce<R>> {
         self.inner.as_receiver()
     }
 
-    fn as_receiver_mut(&mut self) -> &mut Receiver<(Option<usize>, R)> {
+    fn as_receiver_mut(&mut self) -> &mut Receiver<Nonce<R>> {
         self.inner.as_receiver_mut()
     }
 
-    fn into_receiver(self) -> Receiver<(Option<usize>, R)> {
+    fn into_receiver(self) -> Receiver<Nonce<R>> {
         self.inner.into_receiver()
     }
 }

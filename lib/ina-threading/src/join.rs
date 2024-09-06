@@ -75,7 +75,7 @@ where
 {
     type Target = H;
 
-    #[allow(clippy::expect_used)]
+    #[expect(clippy::expect_used, reason = "if the inner handle is `None`, this is being called from an invalid state")]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref().expect("the thread has already been joined")
     }
@@ -86,7 +86,7 @@ where
     H: HandleHolder<T>,
     T: Send + 'static,
 {
-    #[allow(clippy::expect_used)]
+    #[expect(clippy::expect_used, reason = "if the inner handle is `None`, this is being called from an invalid state")]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner.as_mut().expect("the thread has already been joined")
     }
@@ -97,7 +97,7 @@ where
     H: HandleHolder<T>,
     T: Send + 'static,
 {
-    #[allow(clippy::unwrap_used)]
+    #[expect(clippy::unwrap_used, reason = "if the inner thread panics, we should panic as well")]
     fn drop(&mut self) {
         let Some(mut thread) = self.inner.take() else { return };
 
