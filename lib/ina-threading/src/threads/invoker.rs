@@ -85,7 +85,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[allow(clippy::missing_panics_doc)] // this doesn't actually *panic*, it just causes the thread to fail.
+    #[allow(clippy::missing_panics_doc)] // This doesn't actually *panic*, it just causes the thread to fail.
     pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, (Option<usize>, S)>
     where
         N: AsRef<str>,
@@ -93,7 +93,7 @@ where
         O: Future<Output = R> + Send,
     {
         let call = move |sender: Sender<(Option<usize>, R)>, mut receiver: Receiver<(Option<usize>, S)>| {
-            #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
+            #[allow(clippy::expect_used)] // If this can't spawn, we can't execute anything.
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move {
@@ -115,7 +115,7 @@ where
         })
     }
 
-    /// Invokes the thread, returning the reponse of the method when available.
+    /// Invokes the thread, returning the response of the method when available.
     ///
     /// # Errors
     ///
@@ -150,7 +150,7 @@ where
         }
     }
 
-    /// Invokes the thread, returning the reponse of the method when available.
+    /// Invokes the thread, returning the response of the method when available.
     ///
     /// This blocks the current thread.
     ///
@@ -201,7 +201,7 @@ where
         }
     }
 
-    /// Invokes the thread, ignoring the reponse of the method.
+    /// Invokes the thread, ignoring the response of the method.
     ///
     /// # Errors
     ///
@@ -210,7 +210,7 @@ where
         self.as_sender().send((None, input)).await.map_err(Into::into)
     }
 
-    /// Invokes the thread, ignoring the reponse of the method.
+    /// Invokes the thread, ignoring the response of the method.
     ///
     /// This blocks the current thread.
     ///
@@ -325,7 +325,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[allow(clippy::missing_panics_doc, clippy::type_complexity)] // this doesn't actually *panic*, it just causes the thread to fail.
+    #[allow(clippy::missing_panics_doc, clippy::type_complexity)] // This doesn't actually *panic*, it just causes the thread to fail.
     pub fn spawn_with_runtime<N, F, O>(
         name: N,
         state: T,
@@ -342,7 +342,7 @@ where
         Ok(Self { inner: Invoker::spawn_with_runtime(name, move |(s, i)| call(s, i), size)?, state })
     }
 
-    /// Invokes the thread, returning the reponse of the method when available.
+    /// Invokes the thread, returning the response of the method when available.
     ///
     /// # Errors
     ///
@@ -352,7 +352,7 @@ where
         self.inner.invoke((Arc::clone(&self.state), input)).await
     }
 
-    /// Invokes the thread, returning the reponse of the method when available.
+    /// Invokes the thread, returning the response of the method when available.
     ///
     /// This blocks the current thread.
     ///
@@ -368,7 +368,7 @@ where
         self.inner.blocking_invoke((Arc::clone(&self.state), input))
     }
 
-    /// Invokes the thread, ignoring the reponse of the method.
+    /// Invokes the thread, ignoring the response of the method.
     ///
     /// # Errors
     ///
@@ -378,7 +378,7 @@ where
         self.inner.invoke_and_forget((Arc::clone(&self.state), input)).await
     }
 
-    /// Invokes the thread, ignoring the reponse of the method.
+    /// Invokes the thread, ignoring the response of the method.
     ///
     /// This blocks the current thread.
     ///

@@ -61,7 +61,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[allow(clippy::missing_panics_doc)] // this doesn't actually *panic*, it just causes the thread to fail.
+    #[allow(clippy::missing_panics_doc)] // This doesn't actually *panic*, it just causes the thread to fail.
     pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, S>
     where
         N: AsRef<str>,
@@ -69,7 +69,7 @@ where
         O: Future<Output = T> + Send,
     {
         let call = |receiver: Receiver<S>| {
-            #[allow(clippy::expect_used)] // if this can't spawn, we can't execute anything.
+            #[allow(clippy::expect_used)] // If this can't spawn, we can't execute anything.
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
             runtime.block_on(async move { call(receiver).await })
