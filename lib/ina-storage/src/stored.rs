@@ -24,7 +24,7 @@ use crate::format::{DataDecode, DataEncode, DataFormat};
 use crate::system::{DataReader, DataSystem, DataWriter};
 use crate::Storage;
 
-/// A value that is storable within the storage system.
+/// A value that can be stored within the storage system.
 pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {
     /// The arguments required to construct a new path for this type.
     type PathArguments: Send;

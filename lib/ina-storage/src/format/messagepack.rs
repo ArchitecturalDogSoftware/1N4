@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{DataDecode, DataEncode, DataFormat};
 
-/// The Messagepack data format.
+/// The Message-pack data format.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Messagepack;
 

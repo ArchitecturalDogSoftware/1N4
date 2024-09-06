@@ -73,27 +73,24 @@ pub enum Error<S = Infallible> {
 /// A storage instance.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Storage {
-    /// The storage instance's setrtings.
+    /// The storage instance's settings.
     settings: Settings,
 }
 
+#[expect(clippy::expect_used, reason = "allow panics to ensure that the storage system is set up")]
 impl DataSystem for Storage {
-    #[allow(clippy::expect_used)]
     fn blocking_get() -> impl Deref<Target = Self> {
         RwLockReadGuard::map(STORAGE.blocking_read(), |v| v.as_ref().expect("the instance has not been initialized"))
     }
 
-    #[allow(clippy::expect_used)]
     async fn get() -> impl Deref<Target = Self> {
         RwLockReadGuard::map(STORAGE.read().await, |v| v.as_ref().expect("the instance has not been initialized"))
     }
 
-    #[allow(clippy::expect_used)]
     fn blocking_get_mut() -> impl DerefMut<Target = Self> {
         RwLockWriteGuard::map(STORAGE.blocking_write(), |v| v.as_mut().expect("the instance has not been initialized"))
     }
 
-    #[allow(clippy::expect_used)]
     async fn get_mut() -> impl DerefMut<Target = Self> {
         RwLockWriteGuard::map(STORAGE.write().await, |v| v.as_mut().expect("the instance has not been initialized"))
     }
