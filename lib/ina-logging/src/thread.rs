@@ -63,7 +63,7 @@ pub async fn start(settings: Settings) -> Result<()> {
     let capacity = settings.queue_capacity.get();
     let handle = Consumer::spawn_with_runtime("logging", |r| self::run(settings, r), capacity)?;
     let handle = Join::with_handle_handler(handle, |handle| {
-        #[allow(clippy::expect_used)]
+        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
         handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
     });
 
@@ -89,7 +89,7 @@ pub fn blocking_start(settings: Settings) -> Result<()> {
     let capacity = settings.queue_capacity.get();
     let handle = Consumer::spawn_with_runtime("logging", |r| self::run(settings, r), capacity)?;
     let handle = Join::with_handle_handler(handle, |handle| {
-        #[allow(clippy::expect_used)]
+        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
         handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
     });
 
