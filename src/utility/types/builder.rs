@@ -143,7 +143,7 @@ impl ButtonBuilder {
     ///
     /// # Errors
     ///
-    /// This functionn will return an error if this is used on a premium button.
+    /// This function will return an error if this is used on a premium button.
     pub fn emoji(mut self, emoji: impl Into<EmojiReactionType>) -> Result<Self, Error> {
         if matches!(self.0.style, ButtonStyle::Premium) {
             return Err(Error::InvalidType("emoji"));
@@ -317,7 +317,7 @@ impl SelectMenuBuilder {
         self
     }
 
-    /// Sets the selection menu's maximum number of selectable items.
+    /// Sets the selection menu's maximum number of select-able items.
     ///
     /// # Errors
     ///
@@ -338,7 +338,7 @@ impl SelectMenuBuilder {
         Ok(self)
     }
 
-    /// Sets the selection menu's minimum number of selectable items.
+    /// Sets the selection menu's minimum number of select-able items.
     ///
     /// # Errors
     ///

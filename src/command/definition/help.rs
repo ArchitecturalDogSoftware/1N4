@@ -192,7 +192,7 @@ fn clean_commands<'ap: 'ev, 'ev>(_: &Context<'ap, 'ev, &'ev CommandData>, comman
 /// # Errors
 ///
 /// This function will return an error if the member's permissions could not be resolved.
-#[allow(unused)]
+#[expect(dead_code, reason = "this is not currently used")]
 async fn get_member_permissions<'ap: 'ev, 'ev>(
     context: &Context<'ap, 'ev, &'ev CommandData>,
     guild_id: Id<GuildMarker>,

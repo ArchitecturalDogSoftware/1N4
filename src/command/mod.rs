@@ -108,10 +108,10 @@ pub trait ModalCallable: Send + Sync {
     ) -> EventResult;
 }
 
-/// A type that can be invoked to execute an autocompletion.
+/// A type that can be invoked to execute an auto-completion.
 #[async_trait::async_trait]
 pub trait AutocompleteCallable: Send + Sync {
-    /// Executes an autocompletion.
+    /// Executes an auto-completion.
     ///
     /// # Errors
     ///
@@ -152,7 +152,8 @@ macro_rules! define_commands {
         })*
     ) => {
         /// Defines the command's command callbacks.
-        #[allow(missing_docs)]
+        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
+        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         mod command {
             $(pub mod $name {
                 pub(in super::super) use super::super::$callback as callback;
@@ -213,7 +214,8 @@ macro_rules! define_commands {
 macro_rules! define_components {
     ($($name:ident => $call:ident;)*) => {
         /// Defines the command's component callbacks.
-        #[allow(missing_docs)]
+        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
+        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         mod component {$(
             pub mod $name {
                 pub(in super::super) use super::super::$call as callback;
@@ -254,7 +256,8 @@ macro_rules! define_components {
 macro_rules! define_modals {
     ($($name:ident => $call:ident;)*) => {
         /// Defines the command's modal callbacks.
-        #[allow(missing_docs)]
+        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
+        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         mod modal {$(
             pub mod $name {
                 pub(in super::super) use super::super::$call as callback;

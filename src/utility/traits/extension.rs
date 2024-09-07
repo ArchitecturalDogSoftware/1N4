@@ -40,7 +40,7 @@ impl<T> IdExt<T> for Id<T> {
     fn creation_date(&self) -> OffsetDateTime {
         const DISCORD_EPOCH: OffsetDateTime = datetime!(2015-01-01 00:00:00 UTC);
 
-        #[allow(clippy::cast_possible_wrap)]
+        #[expect(clippy::cast_possible_wrap, reason = "this will never feasibly be high enough to wrap")]
         let milliseconds = (self.get() >> 22).min(i64::MAX as u64) as i64;
 
         DISCORD_EPOCH.saturating_add(Duration::milliseconds(milliseconds))

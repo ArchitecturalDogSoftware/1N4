@@ -16,12 +16,12 @@
 
 /// Provides utilities for searching strings.
 pub mod search;
-/// Provides getters for client secrets.
+/// Provides functions for retrieving client secrets.
 pub mod secret;
 
 /// The base Discord CDN URL.
 pub const DISCORD_CDN_URL: &str = "https://cdn.discordapp.com";
-/// The base twemoji CDN URL.
+/// The base Twemoji CDN URL.
 pub const TWEMOJI_CDN_URL: &str = "https://raw.githubusercontent.com/discord/twemoji/main/assets/72x72";
 
 crate::define_categories! {
@@ -95,7 +95,8 @@ pub mod types {
 macro_rules! define_categories {
     ($($name:ident => $value:literal;)*) => {
         /// Localizer category constants.
-        #[allow(missing_docs)]
+        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
+        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         pub mod category {
             pub const LIST: &[&str] = &[$(self::$name),*];
 

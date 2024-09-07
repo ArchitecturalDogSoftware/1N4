@@ -330,7 +330,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
 
     let mut member = context.api.client.guild_member(guild_id, user_id).await?.model().await?;
 
-    member.roles.dedup(); // Do we even need to de-duplicate here?
+    member.roles.dedup(); // Do we even need to deduplicate here?
     member.roles.sort_unstable();
 
     let title = if let Ok(index) = member.roles.binary_search(&role_id) {

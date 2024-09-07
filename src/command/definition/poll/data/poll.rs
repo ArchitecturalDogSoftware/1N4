@@ -48,6 +48,7 @@ pub enum PollType {
     Raffle,
 }
 
+#[expect(dead_code, reason = "polls are currently a work-in-progress")]
 impl PollType {
     /// Returns the emoji that represents this poll type.
     pub const fn emoji(self) -> char {

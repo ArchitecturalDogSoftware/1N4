@@ -399,9 +399,9 @@ impl AsImageSource for EmojiReactionType {
             }
             Self::Unicode { ref name } => {
                 // Each file is encoded as hex numbers separated by hyphens. Some examples:
-                // - '.../1f3f3-fe0f-200d-26a7-fe0f.png' for the transgender flag.
-                // - '.../1f577-fe0f-fe0f' for the spider emoji.
-                // - '.../1f578-fe0f-fe0f-fe0f' for the cobweb emoji.
+                // - `.../1f3f3-fe0f-200d-26a7-fe0f.png` for the transgender flag.
+                // - `.../1f577-fe0f-fe0f` for the spider emoji.
+                // - `.../1f578-fe0f-fe0f-fe0f` for the cobweb emoji.
                 // See also: spiders 🕷️🕸️.
                 let id = name.chars().map(|c| format!("{:x}", c as u32));
 
@@ -464,7 +464,7 @@ impl AsImageSource for Sticker {
             _ => bail!("unknown sticker format"),
         };
 
-        // Why do .gif stickers specifically use a different CDN??? This is stupid.
+        // Why do `.gif` stickers specifically use a different CDN??? This is stupid.
         let url = format!(
             "{}/stickers/{}.{extension}",
             if self.format_type == StickerFormatType::Gif { "https://media.discordapp.net" } else { DISCORD_CDN_URL },

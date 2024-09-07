@@ -144,11 +144,11 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
     crate::client::event::pass()
 }
 
-/// Executes the autocompletion.
+/// Executes the auto-completion.
 ///
 /// # Errors
 ///
-/// This function will return an error if the autocompletion could not be executed.
+/// This function will return an error if the auto-completion could not be executed.
 async fn on_autocomplete<'ap: 'ev, 'ev>(
     _: &CommandEntry,
     _: Context<'ap, 'ev, &'ev CommandData>,
@@ -168,11 +168,11 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
     }
 }
 
-/// Executes the locale autocompletion.
+/// Executes the locale auto-completion.
 ///
 /// # Errors
 ///
-/// This function will return an error if the autocompletion could not be executed.
+/// This function will return an error if the auto-completion could not be executed.
 async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoice]>> {
     let mut locales = ina_localizing::thread::list().await?.to_vec();
 
@@ -187,11 +187,11 @@ async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoic
     Ok(choices.collect())
 }
 
-/// Executes the category autocompletion.
+/// Executes the category auto-completion.
 ///
 /// # Errors
 ///
-/// This function will return an error if the autocompletion could not be executed.
+/// This function will return an error if the auto-completion could not be executed.
 fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
     let mut categories: HashSet<String> = category::LIST.iter().copied().map(Into::into).collect();
 
@@ -215,11 +215,11 @@ fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
     choices.collect()
 }
 
-/// Executes the key autocompletion.
+/// Executes the key auto-completion.
 ///
 /// # Errors
 ///
-/// This function will return an error if the autocompletion could not be executed.
+/// This function will return an error if the auto-completion could not be executed.
 fn on_key_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
     if current.is_empty() {
         return Box::new([]);

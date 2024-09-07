@@ -53,7 +53,7 @@ pub struct Arguments {
     pub log_settings: ina_logging::settings::Settings,
 }
 
-/// The application's main entrypoint.
+/// The application's main entry-point.
 ///
 /// # Errors
 ///
@@ -117,7 +117,7 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
 
     info!(async "starting client process").await?;
 
-    #[allow(clippy::redundant_pub_crate)] // False-positive?
+    #[expect(clippy::redundant_pub_crate, reason = "seems to be a false-positive relating to macro expansion")]
     tokio::select! {
         _ = terminate => info!(async "received termination signal").await,
         result = process => match result {

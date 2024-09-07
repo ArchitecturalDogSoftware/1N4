@@ -271,9 +271,9 @@ where
     type Error = ina_localizing::Error;
 
     // Check in the following order:
-    // 1. interaction locale
-    // 2. user locale
-    // 3. guild locale
+    // 1. Interaction locale
+    // 2. User locale
+    // 3. Guild locale
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.interaction
             .locale

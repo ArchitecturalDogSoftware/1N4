@@ -133,7 +133,7 @@ pub struct CommandEntryCallbacks {
     pub component: Option<Box<dyn ComponentCallable>>,
     /// The modal callback.
     pub modal: Option<Box<dyn ModalCallable>>,
-    /// The autocompletion callback.
+    /// The auto-completion callback.
     pub autocomplete: Option<Box<dyn AutocompleteCallable>>,
 }
 
@@ -319,6 +319,7 @@ macro_rules! define_entry {
         )?
 
         /// Returns this command's registry entry.
+        #[expect(clippy::allow_attributes, reason = "this is not always catching a lint")]
         #[must_use = r"command entries should be registered"]
         pub fn entry() -> $crate::command::registry::CommandEntry {
             #[allow(unused_mut)]

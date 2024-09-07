@@ -201,7 +201,9 @@ impl Instance {
         UpdatePresencePayload::new(vec![activity.into()], false, None, definition.status).map_err(Into::into)
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss, clippy::cast_sign_loss)]
+    #[expect(clippy::cast_possible_truncation, reason = "this is fine as we round before casting")]
+    #[expect(clippy::cast_sign_loss, reason = "buckets cannot be negative")]
+    #[expect(clippy::cast_precision_loss, reason = "there will never be enough shards for this to matter")]
     pub(crate) fn get_shard_timeout(connection: &BotConnectionInfo) -> Duration {
         const DAY: Duration = Duration::from_secs(60 * 60 * 24);
 

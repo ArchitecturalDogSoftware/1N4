@@ -48,13 +48,13 @@ pub enum EventOutput {
 }
 
 /// Returns `Ok(EventOutput::Pass)`.
-#[allow(clippy::missing_errors_doc)]
+#[expect(clippy::missing_errors_doc, reason = "this function never returns an error")]
 pub const fn pass() -> EventResult {
     Ok(EventOutput::Pass)
 }
 
 /// Returns `Ok(EventOutput::Exit)`.
-#[allow(clippy::missing_errors_doc)]
+#[expect(clippy::missing_errors_doc, reason = "this function never returns an error")]
 pub const fn exit() -> EventResult {
     Ok(EventOutput::Exit)
 }

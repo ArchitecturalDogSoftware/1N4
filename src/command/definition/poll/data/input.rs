@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use twilight_model::channel::message::EmojiReactionType;
 
 /// Defines input count limits.
+#[expect(dead_code, reason = "polls are currently a work-in-progress")]
 pub mod limit {
     /// The maximum number of allowed multiple choice inputs.
     pub const MULTIPLE_CHOICE: usize = 20;

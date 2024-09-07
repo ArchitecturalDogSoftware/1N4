@@ -88,8 +88,8 @@ impl<'ev> CommandOptionResolver<'ev> {
         }
     }
 
-    /// Returns a new [`CommandOptionResolver`] for the subcommands assigned to the subcommand group associated with the
-    /// given name.
+    /// Returns a new [`CommandOptionResolver`] for the sub-commands assigned to the subcommand group associated with
+    /// the given name.
     ///
     /// # Errors
     ///
