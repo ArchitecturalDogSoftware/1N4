@@ -96,6 +96,9 @@ impl DataSystem for Storage {
     }
 }
 
+#[cfg(all(not(feature = "system-file"), not(feature = "system-memory")))]
+compile_error!("at least one storage system feature must be enabled");
+
 /// The preference for the storage backend system.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
