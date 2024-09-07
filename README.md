@@ -21,9 +21,8 @@ or you can install and run her directly through Git and Cargo.
 git clone https://github.com/Jaxydog/1N4.git
 cd 1N4
 
-# Build in release mode and strip the binary.
+# Build in release mode
 cargo build --release
-strip ./target/release/ina
 
 # Relocate the binary and clean up build artifacts.
 mv ./target/release/ina .
