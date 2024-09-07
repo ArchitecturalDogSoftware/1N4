@@ -20,11 +20,10 @@
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
 
+use ina_threading::threads::invoker::{Nonce, State};
 use serde::{Deserialize, Serialize};
 use thread::Request;
-use tokio::sync::RwLock;
 
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
@@ -71,9 +70,8 @@ pub enum Error {
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
     /// An error from communicating with a thread.
-    #[allow(clippy::type_complexity)]
     #[error(transparent)]
-    Thread(#[from] ina_threading::Error<(Option<usize>, (Arc<RwLock<Localizer>>, Request))>),
+    Thread(#[from] ina_threading::Error<Nonce<(State<Localizer>, Request)>>),
 }
 
 /// A value that stores and retrieves translated text.
