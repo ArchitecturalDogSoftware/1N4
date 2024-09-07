@@ -12,7 +12,8 @@ And of course, as always, I will be around if you need any help.
 Commit messages should be clear and concise.
 They should properly describe what was added, removed, or otherwise modified within the commit.
 It is also highly preferred that your commit does not contain several large changes.
-Please do your best to split large commits into several smaller ones so that changes are easier to review and revert.
+Please do your best to split large commits into several smaller ones
+so that changes are easier to review and revert.
 
 Pull requests should describe in detail what is being added, removed, or otherwise changed, and why.
 It is expected that they will be as sensible and informative as reasonably possible in the current context.
