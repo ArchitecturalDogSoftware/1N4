@@ -5,20 +5,20 @@ Below is a list of the general rules to follow when submitting code, data, asset
 
 I will be significantly more lenient with contributions from new users,
 just be aware that I may modify any committed content to better fit the general guidelines.
-And of course, as always, I'll be around if you need any help.
+And of course, as always, I will be around if you need any help.
 
 ## Commits and Pull Requests
 
 Commit messages should be clear and concise.
 They should properly describe what was added, removed, or otherwise modified within the commit.
 It is also highly preferred that your commit does not contain several large changes.
-Please do your best to split large commits into several smaller ones so that the repository history is easier to understand.
+Please do your best to split large commits into several smaller ones so that changes are easier to review and revert.
 
 Pull requests should describe in detail what is being added, removed, or otherwise changed, and why.
-It's expected that they will be as sensible and informative as reasonably possible in the current context.
+It is expected that they will be as sensible and informative as reasonably possible in the current context.
 
 Neither commits nor pull requests should cause the build to fail, under any circumstances.
-If a change does cause a build failure, it's expected that you will submit a fix in a follow-up commit.
+If a change does cause a build failure, it is expected that you will submit a fix in a follow-up commit.
 Pull requests that cause a build failure will be denied until the issue is solved.
 
 This project follows [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html),
@@ -56,6 +56,9 @@ and if there is any confusion, feel free to ask me directly or view pre-existing
   When in doubt, use compressed Messagepack.
 
 ### Source Code
+
+All code should strive to follow the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/about.html),
+but here are some key rules:
 
 - All source files should be in the Rust file format (`.rs`).
 - All types, fields, and methods should be fully documented, even if not part of the public API.
