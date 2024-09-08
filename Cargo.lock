@@ -74,7 +74,7 @@ version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d36fc52c7f6c869915e99412912f22093507da8d9e942ceaf66fe4b7c14422a"
 dependencies = [
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -84,7 +84,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bf74e1b6e971609db8ca7a9ce79fd5768ab6ae46441c572e46cf596f59e57f8"
 dependencies = [
  "anstyle",
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -182,9 +182,9 @@ checksum = "8318a53db07bb3f8dca91a600466bdb3f2eaadeedfdbcf02e1accbad9271ba50"
 
 [[package]]
 name = "cc"
-version = "1.1.17"
+version = "1.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a93fe60e2fc87b6ba2c117f67ae14f66e3fc7d6a1e612a25adb238cc980eadb3"
+checksum = "b62ac837cdb5cb22e10a256099b4fc502b1dfe560cb282963a974d7abd80e476"
 dependencies = [
  "shlex",
 ]
@@ -661,7 +661,7 @@ checksum = "261f68e344040fbd0edea105bef17c66edf46f984ddb1115b775ce31be948f4b"
 dependencies = [
  "hermit-abi 0.4.0",
  "libc",
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -742,7 +742,7 @@ dependencies = [
  "hermit-abi 0.3.9",
  "libc",
  "wasi",
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -976,7 +976,7 @@ dependencies = [
  "libc",
  "spin",
  "untrusted",
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1077,11 +1077,11 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 
 [[package]]
 name = "schannel"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbc91545643bcf3a0bbb6569265615222618bdf33ce4ffbbd13c4bbd4c093534"
+checksum = "e9aaafd5a2b6e3d657ff009d82fbd630b6bd54dd4eb06f21693925cdf80f9b8b"
 dependencies = [
- "windows-sys",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1231,7 +1231,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce305eb0b4296696835b71df73eb912e0f1ffd2556a501fcede6e0c50349191c"
 dependencies = [
  "libc",
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1350,7 +1350,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2",
  "tokio-macros",
- "windows-sys",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1525,7 +1525,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 [[package]]
 name = "twilight-cache-inmemory"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "bitflags",
  "dashmap",
@@ -1536,7 +1536,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "bitflags",
  "fastrand",
@@ -1556,7 +1556,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway-queue"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "tokio",
  "tracing",
@@ -1565,7 +1565,7 @@ dependencies = [
 [[package]]
 name = "twilight-http"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "brotli-decompressor",
  "fastrand",
@@ -1587,7 +1587,7 @@ dependencies = [
 [[package]]
 name = "twilight-http-ratelimiting"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "tokio",
  "tracing",
@@ -1596,7 +1596,7 @@ dependencies = [
 [[package]]
 name = "twilight-mention"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "twilight-model",
 ]
@@ -1604,7 +1604,7 @@ dependencies = [
 [[package]]
 name = "twilight-model"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "bitflags",
  "serde",
@@ -1616,7 +1616,7 @@ dependencies = [
 [[package]]
 name = "twilight-util"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "twilight-model",
  "twilight-validate",
@@ -1625,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "twilight-validate"
 version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#5a9da4206045737020f7557ddb4c317fe710cee3"
+source = "git+https://github.com/twilight-rs/twilight#f58b5402cc17a53e68312cc5969fde81fdfb006a"
 dependencies = [
  "twilight-model",
 ]
@@ -1674,6 +1674,15 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
+dependencies = [
+ "windows-targets",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.59.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets",
 ]
