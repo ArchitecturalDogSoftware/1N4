@@ -21,7 +21,7 @@ use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::Permissions;
 
 use crate::client::event::EventResult;
-use crate::command::context::Context;
+use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
@@ -59,7 +59,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
         Err(error) => return Err(error.into()),
     };
 
-    let resolver = CommandOptionResolver::new(context.state);
+    let resolver = CommandOptionResolver::new(context.data);
     let message = resolver.string("content")?;
     let message: Box<[_]> = match resolver.integer("format").copied().unwrap_or(0) {
         1 => message.chars().map(|c| format!("0b{:b}", u32::from(c))).collect(),
@@ -70,7 +70,10 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     };
 
     context.api.client.create_message(channel.id).content(&message.join(" ")).await?;
-    context.text(localize!(async(try in locale) category::UI, "echo-done").await?, true).await?;
+
+    let done = localize!(async(try in locale) category::UI, "echo-done").await?;
+
+    context.text(done, Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }

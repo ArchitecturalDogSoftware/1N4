@@ -27,7 +27,7 @@ use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::client::event::EventResult;
-use crate::command::context::Context;
+use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::search::{fuzzy_contains, Strictness};
@@ -73,7 +73,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
     mut context: Context<'ap, 'ev, &CommandData>,
     _: CommandOptionResolver<'ev>,
 ) -> EventResult {
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -99,7 +99,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
 
     let embed = EmbedBuilder::new().title(title).color(color::SUCCESS).description(locales);
 
-    context.embed(embed.build(), true).await?;
+    context.embed(embed.build(), Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
@@ -114,7 +114,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
     mut context: Context<'ap, 'ev, &'ev CommandData>,
     resolver: CommandOptionResolver<'ev>,
 ) -> EventResult {
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -139,7 +139,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
         localize!(async(try in locale) category, key).await?
     };
 
-    context.text(translated, true).await?;
+    context.text(translated, Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }

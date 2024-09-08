@@ -184,7 +184,7 @@ macro_rules! define_commands {
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
         ) -> $crate::client::event::EventResult {
-            let resolver = $crate::command::resolver::CommandOptionResolver::new(context.state);
+            let resolver = $crate::command::resolver::CommandOptionResolver::new(context.data);
 
             $(if let Ok(resolver) = resolver.subcommand(self::command::$name::NAME) {
                 return self::command::$name::callback(entry, context, resolver).await;

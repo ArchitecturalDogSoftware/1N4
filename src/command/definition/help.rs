@@ -29,7 +29,7 @@ use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
 use twilight_util::permission_calculator::PermissionCalculator;
 
 use crate::client::event::EventResult;
-use crate::command::context::Context;
+use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::{category, color};
@@ -46,7 +46,7 @@ crate::define_entry!("help", CommandType::ChatInput, struct {
 ///
 /// This function will return an error if the command could not be executed.
 async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -86,7 +86,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
 
     let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).footer(footer);
 
-    context.embed(embed.build(), true).await?;
+    context.embed(embed.build(), Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }

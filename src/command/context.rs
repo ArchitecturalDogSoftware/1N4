@@ -40,15 +40,13 @@ where
     pub api: ApiRef<'ar>,
     /// The interaction reference.
     pub interaction: &'ev Interaction,
-    /// The interaction state.
-    pub state: T,
+    /// The interaction data.
+    pub data: T,
 
-    /// Tracks whether this interaction has been deferred.
-    is_deferred: bool,
-    /// Tracks whether this interaction is marked as ephemeral.
-    is_ephemeral: bool,
-    /// Tracks whether this interaction has been completed.
-    is_completed: bool,
+    /// The context's current interaction state.
+    state: ContextState,
+    /// The context's assigned visibility.
+    visibility: Option<Visibility>,
 }
 
 impl<'ar: 'ev, 'ev, T> Context<'ar, 'ev, T>
@@ -56,23 +54,28 @@ where
     T: Send,
 {
     /// Creates a new [`Context<T>`].
-    pub const fn new(api: ApiRef<'ar>, interaction: &'ev Interaction, state: T) -> Self {
-        Self { api, interaction, state, is_deferred: false, is_ephemeral: false, is_completed: false }
+    pub const fn new(api: ApiRef<'ar>, interaction: &'ev Interaction, data: T) -> Self {
+        Self { api, interaction, data, state: ContextState::Pending, visibility: None }
+    }
+
+    /// Returns whether this interaction is pending.
+    pub const fn is_pending(&self) -> bool {
+        self.state.is_pending()
     }
 
     /// Returns whether this interaction has been deferred.
     pub const fn is_deferred(&self) -> bool {
-        self.is_deferred
-    }
-
-    /// Returns whether this interaction is marked as ephemeral.
-    pub const fn is_ephemeral(&self) -> bool {
-        self.is_ephemeral
+        self.state.is_deferred()
     }
 
     /// Returns whether this interaction has been completed.
     pub const fn is_completed(&self) -> bool {
-        self.is_completed
+        self.state.is_completed()
+    }
+
+    /// Returns whether this interaction is marked as ephemeral.
+    pub const fn is_ephemeral(&self) -> bool {
+        matches!(self.visibility, Some(Visibility::Ephemeral))
     }
 
     /// Returns the interaction client of this [`Context<T>`].
@@ -86,14 +89,15 @@ where
     ///
     /// This function will return an error if `kind` is invalid, or if the context fails to defer the interaction
     /// response, or if this is called on an invalid interaction type.
-    async fn defer_any(&mut self, ephemeral: bool, kind: InteractionResponseType) -> Result<()> {
-        if self.is_deferred() {
-            ensure!(self.is_ephemeral() == ephemeral, "the ephemeral state has already been set");
-
+    async fn defer_any(&mut self, visibility: Visibility, kind: InteractionResponseType) -> Result<()> {
+        if let Some(preset) = self.visibility {
+            ensure!(preset == visibility, "the response visibility has already been set");
+        }
+        if self.state.is_deferred() {
             return Ok(());
         }
 
-        let flags = if ephemeral { MessageFlags::EPHEMERAL } else { MessageFlags::empty() };
+        let flags = if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() };
 
         crate::create_response!(self, struct {
             kind: kind,
@@ -101,8 +105,8 @@ where
         })
         .await?;
 
-        self.is_deferred = true;
-        self.is_ephemeral = ephemeral;
+        self.state = ContextState::Deferred;
+        self.visibility = Some(visibility);
 
         Ok(())
     }
@@ -113,8 +117,8 @@ where
     ///
     /// This function will return an error if the context fails to defer the interaction response, or if this is called
     /// on an invalid interaction type.
-    pub async fn defer(&mut self, ephemeral: bool) -> Result<()> {
-        self.defer_any(ephemeral, InteractionResponseType::DeferredChannelMessageWithSource).await
+    pub async fn defer(&mut self, visibility: Visibility) -> Result<()> {
+        self.defer_any(visibility, InteractionResponseType::DeferredChannelMessageWithSource).await
     }
 
     /// Defers the interaction response.
@@ -123,13 +127,13 @@ where
     ///
     /// This function will return an error if the context fails to defer the interaction response, or if this is called
     /// on an invalid interaction type.
-    pub async fn defer_update(&mut self, ephemeral: bool) -> Result<()> {
+    pub async fn defer_update(&mut self, visibility: Visibility) -> Result<()> {
         ensure!(
             matches!(self.interaction.kind, InteractionType::MessageComponent | InteractionType::ModalSubmit),
             "invalid interaction type"
         );
 
-        self.defer_any(ephemeral, InteractionResponseType::DeferredUpdateMessage).await
+        self.defer_any(visibility, InteractionResponseType::DeferredUpdateMessage).await
     }
 
     /// Responds to the interaction with a text message.
@@ -138,26 +142,33 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn text(&mut self, content: impl Send + Display, ephemeral: bool) -> Result<()> {
+    pub async fn text(&mut self, content: impl Send + Display, visibility: Visibility) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
 
-        if self.is_deferred() {
-            ensure!(self.is_ephemeral() == ephemeral, "the ephemeral state has already been set");
-
-            crate::follow_up_response!(self, struct {
-                content: &content.to_string(),
-            })
-            .await?;
-        } else {
-            crate::create_response!(self, struct {
-                kind: InteractionResponseType::ChannelMessageWithSource,
-                content: content.to_string(),
-                flags: if ephemeral { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
-            })
-            .await?;
+        if let Some(assigned) = self.visibility {
+            ensure!(assigned == visibility, "the response visibility has already been set");
         }
 
-        self.is_completed = true;
+        match self.state {
+            ContextState::Pending => {
+                crate::create_response!(self, struct {
+                    kind: InteractionResponseType::ChannelMessageWithSource,
+                    content: content.to_string(),
+                    flags: if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
+                })
+                .await?;
+            }
+            ContextState::Deferred => {
+                crate::follow_up_response!(self, struct {
+                    content: &content.to_string(),
+                })
+                .await?;
+            }
+            ContextState::Completed => unreachable!("the interaction must not be completed"),
+        }
+
+        self.state = ContextState::Completed;
+        self.visibility = Some(visibility);
 
         Ok(())
     }
@@ -168,26 +179,33 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn embed(&mut self, embed: impl Into<Embed> + Send, ephemeral: bool) -> Result<()> {
+    pub async fn embed(&mut self, embed: impl Into<Embed> + Send, visibility: Visibility) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
 
-        if self.is_deferred() {
-            ensure!(self.is_ephemeral() == ephemeral, "the ephemeral state has already been set");
-
-            crate::follow_up_response!(self, struct {
-                embeds: &[embed.into()],
-            })
-            .await?;
-        } else {
-            crate::create_response!(self, struct {
-                kind: InteractionResponseType::ChannelMessageWithSource,
-                embeds: [embed.into()],
-                flags: if ephemeral { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
-            })
-            .await?;
+        if let Some(assigned) = self.visibility {
+            ensure!(assigned == visibility, "the response visibility has already been set");
         }
 
-        self.is_completed = true;
+        match self.state {
+            ContextState::Pending => {
+                crate::create_response!(self, struct {
+                    kind: InteractionResponseType::ChannelMessageWithSource,
+                    embeds: [embed.into()],
+                    flags: if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
+                })
+                .await?;
+            }
+            ContextState::Deferred => {
+                crate::follow_up_response!(self, struct {
+                    embeds: &[embed.into()],
+                })
+                .await?;
+            }
+            ContextState::Completed => unreachable!("the interaction must not be completed"),
+        }
+
+        self.state = ContextState::Completed;
+        self.visibility = Some(visibility);
 
         Ok(())
     }
@@ -210,7 +228,7 @@ where
         })
         .await?;
 
-        self.is_completed = true;
+        self.state = ContextState::Completed;
 
         Ok(())
     }
@@ -232,7 +250,7 @@ where
             embed = embed.description(description.to_string());
         }
 
-        self.embed(embed.build(), if self.is_deferred() { self.is_ephemeral() } else { true }).await
+        self.embed(embed.build(), self.visibility.unwrap_or(Visibility::Ephemeral)).await
     }
 
     /// Finishes an interaction with an embedded success message.
@@ -282,6 +300,72 @@ where
             .or(self.interaction.guild_locale.as_deref())
             .map(|s| s.parse().map_err(Into::into))
             .ok_or(ina_localizing::Error::MissingLocale)?
+    }
+}
+
+/// Describes the user visibility of a response.
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Visibility {
+    /// The response is visible to all users.
+    #[default]
+    Visible,
+    /// The response is only visible to a specific user.
+    Ephemeral,
+}
+
+impl Visibility {
+    /// Returns `true` if the visibility is [`Visible`].
+    ///
+    /// [`Visible`]: Visibility::Visible
+    #[must_use]
+    pub const fn is_visible(&self) -> bool {
+        matches!(self, Self::Visible)
+    }
+
+    /// Returns `true` if the visibility is [`Ephemeral`].
+    ///
+    /// [`Ephemeral`]: Visibility::Ephemeral
+    #[must_use]
+    pub const fn is_ephemeral(&self) -> bool {
+        matches!(self, Self::Ephemeral)
+    }
+}
+
+/// Describes the current state of a context's interaction.
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ContextState {
+    /// The interaction is pending.
+    #[default]
+    Pending,
+    /// The interaction has been deferred.
+    Deferred,
+    /// The interaction has been completed.
+    Completed,
+}
+
+impl ContextState {
+    /// Returns `true` if the context state is [`Pending`].
+    ///
+    /// [`Pending`]: ContextState::Pending
+    #[must_use]
+    pub const fn is_pending(&self) -> bool {
+        matches!(self, Self::Pending)
+    }
+
+    /// Returns `true` if the context state is [`Deferred`].
+    ///
+    /// [`Deferred`]: ContextState::Deferred
+    #[must_use]
+    pub const fn is_deferred(&self) -> bool {
+        matches!(self, Self::Deferred)
+    }
+
+    /// Returns `true` if the context state is [`Completed`].
+    ///
+    /// [`Completed`]: ContextState::Completed
+    #[must_use]
+    pub const fn is_completed(&self) -> bool {
+        matches!(self, Self::Completed)
     }
 }
 

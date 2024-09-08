@@ -20,7 +20,7 @@ use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::client::event::EventResult;
-use crate::command::context::Context;
+use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::traits::extension::IdExt;
@@ -47,7 +47,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     let title = localize!(async(try in locale) category::UI, "ping-start").await?;
     let embed = EmbedBuilder::new().title(title).color(color::BRANDING_B);
 
-    context.embed(embed.build(), true).await?;
+    context.embed(embed.build(), Visibility::Ephemeral).await?;
 
     let response = context.client().response(&context.interaction.token).await?.model().await?;
     let delay = response.id.creation_date() - context.interaction.id.creation_date();

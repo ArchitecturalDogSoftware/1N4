@@ -25,7 +25,7 @@ use twilight_model::id::marker::RoleMarker;
 use twilight_model::id::Id;
 
 use crate::client::event::EventResult;
-use crate::command::context::Context;
+use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
@@ -87,7 +87,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     let role_id = resolver.role_id("role")?;
     let icon = resolver.string("icon")?;
 
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -158,7 +158,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
         bail!("this command must be used by a user");
     };
 
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -209,7 +209,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
         bail!("this command must be used by a user");
     };
 
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -263,7 +263,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
         bail!("this command must be used by a user");
     };
 
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -320,7 +320,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
     };
     let role_id: Id<RoleMarker> = role_id.parse()?;
 
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
@@ -370,7 +370,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     };
     let role_id: Id<RoleMarker> = role_id.parse()?;
 
-    context.defer(true).await?;
+    context.defer(Visibility::Ephemeral).await?;
 
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
