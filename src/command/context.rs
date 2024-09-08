@@ -288,17 +288,28 @@ where
 {
     type Error = ina_localizing::Error;
 
-    // Check in the following order:
-    // 1. Interaction locale
-    // 2. User locale
-    // 3. Guild locale
+    /// Fallibly converts this value into a translation locale.
+    ///
+    /// This is resolved in the following priority order:
+    ///     1. Interaction locale
+    ///     2. User locale
+    ///     3. Guild locale
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be converted.
     fn as_locale(&self) -> Result<Locale, Self::Error> {
+        // Prefer the interaction-specified locale.
         self.interaction
             .locale
             .as_deref()
+            // Fall back to the author's locale.
             .or_else(|| self.interaction.author().and_then(|u| u.locale.as_deref()))
+            // Fall back to the guild's locale.
             .or(self.interaction.guild_locale.as_deref())
+            // Attempt to parse it into a valid locale value.
             .map(|s| s.parse().map_err(Into::into))
+            // Or fail and say that it's missing.
             .ok_or(ina_localizing::Error::MissingLocale)?
     }
 }
