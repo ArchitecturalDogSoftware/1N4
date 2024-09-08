@@ -70,4 +70,4 @@ but here are some key rules:
 - Names must be consistent and clear.
   Single-letter names are only allowed within single-line closures.
 - Code should be as safe and performant as possible.
-  Avoid repeated allocations, computation, and the usage of unsafe.
+  Avoid repeated allocations, computation, and the usage of Unsafe Rust.
