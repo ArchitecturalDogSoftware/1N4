@@ -2,7 +2,7 @@
 
 > Your resident M41D Unit, here to help with your server.
 
-1N4, pronounched 'ee-nah' (/inä/),
+1N4, pronounced 'ee-nah' (/inä/),
 is a Discord bot made for a private Minecraft SMP.
 
 It provides moderation capabilities and various useful features,
