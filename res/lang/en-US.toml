@@ -49,7 +49,7 @@ echo-format-decimal = "Decimal (0-9)"
 echo-format-hexadecimal = "Hexadecimal (0-F)"
 
 [ui]
-error-inform-title = "An error has occured."
+error-inform-title = "An error has occurred."
 error-inform-description = "The following identifier can be used for more information"
 error-titles = """\
 Encountered an error.
