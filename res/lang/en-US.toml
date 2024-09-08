@@ -42,7 +42,7 @@ role-finish-name = "finish"
 role-finish-description = "Finish and send all added role selectors."
 
 [command-choice]
-echo-format-plain = "Plaintext"
+echo-format-plain = "Plain text"
 echo-format-binary = "Binary (0-1)"
 echo-format-octal = "Octal (0-7)"
 echo-format-decimal = "Decimal (0-9)"
@@ -51,6 +51,7 @@ echo-format-hexadecimal = "Hexadecimal (0-F)"
 [ui]
 error-inform-title = "An error has occurred."
 error-inform-description = "The following identifier can be used for more information"
+# One line is picked randomly and used as the title of the embed containing the error message
 error-titles = """\
 Encountered an error.
 System malfunctioning.
