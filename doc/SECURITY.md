@@ -26,3 +26,11 @@ see [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 1. Discord bots do not accept arbitrary connections,
    only WebSocket connections and outgoing HTTP requests to Discord's servers.
 1. Though its dependencies do, 1N4 does not use unsafe code.
+
+### Supported Versions
+
+1N4's only supported version is its latest release.
+Any version other than latest is considered out of date.
+
+1N4 does not come with any form of warranty or any other guarantee of functionality.
+See [`../LICENSE`](../LICENSE) for more details.
