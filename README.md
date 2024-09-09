@@ -51,6 +51,10 @@ Contributors are expected to have read and understood the contents of this docum
 
 If you ever need help, feel free to contact me here or on Discord, and I will do my best to assist you \<3
 
+### Reporting Security Issues
+
+Please see 1N4's [security reporting guidelines](./doc/SECURITY.md).
+
 ## License
 
 1N4 is free software: you can redistribute it and/or modify it
