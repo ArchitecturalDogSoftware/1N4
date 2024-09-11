@@ -1,11 +1,11 @@
 # Contribution Guidelines
 
 Thank you for your interest in contributing to 1N4!
-Below is a list of the general rules to follow when submitting code, data, assets, or other content to this bot.
+Below is a list of the general rules to follow when submitting code, data, assets, and other content to this bot.
 
-I will be significantly more lenient with contributions from new users,
-just be aware that I may modify any committed content to better fit the general guidelines.
-And of course, as always, I will be around if you need any help.
+We will be significantly more lenient with contributions from new users,
+just be aware that We may modify any committed content to better fit the general guidelines.
+And of course, as always, We will be around if you need any help.
 
 ## Commits and Pull Requests
 
