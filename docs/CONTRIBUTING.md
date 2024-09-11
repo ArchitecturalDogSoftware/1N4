@@ -36,7 +36,7 @@ Applicable file types include (but are not limited to)
 Rust source files (`.rs`) and script files (`.sh`, `.bat`).
 
 There is a copyright header template available to you
-within the [`LICENSE_TEMPLATE`](./LICENSE_TEMPLATE.md) file in the `doc` directory.
+within the [`LICENSE_TEMPLATE`](./LICENSE_TEMPLATE.md) file in the `docs/` directory.
 
 ## Programming Conventions
 
