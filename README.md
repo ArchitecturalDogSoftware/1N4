@@ -46,14 +46,14 @@ If you are running your own instance of 1N4, ensure that the following environme
 ## Contributing
 
 Contributions are always welcome!
-If you're interested in helping development, please read 1N4's [contribution guidelines](./doc/CONTRIBUTING.md).
+If you're interested in helping development, please read 1N4's [contribution guidelines](./docs/CONTRIBUTING.md).
 Contributors are expected to have read and understood the contents of this document.
 
 If you ever need help, feel free to contact me here or on Discord, and I will do my best to assist you \<3
 
 ### Reporting Security Issues
 
-Please see 1N4's [security reporting guidelines](./doc/SECURITY.md).
+Please see 1N4's [security reporting guidelines](./docs/SECURITY.md).
 
 ## License
 
