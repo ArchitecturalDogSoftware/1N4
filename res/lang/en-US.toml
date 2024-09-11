@@ -51,7 +51,7 @@ echo-format-hexadecimal = "Hexadecimal (0-F)"
 [ui]
 error-inform-title = "An error has occurred."
 error-inform-description = "The following identifier can be used for more information"
-# One line is picked randomly and used as the title of the embed containing the error message
+# One line is picked randomly and used as the title of the embed containing the error message.
 error-titles = """\
 Encountered an error.
 System malfunctioning.

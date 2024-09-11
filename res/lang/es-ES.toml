@@ -51,6 +51,7 @@ echo-format-hexadecimal = "Hexadecimal (0-F)"
 [ui]
 error-inform-title = "Se ha producio un error."
 error-inform-description = "El siguiente identificador se puede utilizar para obtener más información"
+# Se selecciona aleatoriamente una línea y se usa como título del mensaje incrustado que contiene el mensaje del error.
 error-titles = """\
 Se encontró un error.
 Mal functionamiento del sistema.
