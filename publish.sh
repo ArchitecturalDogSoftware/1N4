@@ -142,8 +142,6 @@ step 'Copying executable' "cp '$executable' '$binary_dir/ina-$executable_version
 
 unset executable executable_version target_triple
 
-step 'Stripping executable' "strip '$binary_dir'/*"
-
 escaped_binary_dir="$(echo "$binary_dir" | sed 's/\//\\\//g')"
 
 step 'Generating checksums' "sha256sum '$binary_dir'/* | sed \"s/$escaped_binary_dir\///\" > '$checksums'"
