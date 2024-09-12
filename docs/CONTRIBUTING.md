@@ -71,3 +71,24 @@ but here are some key rules:
   Single-letter names are only allowed within single-line closures.
 - Code should be as safe and performant as possible.
   Avoid repeated allocations, computation, and the usage of Unsafe Rust.
+
+### Documentation
+
+This section applies to *standalone* documentation, such as this file.
+See [the standards for source code](#source-code) for code documentation.
+
+- Documentation should be written in [CommonMark](https://commonmark.org/) markdown.
+- Documentation should be formatted using [mdformat](https://github.com/executablebooks/mdformat),
+  which enforces an opinionated subset of CommonMark.
+- All documentation should be written with [Semantic Line Breaks](https://sembr.org/).
+  - The only exception is that documentation should always wrap after 120 columns,
+    instead of Semantic Line Breaks' recommendation of 80 columns.
+    This is where our mdformat configuration deviates from the default,
+    which does not enforce any line wrapping at all.
+
+Not using GitHub Flavored Markdown means that certain features,
+such as checklists, tables, and strikethrough text,
+are not available.
+These choices were made for the sake of
+wide compatibility, maintainability, and plain-text readability.
+See [this issue](https://github.com/Jaxydog/1N4/issues/3) for a look at the decision making process.
