@@ -74,19 +74,43 @@ but here are some key rules:
 - Code should be as safe and performant as possible.
   Avoid repeated allocations, computation, and the usage of Unsafe Rust.
 
-### Documentation
+#### Rust Documentation
+
+As with source code,
+refer to the Rust API Guidelines.
+Specifically, refer to the [section on Documentation](https://rust-lang.github.io/api-guidelines/documentation.html).
+
+- As with [standalone documentation](#standalone-documentation),
+  prefer the use of [CommonMark](https://commonmark.org/) and
+  refer to the [formatting style of mdformat](https://mdformat.readthedocs.io/en/stable/users/style.html)
+  where CommonMark is not opinionated.
+- Unlike standalone documentation,
+  Rust documentation does *not* use Semantic Line Breaks.
+  This is to avoid excessive use of vertical space in code by documentation comments.
+- As with standalone documentation,
+  avoid using raw HTML.
+- Unlike standalone documentation,
+  using the features added to CommonMark by Rust documentation is allowed.
+  - Notably, linking between items is encouraged.
+  - This is because Rust documentation is very standardized,
+    such as Rustdoc being a standard tool for HTML documentation generation.
+    This means that compatibility is not an issue.
+
+### Standalone Documentation
 
 This section applies to *standalone* documentation, such as this file.
-See [the standards for source code](#source-code) for code documentation.
+See [the standards for Rust documentation](#rust-documentation) for code documentation.
 
 - Documentation should be written in [CommonMark](https://commonmark.org/) markdown.
+  - Though CommonMark allows it,
+    raw HTML should be used *very* sparsely for 1N4 documentation.
 - Documentation should be formatted using [mdformat](https://github.com/executablebooks/mdformat),
   which enforces an opinionated subset of CommonMark.
 - All documentation should be written with [Semantic Line Breaks](https://sembr.org/).
-  - The only exception is that documentation should always wrap after 120 columns,
-    instead of Semantic Line Breaks' recommendation of 80 columns.
-    This is where our mdformat configuration deviates from the default,
-    which does not enforce any line wrapping at all.
+  - We do not enforce the 80 column limit.
+    If lines are getting to be longer than 80~100 columns without hyperlinks,
+    it is a problem of conservative use of line breaks,
+    not a problem of formatting.
 
 Not using GitHub Flavored Markdown means that certain features,
 such as checklists, tables, and strikethrough text,
