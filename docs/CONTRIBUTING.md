@@ -62,9 +62,11 @@ All code should strive to follow the [Rust API Guidelines](https://rust-lang.git
 but here are some key rules:
 
 - All source files should be in the Rust file format (`.rs`).
-- All types, fields, and methods should be fully documented, even if not part of the public API.
+- All types, fields, and methods should be fully documented,
+  even if not part of the public API.
 - Logic should be easy to follow.
-  If something is overly confusing or obscure, it should be explained in a comment.
+  If something is overly confusing or obscure,
+  it should be explained in a comment.
 - Code should have consistent formatting.
   Use the included `rustfmt.toml` file as your format configuration.
 - Names must be consistent and clear.
