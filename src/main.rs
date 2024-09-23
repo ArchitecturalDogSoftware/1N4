@@ -22,7 +22,7 @@ use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
 use ina_logging::{error, info};
 use serde::{Deserialize, Serialize};
 
-use self::client::Instance;
+use crate::client::Instance;
 
 /// The bot's client implementation.
 pub mod client;
