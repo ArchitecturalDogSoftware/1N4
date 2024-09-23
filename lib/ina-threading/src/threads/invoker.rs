@@ -21,9 +21,9 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use tokio::runtime::Builder;
+use tokio::sync::RwLock;
 use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::RwLock;
 
 use super::exchanger::Exchanger;
 use crate::{ConsumingThread, Error, HandleHolder, ProducingThread, Result};
@@ -65,17 +65,15 @@ where
         N: AsRef<str>,
         F: Fn(S) -> R + Send + 'static,
     {
-        let call = move |sender: Sender<Nonce<R>>, mut receiver: Receiver<Nonce<S>>| {
-            loop {
-                let Some((sequence, input)) = receiver.blocking_recv() else {
-                    break;
-                };
+        let call = move |sender: Sender<Nonce<R>>, mut receiver: Receiver<Nonce<S>>| loop {
+            let Some((sequence, input)) = receiver.blocking_recv() else {
+                break;
+            };
 
-                let response = call(input);
+            let response = call(input);
 
-                if sequence.is_some() && sender.blocking_send((sequence, response)).is_err() {
-                    break;
-                }
+            if sequence.is_some() && sender.blocking_send((sequence, response)).is_err() {
+                break;
             }
         };
 

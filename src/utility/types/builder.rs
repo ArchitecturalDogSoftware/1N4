@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use twilight_model::channel::ChannelType;
 use twilight_model::channel::message::component::{
     ActionRow, Button, ButtonStyle, SelectDefaultValue, SelectMenu, SelectMenuOption, SelectMenuType, TextInput,
     TextInputStyle,
 };
 use twilight_model::channel::message::{Component, EmojiReactionType};
-use twilight_model::channel::ChannelType;
-use twilight_model::id::marker::SkuMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::SkuMarker;
 
 /// An error that may be returned when interacting with builders.
 #[non_exhaustive]

@@ -22,8 +22,8 @@ use std::time::Duration;
 use endpoint::Endpoint;
 use settings::Settings;
 use thread::Request;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::RwLock;
+use tokio::sync::mpsc::error::SendError;
 use tokio::task::{JoinError, JoinSet};
 
 use crate::entry::Entry;

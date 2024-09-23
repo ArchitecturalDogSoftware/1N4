@@ -18,10 +18,10 @@ use anyhow::Result;
 use ina_macro::Stored;
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
-use twilight_model::channel::message::component::{Button, ButtonStyle};
 use twilight_model::channel::message::Component;
-use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
+use twilight_model::channel::message::component::{Button, ButtonStyle};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;

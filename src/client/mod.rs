@@ -20,17 +20,17 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ina_logging::{debug, error, warn};
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tokio_stream::{StreamExt, StreamMap};
 use twilight_gateway::{Config, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::Client;
-use twilight_model::gateway::connection_info::BotConnectionInfo;
-use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
-use twilight_model::gateway::payload::outgoing::UpdatePresence;
-use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status};
 use twilight_model::gateway::OpCode;
+use twilight_model::gateway::connection_info::BotConnectionInfo;
+use twilight_model::gateway::payload::outgoing::UpdatePresence;
+use twilight_model::gateway::payload::outgoing::update_presence::UpdatePresencePayload;
+use twilight_model::gateway::presence::{ActivityType, MinimalActivity, Status};
 
 use self::api::Api;
 use self::event::{EventOutput, EventResult};

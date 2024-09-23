@@ -17,7 +17,7 @@
 use anyhow::bail;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 use twilight_model::channel::message::MessageFlags;

@@ -20,9 +20,9 @@ use owo_colors::Stream;
 use tokio::io::{AsyncWriteExt, Stderr, Stdout};
 
 use super::Endpoint;
+use crate::Result;
 use crate::entry::Entry;
 use crate::settings::Settings;
-use crate::Result;
 
 /// A logger endpoint for the terminal.
 #[derive(Debug, Default)]

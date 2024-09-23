@@ -21,8 +21,8 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use twilight_http::request::channel::message::UpdateMessage;
 use twilight_model::channel::Message;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker};
 
 use crate::client::api::ApiRef;
 

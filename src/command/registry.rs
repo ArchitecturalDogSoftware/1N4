@@ -18,12 +18,12 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::LazyLock;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use ina_logging::info;
 use tokio::sync::RwLock;
 use twilight_model::application::command::Command;
-use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::GuildMarker;
 
 use super::{AutocompleteCallable, CommandCallable, CommandFactory, ComponentCallable, ModalCallable};
 

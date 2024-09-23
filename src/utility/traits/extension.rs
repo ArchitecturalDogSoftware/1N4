@@ -25,8 +25,8 @@ use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
-use twilight_model::id::marker::{InteractionMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{InteractionMarker, UserMarker};
 use twilight_model::user::{CurrentUser, CurrentUserGuild, User};
 use twilight_model::util::ImageHash;
 

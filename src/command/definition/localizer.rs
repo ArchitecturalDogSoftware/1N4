@@ -30,7 +30,7 @@ use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
-use crate::utility::search::{fuzzy_contains, Strictness};
+use crate::utility::search::{Strictness, fuzzy_contains};
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::{category, color};
 

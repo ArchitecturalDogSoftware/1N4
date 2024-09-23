@@ -20,9 +20,9 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use crate::Storage;
 use crate::format::{DataDecode, DataEncode, DataFormat};
 use crate::system::{DataReader, DataSystem, DataWriter};
-use crate::Storage;
 
 /// A value that can be stored within the storage system.
 pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {

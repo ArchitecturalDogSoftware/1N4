@@ -32,11 +32,11 @@ use twilight_model::channel::{Attachment, Channel, Message};
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Emoji, Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
+use twilight_model::id::Id;
 use twilight_model::id::marker::{
     AttachmentMarker, ChannelMarker, EmojiMarker, GuildMarker, InteractionMarker, MessageMarker, StickerMarker,
     UserMarker,
 };
-use twilight_model::id::Id;
 use twilight_model::user::{CurrentUser, CurrentUserGuild, User};
 use twilight_util::builder::embed::{EmbedAuthorBuilder, ImageSource};
 

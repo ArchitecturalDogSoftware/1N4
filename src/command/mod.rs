@@ -19,8 +19,8 @@ use twilight_model::application::command::{Command, CommandOptionChoice, Command
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
-use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::GuildMarker;
 
 use self::context::Context;
 use self::registry::CommandEntry;

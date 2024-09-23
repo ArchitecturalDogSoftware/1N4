@@ -15,8 +15,8 @@
 // <https://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
-use twilight_model::channel::message::component::{ActionRow, TextInput};
 use twilight_model::channel::message::Component;
+use twilight_model::channel::message::component::{ActionRow, TextInput};
 
 /// The maximum amount of permitted inputs within a single modal.
 pub const MAX_INPUTS: usize = 5;

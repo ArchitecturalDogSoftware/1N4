@@ -18,8 +18,8 @@ use std::marker::PhantomData;
 
 use tokio::sync::{RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::join::Join;
 use crate::HandleHolder;
+use crate::join::Join;
 
 /// A static thread handle.
 #[derive(Debug)]

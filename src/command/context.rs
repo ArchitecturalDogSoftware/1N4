@@ -16,7 +16,7 @@
 
 use std::fmt::Display;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use ina_localizing::locale::Locale;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::{Interaction, InteractionType};

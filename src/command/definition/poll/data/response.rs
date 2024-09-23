@@ -18,8 +18,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use twilight_model::id::marker::UserMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::UserMarker;
 
 /// A poll's response.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]

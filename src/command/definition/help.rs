@@ -19,12 +19,12 @@ use std::fmt::Write;
 use anyhow::Result;
 use ina_localizing::locale::Locale;
 use ina_localizing::localize;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::{PartialMember, Permissions, Role};
-use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
 use twilight_util::permission_calculator::PermissionCalculator;
 

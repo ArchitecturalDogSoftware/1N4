@@ -20,8 +20,8 @@ use ina_macro::{AsTranslation, Stored};
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use twilight_model::id::marker::{GuildMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, UserMarker};
 
 use super::input::PollInput;
 use super::response::PollResponse;
