@@ -7,7 +7,7 @@ When hosting (1) a web service that (2) accepts user input, security problems ca
 Firstly, thank you for your interest in filing a report!
 Nobody wants to be hacked, us included.
 
-Please privately report security issues through [GitHub's Security Advisories](https://github.com/Jaxydog/1N4/security/advisories/new) feature.
+Please privately report security issues through [GitHub's Security Advisories](https://github.com/ArchitecturalDogSoftware/1N4/security/advisories/new) feature.
 Do not file a public issue to report a security issue.
 
 ## Got an Issue That You Want to Fix?

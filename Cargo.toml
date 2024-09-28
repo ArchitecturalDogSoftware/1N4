@@ -20,7 +20,7 @@ resolver = "2"
 package.edition = "2021"
 package.license = "AGPL-3.0-or-later"
 package.publish = false
-package.repository = "https://github.com/Jaxydog/1N4"
+package.repository = "https://github.com/ArchitecturalDogSoftware/1N4"
 
 [workspace.lints]
 clippy.allow_attributes = "warn"

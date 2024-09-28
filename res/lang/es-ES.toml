@@ -72,7 +72,7 @@ help-header = """\
 ¡Gracias por usar 1N4! Estoy feliz de ser de servicio.
 A continuación se muestra una lista de todos los comandos que están disponsibles para usted.
 
-Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/Jaxydog/1N4/issues).\
+Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/ArchitecturalDogSoftware/1N4/issues).\
 """
 help-footer = """\
 Propiedad de Arden Inc., versión %V+neon.

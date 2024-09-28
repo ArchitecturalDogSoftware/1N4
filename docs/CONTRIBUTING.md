@@ -117,4 +117,4 @@ such as checklists, tables, and strikethrough text,
 are not available.
 These choices were made for the sake of
 wide compatibility, maintainability, and plain-text readability.
-See [this issue](https://github.com/Jaxydog/1N4/issues/3) for a look at the decision making process.
+See [this issue](https://github.com/ArchitecturalDogSoftware/1N4/issues/3) for a look at the decision making process.
