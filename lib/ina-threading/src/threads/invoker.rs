@@ -142,13 +142,16 @@ where
 
             match self.as_receiver_mut().try_recv() {
                 Ok((Some(seq), result)) if seq == sequence => return Ok(result),
-                Ok((Some(seq), result)) => self.produced.write().await.insert(seq, result),
+                Ok((Some(seq), result)) => {
+                    // This would require that enough tasks ([`usize::MAX`] to be exact) are
+                    // triggered to cause a task to receive the same sequence ID as another pending
+                    // task.
+                    assert!(self.produced.write().await.insert(seq, result).is_none())
+                }
                 Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
-                Err(TryRecvError::Empty) => continue,
+                Err(TryRecvError::Empty) => tokio::task::yield_now().await,
                 Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
             };
-
-            tokio::task::yield_now().await;
         }
     }
 
