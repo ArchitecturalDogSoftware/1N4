@@ -131,11 +131,7 @@ where
 
         self.as_sender().send((Some(sequence), input)).await?;
 
-        let mut interval = tokio::time::interval(Duration::from_millis(5));
-
         loop {
-            interval.tick().await;
-
             let mut produced = self.produced.write().await;
 
             if let Some(result) = produced.remove(&sequence) {
@@ -151,6 +147,8 @@ where
                 Err(TryRecvError::Empty) => continue,
                 Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
             };
+
+            tokio::task::yield_now().await;
         }
     }
 
