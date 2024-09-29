@@ -209,7 +209,12 @@ where
                 Ok((Some(seq), result)) if seq == sequence => return Ok(result),
                 // If the value was returned by another task, drop it into `self.produced` so that
                 // it can still be consumed.
-                Ok((Some(seq), result)) => self.produced.blocking_write().insert(seq, result),
+                Ok((Some(seq), result)) => {
+                    // This would require that enough tasks ([`usize::MAX`] to be exact) are
+                    // triggered to cause a task to receive the same sequence ID as another pending
+                    // task.
+                    assert!(self.produced.blocking_write().insert(seq, result).is_none())
+                }
                 Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
                 // If task hasn't returned yet.
                 Err(TryRecvError::Empty) => continue,
