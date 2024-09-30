@@ -121,6 +121,11 @@ where
 
     /// Invokes the thread, returning the response of the method when available.
     ///
+    /// # Panics
+    ///
+    /// Panics if enough tasks ([`usize::MAX`] to be exact) are triggered to cause a task to receive the same sequence
+    /// ID as another pending task.
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
@@ -168,6 +173,9 @@ where
     /// # Panics
     ///
     /// Panics if this is called in an asynchronous context.
+    ///
+    /// Panics if enough tasks ([`usize::MAX`] to be exact) are triggered to cause a task to receive the same sequence
+    /// ID as another pending task.
     ///
     /// # Errors
     ///
