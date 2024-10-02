@@ -11,8 +11,8 @@ Publicly loop us into a discussion using an @mention, or [reach out to us in pri
 
 ## Contacting Us
 
-As of right now, 1N4 has no official method to contact maintainers privately.
-We are working on a solution.
+1N4's maintainers can be contacted privately at
+<ArchitecturalDogSoftware@gmail.com>.
 
 ### Maintainers
 
