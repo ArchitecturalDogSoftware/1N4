@@ -2,9 +2,13 @@ name: Rust
 
 on:
   push:
-    branches: []
+    branches-ignore:
+      - 'doc-improvements'
+      - 'script-improvements'
   pull_request:
-    branches: []
+    branches-ignore:
+      - 'doc-improvements'
+      - 'script-improvements'
 
 env:
   CARGO_TERM_COLOR: always
