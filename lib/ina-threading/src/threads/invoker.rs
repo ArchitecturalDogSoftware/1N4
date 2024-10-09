@@ -156,7 +156,7 @@ where
                     // This would require that enough tasks ([`usize::MAX`] to be exact) are
                     // triggered to cause a task to receive the same sequence ID as another pending
                     // task.
-                    assert!(self.produced.write().await.insert(seq, result).is_none())
+                    assert!(self.produced.write().await.insert(seq, result).is_none());
                 }
                 Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
                 // If task hasn't returned yet.
@@ -221,7 +221,7 @@ where
                     // This would require that enough tasks ([`usize::MAX`] to be exact) are
                     // triggered to cause a task to receive the same sequence ID as another pending
                     // task.
-                    assert!(self.produced.blocking_write().insert(seq, result).is_none())
+                    assert!(self.produced.blocking_write().insert(seq, result).is_none());
                 }
                 Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
                 // If task hasn't returned yet.
