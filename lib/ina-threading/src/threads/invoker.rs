@@ -121,23 +121,26 @@ where
 
     /// Invokes the thread, returning the response of the method when available.
     ///
+    /// # Panics
+    ///
+    /// Panics if enough tasks ([`usize::MAX`] to be exact) are triggered to cause a task to receive the same sequence
+    /// ID as another pending task.
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
     pub async fn invoke(&mut self, input: S) -> Result<R, Nonce<S>> {
+        // Claim the current sequence ID and increment `self.sequence` to a fresh sequence ID.
         let sequence = *self.sequence.read().await;
-
         *self.sequence.write().await = sequence.wrapping_add(1);
 
+        // Instruct the thread to evaluate `input`.
         self.as_sender().send((Some(sequence), input)).await?;
 
-        let mut interval = tokio::time::interval(Duration::from_millis(5));
-
         loop {
-            interval.tick().await;
-
             let mut produced = self.produced.write().await;
 
+            // If another task received the result first, it will drop it into `self.produced`.
             if let Some(result) = produced.remove(&sequence) {
                 return Ok(result);
             }
@@ -145,10 +148,19 @@ where
             drop(produced);
 
             match self.as_receiver_mut().try_recv() {
+                // If the value was returned by the task triggered above, return it.
                 Ok((Some(seq), result)) if seq == sequence => return Ok(result),
-                Ok((Some(seq), result)) => self.produced.write().await.insert(seq, result),
+                // If the value was returned by another task, drop it into `self.produced` so that
+                // it can still be consumed.
+                Ok((Some(seq), result)) => {
+                    // This would require that enough tasks ([`usize::MAX`] to be exact) are
+                    // triggered to cause a task to receive the same sequence ID as another pending
+                    // task.
+                    assert!(self.produced.write().await.insert(seq, result).is_none())
+                }
                 Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
-                Err(TryRecvError::Empty) => continue,
+                // If task hasn't returned yet.
+                Err(TryRecvError::Empty) => tokio::task::yield_now().await,
                 Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
             };
         }
@@ -162,16 +174,20 @@ where
     ///
     /// Panics if this is called in an asynchronous context.
     ///
+    /// Panics if enough tasks ([`usize::MAX`] to be exact) are triggered to cause a task to receive the same sequence
+    /// ID as another pending task.
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread is disconnected.
     pub fn blocking_invoke(&mut self, input: S) -> Result<R, Nonce<S>> {
         const DURATION: Duration = Duration::from_millis(5);
 
+        // Claim the current sequence ID and increment `self.sequence` to a fresh sequence ID.
         let sequence = *self.sequence.blocking_read();
-
         *self.sequence.blocking_write() = sequence.wrapping_add(1);
 
+        // Instruct the thread to evaluate `input`.
         self.as_sender().blocking_send((Some(sequence), input))?;
 
         let mut interval = Instant::now();
@@ -189,6 +205,7 @@ where
 
             let mut produced = self.produced.blocking_write();
 
+            // If another task received the result first, it will drop it into `self.produced`.
             if let Some(result) = produced.remove(&sequence) {
                 return Ok(result);
             }
@@ -196,9 +213,18 @@ where
             drop(produced);
 
             match self.as_receiver_mut().try_recv() {
+                // If the value was returned by the task triggered above, return it.
                 Ok((Some(seq), result)) if seq == sequence => return Ok(result),
-                Ok((Some(seq), result)) => self.produced.blocking_write().insert(seq, result),
+                // If the value was returned by another task, drop it into `self.produced` so that
+                // it can still be consumed.
+                Ok((Some(seq), result)) => {
+                    // This would require that enough tasks ([`usize::MAX`] to be exact) are
+                    // triggered to cause a task to receive the same sequence ID as another pending
+                    // task.
+                    assert!(self.produced.blocking_write().insert(seq, result).is_none())
+                }
                 Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
+                // If task hasn't returned yet.
                 Err(TryRecvError::Empty) => continue,
                 Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
             };
