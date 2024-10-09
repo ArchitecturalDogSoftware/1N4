@@ -65,7 +65,7 @@ pub struct InteractionLabelDisplay<'ev> {
     user_id: Option<Id<UserMarker>>,
 }
 
-impl<'ev> Display for InteractionLabelDisplay<'ev> {
+impl Display for InteractionLabelDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(user_id) = self.user_id {
             write!(f, "<{}:{}:{user_id}>", self.kind, self.id)
@@ -162,7 +162,7 @@ pub struct UserNameDisplay<'us> {
     user: &'us str,
 }
 
-impl<'us> Display for UserNameDisplay<'us> {
+impl Display for UserNameDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.nick.map_or(self.name.map_or(self.user, identity), identity))
     }
@@ -178,7 +178,7 @@ pub struct UserTagDisplay<'us> {
     tag: Option<NonZeroU16>,
 }
 
-impl<'us> Display for UserTagDisplay<'us> {
+impl Display for UserTagDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(discriminator) = self.tag {
             write!(f, "{}#{discriminator:04}", self.user)

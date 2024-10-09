@@ -134,7 +134,7 @@ impl From<&Message> for Anchor {
 #[derive(Clone, Copy, Debug)]
 pub struct AnchorLinkDisplay<'ak>(&'ak Anchor);
 
-impl<'ak> Display for AnchorLinkDisplay<'ak> {
+impl Display for AnchorLinkDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         const BASE_URL: &str = "https://discord.com/channels";
 

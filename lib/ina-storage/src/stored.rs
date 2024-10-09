@@ -360,7 +360,7 @@ impl<T: Stored> SyncApi<T> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct SyncHolderApi<'sv, T: Stored>(&'sv T);
 
-impl<'sv, T: Stored> SyncHolderApi<'sv, T> {
+impl<T: Stored> SyncHolderApi<'_, T> {
     /// Returns whether data is stored for this value.
     ///
     /// This blocks the current thread.

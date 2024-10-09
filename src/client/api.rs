@@ -53,7 +53,7 @@ pub struct ApiRef<'api> {
     pub cache: &'api Arc<DefaultInMemoryCache>,
 }
 
-impl<'api> ApiRef<'api> {
+impl ApiRef<'_> {
     /// Returns a cloned version of this [`ApiRef`].
     #[must_use]
     pub fn into_owned(&self) -> Api {

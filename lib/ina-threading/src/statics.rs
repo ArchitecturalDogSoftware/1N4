@@ -186,7 +186,7 @@ pub struct SyncStaticApi<'s, T> {
 }
 
 #[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized")]
-impl<'s, T> SyncStaticApi<'s, T> {
+impl<T> SyncStaticApi<'_, T> {
     /// Returns whether the inner thread is initialized.
     ///
     /// This blocks the current thread.

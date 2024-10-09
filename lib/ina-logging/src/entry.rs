@@ -63,7 +63,7 @@ pub struct Level<'lv> {
     pub error: bool,
 }
 
-impl<'lv> Level<'lv> {
+impl Level<'_> {
     /// The debug log level.
     #[cfg(debug_assertions)]
     pub const DEBUG: Self = Self {
@@ -160,7 +160,7 @@ pub mod display {
     }
 
     #[cfg(feature = "terminal")]
-    impl<'r> Display for TimestampDisplay<'r> {
+    impl Display for TimestampDisplay<'_> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             use owo_colors::OwoColorize;
 
