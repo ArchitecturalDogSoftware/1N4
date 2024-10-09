@@ -121,6 +121,9 @@ impl Instance {
     ///
     /// This function will return an error if an [`Instance`] cannot be created.
     pub async fn new(settings: Settings) -> Result<Self> {
+        // If this fails, it means that the provider was already set, meaning that we can safely ignore it.
+        _ = rustls::crypto::ring::default_provider().install_default();
+
         let discord_token = crate::utility::secret::discord_token()?;
         let client = Client::new(discord_token.to_string());
         let status = Self::new_status(&settings).await?;
