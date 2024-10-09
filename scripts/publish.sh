@@ -12,98 +12,35 @@
 #
 # You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see <https://www.gnu.org/licenses/>.
 
+source "$(dirname "$0")/utilities.sh"
+
 declare -r script_name='publish'
-declare -r script_version='0.1.0'
+declare -r script_version='0.2.0'
 
-function print_version() {
-    echo "$script_name v$script_version"
-}
-
-function print_argument() {
-    local flag="-$1"
-    local desc="$2"
-    local args
-
-    if [ -n "$3" ]; then
-        args=" [$3]\t"
-    else
-        args="\t\t"
-    fi
-
-    echo -e "$flag$args$desc"
-}
-
-function print_help() {
-    echo "$script_name v$script_version"
-    echo -e "usage: $0 [arguments]\n"
-
-    print_argument 'h' 'Displays this screen.'
-    print_argument 'v' 'Displays the current script version.'
-    print_argument 'c' 'Cleans the build directory before compiling'
-    print_argument 'C' 'Cleans the Cargo cache before compiling'
-    print_argument 't' 'Override the target triple appended to the finished binary name.'
-}
-
-function cancel() {
-    declare -i code
-
-    if [[ "$1" =~ ^-?[0-9]+$ ]]; then
-        code=$1
-        
-        shift 1
-    else
-        code=1
-    fi
-
-    if [ $code -eq 0 ]; then
-        echo "$*"
-    else
-        echo "$*" >&2
-    fi
-
-    exit $code
-}
-
-function or_cancel() {
-    cancel $? "$*"
-}
-
-function step() {
-    local name="$1"
-    local command="$2"
-
-    echo -n "- $name..."
-
-    local output
-
-    output="$(eval "$command" 2>&1)"
-    
-    local code="$?"
-
-    [ $code -ne 0 ] && {
-        echo ' Failed'
-        echo "$output"
-        exit $code
-    }
-
-    echo ' Done'
-}
-
-declare binary_dir="$PWD/bin"
-declare target_dir="$PWD/target/release"
-declare executable="$target_dir/ina"
-declare checksums="$binary_dir/checksums"
+declare -r binary_dir="$PWD/bin"
+declare -r target_dir="$PWD/target/release"
+declare -r executable="$target_dir/ina"
+declare -r checksums="$binary_dir/checksums"
 declare target_triple executable_version
 declare -i clean_build clean_cache
 
+function print_help() {
+    print_help_header "$script_name" "$script_version" '[arguments]'
+    print_help_argument 'h' 'Displays this screen.'
+    print_help_argument 'v' 'Displays the current script version.'
+    print_help_argument 'c' 'Cleans the build directory before compiling'
+    print_help_argument 'C' 'Cleans the Cargo cache before compiling'
+    print_help_argument 't' 'Override the target triple appended to the finished binary name.'
+}
+
 [ -d "$PWD"/.git ] || {
-    cancel "This script must be run within the project's root directory"
+    cancel_execution "This script must be run within the project's root directory"
 }
 
 while getopts 'hvcCt:' argument; do
     case $argument in
         h) print_help; exit 0;;
-        v) print_version; exit 0;;
+        v) print_version "$script_name" "$script_version"; exit 0;;
         t) target_triple="$OPTARG";;
         c) clean_build=1;;
         C) clean_cache=1;;
@@ -119,32 +56,32 @@ echo -e 'Publishing executable\n'
 }
 
 [ $clean_build ] && {
-    step 'Cleaning build directory' 'cargo clean'
+    eval_step 'Cleaning build directory' 'cargo clean'
 }
 [ $clean_cache ] && {
-    step 'Cleaning Cargo cache' 'cargo cache -r all'
+    eval_step 'Cleaning Cargo cache' 'cargo cache -r all'
 }
 
 unset clean_build clean_cache
 
-step 'Compiling executable' 'cargo build --release'
+eval_step 'Compiling executable' 'cargo build --release'
 
 [ -d "$binary_dir" ] || {
-    step 'Creating binary directory' "mkdir -p '$binary_dir' || or_cancel 'Failed to create binary directory'"
+    eval_step 'Creating binary directory' "mkdir -p '$binary_dir' || or_cancel_execution 'Failed to create binary directory'"
 }
 [ -z "$(ls -A "$binary_dir")" ] || {
-    step 'Clearing binary directory' "rm --interactive=once '$binary_dir'/*"
+    eval_step 'Clearing binary directory' "rm --interactive=once '$binary_dir'/*"
 }
 
 executable_version="$(eval "$executable -V" | sed 's/ina //')"
 
-step 'Copying executable' "cp '$executable' '$binary_dir/ina-$executable_version+$target_triple'"
+eval_step 'Copying executable' "cp '$executable' '$binary_dir/ina-$executable_version+$target_triple'"
 
-unset executable executable_version target_triple
+unset executable_version target_triple
 
 escaped_binary_dir="$(echo "$binary_dir" | sed 's/\//\\\//g')"
 
-step 'Generating checksums' "sha256sum '$binary_dir'/* | sed \"s/$escaped_binary_dir\///\" > '$checksums'"
+eval_step 'Generating checksums' "sha256sum '$binary_dir'/* | sed \"s/$escaped_binary_dir\///\" > '$checksums'"
 
 unset escaped_binary_dir
 
