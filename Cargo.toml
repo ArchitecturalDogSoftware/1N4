@@ -45,6 +45,12 @@ workspace = true
 default = ["dotenv"]
 dotenv = ["dep:dotenvy"]
 
+[profile.release-super-optimized]
+inherits = "release"
+codegen-units = 1
+lto = "fat"
+strip = "symbols"
+
 [dependencies]
 anyhow = "1.0"
 async-trait = "0.1"
