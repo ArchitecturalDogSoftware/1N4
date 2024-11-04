@@ -153,7 +153,7 @@ impl<T: Stored> AsyncApi<T> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct AsyncHolderApi<'sv, T: Stored>(&'sv T);
 
-impl<'sv, T: Stored> AsyncHolderApi<'sv, T> {
+impl<T: Stored> AsyncHolderApi<'_, T> {
     /// Returns whether data is stored for this value.
     ///
     /// # Errors

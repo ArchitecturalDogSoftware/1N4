@@ -130,7 +130,7 @@ where
 }
 
 #[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized")]
-impl<'s, T> AsyncStaticApi<'s, T>
+impl<T> AsyncStaticApi<'_, T>
 where
     T: Send + Sync,
 {
