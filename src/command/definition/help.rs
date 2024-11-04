@@ -21,6 +21,7 @@ use ina_localizing::locale::Locale;
 use ina_localizing::localize;
 use rand::{Rng, thread_rng};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::{PartialMember, Permissions, Role};
 use twilight_model::id::Id;
@@ -131,7 +132,7 @@ async fn write_command<F>(locale: Option<Locale>, command: Command, f: &mut F) -
 where
     F: Write + Send,
 {
-    let Command { name, kind, id, dm_permission, nsfw, options, .. } = command;
+    let Command { name, kind, id, contexts, nsfw, options, .. } = command;
 
     let Some(id) = id else {
         return Ok(());
@@ -157,7 +158,7 @@ where
     if has_subcommands {
         flags.push(localize!(async(try in locale) category::UI, "help-tag-subcommands").await?);
     }
-    if dm_permission.unwrap_or(false) {
+    if contexts.is_some_and(|v| v.iter().any(|v| *v == InteractionContextType::BotDm)) {
         flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?);
     }
     if nsfw.unwrap_or(false) {
