@@ -25,6 +25,7 @@ use twilight_model::id::marker::GuildMarker;
 use self::context::Context;
 use self::registry::CommandEntry;
 use crate::client::event::EventResult;
+use crate::define_command_modules;
 use crate::utility::types::id::CustomId;
 
 /// Provides an interaction context API.
@@ -34,20 +35,22 @@ pub mod registry;
 /// Provides helpers for resolving command options.
 pub mod resolver;
 
-/// Provides all defined commands.
-pub mod definition {
-    /// The echo command.
-    pub mod echo;
-    /// The help command.
-    pub mod help;
-    /// The localizer command.
-    pub mod localizer;
-    /// The ping command.
-    pub mod ping;
-    /// The poll command.
-    pub mod poll;
-    /// The role command.
-    pub mod role;
+define_command_modules! {
+    /// Provides all defined commands.
+    pub mod definition {
+        /// The echo command.
+        pub mod echo;
+        /// The help command.
+        pub mod help;
+        /// The localizer command.
+        pub mod localizer;
+        /// The ping command.
+        pub mod ping;
+        /// The poll command.
+        pub mod poll;
+        /// The role command.
+        pub mod role;
+    }
 }
 
 /// A type that can be invoked to construct a command.

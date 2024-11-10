@@ -155,15 +155,52 @@ pub async fn registry_mut() -> impl DerefMut<Target = CommandRegistry> {
 pub async fn initialize() -> Result<()> {
     let mut registry = self::registry_mut().await;
 
-    registry.register(super::definition::echo::entry())?;
-    registry.register(super::definition::help::entry())?;
-    registry.register(super::definition::localizer::entry())?;
-    registry.register(super::definition::ping::entry())?;
-    registry.register(super::definition::role::entry())?;
+    super::definition::register(&mut registry)?;
 
     drop(registry);
 
     info!(async "initialized command registry").await.map_err(Into::into)
+}
+
+/// Creates a module that contains command definitions.
+///
+/// # Examples
+///
+/// ```
+/// define_command_modules! {
+///     /// Defines commands.
+///     pub mod definition {
+///         /// The help command.
+///         pub mod help;
+///         /// The ping command.
+///         pub mod ping;
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_command_modules {
+    (
+        $(#[$base_attribute:meta])*
+        $base_visibility:vis mod $base_module:ident {$(
+            $(#[$command_attribute:meta])*
+            $command_visibility:vis mod $command_module:ident;
+        )*}
+    ) => {
+        $(#[$base_attribute])* $base_visibility mod $base_module {
+            $($(#[$command_attribute])* $command_visibility mod $command_module;)*
+
+            /// Registers all commands within this module.
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if command registration fails.
+            pub(in $crate::command) fn register(registry: &mut $crate::command::registry::CommandRegistry) -> ::anyhow::Result<()> {
+                $(registry.register(self::$command_module::entry())?;)*
+
+                Ok(())
+            }
+        }
+    };
 }
 
 /// Creates a command.
