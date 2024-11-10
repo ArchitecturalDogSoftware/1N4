@@ -7,6 +7,8 @@ localizer-name = "localizer"
 localizer-description = "Provides access to the bot's localizer."
 ping-name = "ping"
 ping-description = "Calculates the bot's approximate response time."
+poll-name = "poll"
+poll-description = "Create and manage polls."
 role-name = "role"
 role-description = "Create and manage role selectors."
 
