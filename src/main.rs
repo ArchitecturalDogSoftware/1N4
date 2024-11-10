@@ -79,6 +79,8 @@ pub fn main() -> Result<()> {
 
     runtime.block_on(self::async_main(arguments))?;
 
+    drop(runtime);
+
     info!("closing logging thread")?;
 
     ina_logging::thread::blocking_close();
