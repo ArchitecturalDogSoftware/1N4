@@ -64,7 +64,7 @@ ina-storage = { version = "*", path = "./lib/ina-storage", features = ["format-c
 rand = { version = "0.8", features = ["nightly"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
+thiserror = "2.0"
 time = { version = "0.3", features = ["local-offset", "serde"] }
 tokio = { version = "1.41", features = ["full"] }
 tokio-stream = "0.1"
