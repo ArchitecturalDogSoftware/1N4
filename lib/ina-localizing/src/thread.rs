@@ -22,7 +22,7 @@ use tokio::sync::RwLock;
 
 use crate::locale::Locale;
 use crate::settings::Settings;
-use crate::text::Text;
+use crate::text::{Text, TextRef};
 use crate::{Localizer, Result};
 
 /// The localization thread's handle.
@@ -135,7 +135,17 @@ async fn run(localizer: Arc<RwLock<Localizer>>, input: Request) -> Response {
             let locale = locale.unwrap_or_else(|| localizer.settings.default_locale);
 
             match localizer.get(locale, &category, &key) {
-                Ok(text) => Response::Text(text.into_owned()),
+                Ok(text) => {
+                    if text.is_missing() && ina_logging::thread::is_started().await {
+                        let TextRef::Missing(category, key) = text else { unreachable!() };
+
+                        // TODO: is it fine to ignore the possible error here?
+                        // This is with the assumption that the logger will not fail to output.
+                        ina_logging::error!(async "missing text for key '{category}::{key}'").await.ok();
+                    }
+
+                    Response::Text(text.into_owned())
+                }
                 Err(error) => Response::Error(error),
             }
         }
