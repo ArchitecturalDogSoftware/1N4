@@ -41,7 +41,8 @@ pub struct Settings {
     pub directory: Box<Path>,
 
     /// The behavior that the localizer will exhibit when it fails to translate a key.
-    #[arg(long = "lang-miss-behavior", default_value = "return")]
+    #[cfg_attr(not(debug_assertions), arg(long = "lang-miss-behavior", default_value = "return"))]
+    #[cfg_attr(debug_assertions, arg(long = "lang-miss-behavior", default_value = "error"))]
     #[serde(default)]
     pub miss_behavior: MissingBehavior,
 
@@ -55,10 +56,11 @@ pub struct Settings {
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum MissingBehavior {
-    /// Returns the missing text.
-    #[default]
+    /// Returns a string that is representative of the missing key.
+    #[cfg_attr(not(debug_assertions), default)]
     Return,
     /// Returns an error.
+    #[cfg_attr(debug_assertions, default)]
     Error,
 }
 

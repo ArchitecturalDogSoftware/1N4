@@ -20,6 +20,7 @@ default = []
 
 [dependencies]
 clap = { version = "4.5", features = ["cargo", "derive", "env"] }
+ina-logging = { version = "*", path = "../ina-logging/" }
 ina-threading = { version = "*", path = "../ina-threading/" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"

@@ -72,6 +72,9 @@ pub enum Error {
     /// An error from communicating with a thread.
     #[error(transparent)]
     Thread(#[from] ina_threading::Error<Nonce<(State<Localizer>, Request)>>),
+    /// An error from interacting with the logging system.
+    #[error(transparent)]
+    Logging(#[from] ina_logging::Error),
 }
 
 /// A value that stores and retrieves translated text.
