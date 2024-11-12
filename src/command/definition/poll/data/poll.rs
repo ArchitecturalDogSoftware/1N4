@@ -14,18 +14,28 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroU64;
+use std::fmt::Write;
+use std::num::{NonZeroU16, NonZeroU64};
 
+use anyhow::Result;
+use ina_localizing::locale::Locale;
+use ina_localizing::localize;
 use ina_macro::{AsTranslation, Stored};
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime};
+use twilight_model::channel::message::Embed;
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, UserMarker};
+use twilight_util::builder::embed::{EmbedBuilder, ImageSource};
 
 use super::input::PollInput;
 use super::response::PollResponse;
+use crate::command::definition::poll::data::input::{
+    HybridInputData, MultipleChoiceInputData, OpenResponseInputData, RaffleInputData,
+};
 use crate::utility::category;
+use crate::utility::traits::convert::AsTranslation;
 
 /// A poll's type.
 #[non_exhaustive]
@@ -35,20 +45,19 @@ use crate::utility::category;
 #[localizer_category(category::UI)]
 pub enum PollType {
     /// A multiple-choice poll.
-    #[localizer_key("multiple-choice")]
+    #[localizer_key("poll-multiple-choice")]
     MultipleChoice,
     /// An open-response poll.
-    #[localizer_key("open-response")]
+    #[localizer_key("poll-open-response")]
     OpenResponse,
     /// A multiple-choice poll with an open-ended option.
-    #[localizer_key("hybrid")]
+    #[localizer_key("poll-hybrid")]
     Hybrid,
     /// A raffle poll.
-    #[localizer_key("raffle")]
+    #[localizer_key("poll-raffle")]
     Raffle,
 }
 
-#[expect(dead_code, reason = "polls are currently a work-in-progress")]
 impl PollType {
     /// Returns the emoji that represents this poll type.
     pub const fn emoji(self) -> char {
@@ -78,12 +87,90 @@ pub struct PollBuilder {
     pub title: Box<str>,
     /// The poll's description.
     pub description: Option<Box<str>>,
+    /// The poll's image URL.
+    pub image_url: Option<Box<str>>,
 
     /// The poll's submission period duration.
-    pub duration: NonZeroU64,
+    pub duration: NonZeroU16,
 
     /// The poll's inputs.
     pub inputs: Vec<PollInput>,
+}
+
+impl PollBuilder {
+    pub async fn build_preview(&self, locale: Option<Locale>) -> Result<Embed> {
+        macro_rules! field {
+            ($content:expr, $locale:expr, $key:literal, $value:expr) => {{
+                let key = localize!(async(try in $locale) category::UI, $key).await?;
+
+                writeln!(&mut $content, "**{key}:** {}", $value)?;
+            }};
+        }
+
+        let embed_title = localize!(async(try in locale) category::UI, "poll-builder-title").await?;
+        let mut builder = EmbedBuilder::new().title(embed_title);
+        let mut content = String::new();
+
+        field!(&mut content, locale, "poll-builder-title-field", self.title);
+        field!(
+            &mut content,
+            locale,
+            "poll-builder-type-field",
+            format_args!("{} {}", self.kind.emoji(), self.kind.as_translation(locale).await?)
+        );
+        field!(&mut content, locale, "poll-builder-duration-field", {
+            let minutes = f64::from(self.duration.get());
+
+            let (time, unit) = if minutes < 60.0 {
+                (minutes, localize!(async(try in locale) category::UI, "unit-minutes").await?)
+            } else if minutes < 60.0 * 60.0 {
+                (minutes / 60.0, localize!(async(try in locale) category::UI, "unit-hours").await?)
+            } else {
+                (minutes / (60.0 * 60.0), localize!(async(try in locale) category::UI, "unit-days").await?)
+            };
+
+            format!("{time} {unit}")
+        });
+
+        if let Some(description) = self.description.as_deref() {
+            field!(
+                &mut content,
+                locale,
+                "poll-builder-description-field",
+                format_args!("\n>>> {}", description.replace('\n', "\n>>> "))
+            );
+        }
+
+        if !self.inputs.is_empty() {
+            field!(&mut content, locale, "poll-builder-inputs-field", "\n");
+
+            for input in &self.inputs {
+                write!(&mut content, "- ")?;
+
+                match input {
+                    PollInput::MultipleChoice(MultipleChoiceInputData { name, .. })
+                    | PollInput::OpenResponse(OpenResponseInputData { name, .. })
+                    | PollInput::Hybrid(
+                        HybridInputData::MultipleChoice(MultipleChoiceInputData { name, .. })
+                        | HybridInputData::OpenResponse(OpenResponseInputData { name, .. }),
+                    ) => {
+                        writeln!(&mut content, "{name}")?;
+                    }
+                    PollInput::Raffle(RaffleInputData { winners }) => {
+                        let text = localize!(async(try in locale) category::UI, "poll-builder-winners-field").await?;
+
+                        writeln!(&mut content, "{winners} {text}")?;
+                    }
+                }
+            }
+        }
+
+        if let Some(image_url) = self.image_url.as_deref() {
+            builder = builder.image(ImageSource::url(image_url)?);
+        }
+
+        builder.description(content).validate().map(EmbedBuilder::build).map_err(Into::into)
+    }
 }
 
 /// Tracks an active poll's state.
@@ -105,7 +192,7 @@ pub struct PollState {
     pub description: Option<Box<str>>,
 
     /// The poll's submission period duration.
-    pub duration: NonZeroU64,
+    pub duration: NonZeroU16,
     /// The poll's starting time.
     pub start_time: OffsetDateTime,
     /// The poll's expected ending time.

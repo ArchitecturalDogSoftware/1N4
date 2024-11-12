@@ -30,6 +30,15 @@ localizer-category-description = "The translation category."
 localizer-key-name = "key"
 localizer-key-description = "The translation key."
 
+poll-create-name = "create"
+poll-create-description = "Create a new poll"
+poll-type-name = "type"
+poll-type-description = "The poll's type."
+poll-duration-name = "duration"
+poll-duration-description = "The poll's duration in minutes."
+poll-close-name = "close"
+poll-close-description = "Close your active poll early, or discard your work-in-progress poll."
+
 role-create-name = "create"
 role-create-description = "Create a new role selector."
 role-role-name = "role"
@@ -49,6 +58,11 @@ echo-format-binary = "Binary (0-1)"
 echo-format-octal = "Octal (0-7)"
 echo-format-decimal = "Decimal (0-9)"
 echo-format-hexadecimal = "Hexadecimal (0-F)"
+
+poll-type-multiple-choice = "Multiple Choice"
+poll-type-open-response = "Open Response"
+poll-type-hybrid = "Multiple Choice with Open Response"
+poll-type-raffle = "Raffle"
 
 [ui]
 error-inform-title = "An error has occurred."
@@ -96,6 +110,8 @@ localizer-unknown = "Unknown locale"
 ping-start = "Calculating..."
 ping-finish = "Operation successful!"
 
+poll-create-title = "Create a new poll"
+
 role-load-failed = "Failed to load list of role selectors."
 role-load-missing = "You have not added any role selectors."
 
@@ -111,3 +127,8 @@ role-remove-emptied = "All role selectors were removed."
 role-remove-missing = "The selected role was already removed."
 
 role-finished = "Finished role selectors."
+
+[ui-input]
+poll-create-title = "Title"
+poll-create-image = "Image URL"
+poll-create-description = "Body text"
