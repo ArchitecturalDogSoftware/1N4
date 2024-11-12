@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Write;
-use std::num::{NonZeroU16, NonZeroU64};
+use std::num::NonZeroU16;
 
 use anyhow::Result;
 use ina_localizing::locale::Locale;
@@ -23,7 +23,7 @@ use ina_localizing::localize;
 use ina_macro::{AsTranslation, Stored};
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 use twilight_model::channel::message::Embed;
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, UserMarker};

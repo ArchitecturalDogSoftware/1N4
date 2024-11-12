@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::{NonZeroU16, NonZeroU64};
+use std::num::NonZeroU16;
 
 use anyhow::bail;
 use data::poll::{PollBuilder, PollType};
