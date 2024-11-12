@@ -230,6 +230,20 @@ pub fn blocking_setup() -> Result<()> {
     Ok(())
 }
 
+/// Returns whether the thread has been started.
+pub async fn is_started() -> bool {
+    THREAD.async_api().has().await
+}
+
+/// Returns whether the thread has been started.
+///
+/// # Panics
+///
+/// Panics if this is called in an asynchronous context.
+pub fn blocking_is_started() -> bool {
+    THREAD.sync_api().has()
+}
+
 /// Closes the logging thread.
 ///
 /// # Panics
