@@ -25,6 +25,7 @@ use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::channel::message::component::TextInputStyle;
 use twilight_model::guild::Permissions;
+use twilight_util::builder::embed::ImageSource;
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
@@ -123,11 +124,14 @@ async fn on_create_command<'ap: 'ev, 'ev>(
         .required(true),
     )?;
 
-    modal.input(TextInputBuilder::new(
-        CustomId::<Box<str>>::new(entry.name, "image_url")?.to_string(),
-        localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?.to_string(),
-        TextInputStyle::Short,
-    )?)?;
+    modal.input(
+        TextInputBuilder::new(
+            CustomId::<Box<str>>::new(entry.name, "image_url")?.to_string(),
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?.to_string(),
+            TextInputStyle::Short,
+        )?
+        .required(false),
+    )?;
 
     modal.input(
         TextInputBuilder::new(
@@ -135,7 +139,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
             localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?.to_string(),
             TextInputStyle::Paragraph,
         )?
-        .max_length(2048)?,
+        .max_length(2048)?
+        .required(false),
     )?;
 
     context.modal(modal.build()?).await?;
@@ -183,6 +188,14 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
     let Some(title) = resolver.get(CustomId::<Box<str>>::new(event.name, "title")?.to_string())? else {
         bail!("failed to resolve poll title");
     };
+
+    if let Some(Err(error)) = image_url.map(ImageSource::url) {
+        let error_title = localize!(async(try in locale) category::UI, "poll-invalid-url").await?;
+
+        context.failure(error_title, Some(format!("> {error}"))).await?;
+
+        return crate::client::event::pass();
+    }
 
     let poll = PollBuilder {
         user_id,
