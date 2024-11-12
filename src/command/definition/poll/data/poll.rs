@@ -123,22 +123,17 @@ impl PollBuilder {
 
             let (time, unit) = if minutes < 60.0 {
                 (minutes, localize!(async(try in locale) category::UI, "unit-minutes").await?)
-            } else if minutes < 60.0 * 60.0 {
+            } else if minutes < 60.0 * 24.0 {
                 (minutes / 60.0, localize!(async(try in locale) category::UI, "unit-hours").await?)
             } else {
-                (minutes / (60.0 * 60.0), localize!(async(try in locale) category::UI, "unit-days").await?)
+                (minutes / (60.0 * 24.0), localize!(async(try in locale) category::UI, "unit-days").await?)
             };
 
-            format!("{time} {unit}")
+            format!("{time:.1} {unit}")
         });
 
         if let Some(description) = self.description.as_deref() {
-            field!(
-                &mut content,
-                locale,
-                "poll-builder-description-field",
-                format_args!("\n>>> {}", description.replace('\n', "\n>>> "))
-            );
+            field!(&mut content, locale, "poll-builder-description-field", format_args!("\n>>> {}", description));
         }
 
         if !self.inputs.is_empty() {
