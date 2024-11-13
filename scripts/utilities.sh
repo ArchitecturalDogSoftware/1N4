@@ -31,8 +31,11 @@ print_help_argument() {
     local description="$2"
     local arguments
 
-    # If `$3` is non-empty, fill in an argument listing.
-    ([ -n "$3" ] && arguments=" [$3]\t") || arguments='\t\t'
+    if [ -n "$3" ]; then
+        arguments=" [$3]\t"
+    else
+        arguments="\t\t"
+    fi
 
     echo -e "$flag$arguments$description"
 }
@@ -64,10 +67,12 @@ eval_step() {
     echo -n ' '
 
     # Exit early, printing the command output if it failed.
-    ([ $code -ne 0 ] && {
+    if [ $code -ne 0 ]; then
         echo -e "Failed!\n$output"
         exit $code
-    }) || echo 'Done!' # Otherwise, silently pass.
+    else
+        echo 'Done!'
+    fi
 }
 
 # Usage:
@@ -77,16 +82,20 @@ eval_step() {
 cancel_execution() {
     declare -i code
 
-    # Assign the code to the first argument if it is a number.
-    ([[ "$1" =~ ^-?[0-9]+$ ]] && {
+    if [[ "$1" =~ ^-?[0-9]+$ ]]; then
         code=$1
         shift 1
-    }) || code=1 # Or set it to 1 as a default, assuming an error.
+    else
+        code=1
+    fi
 
     declare -i stream
 
-    # Use stdout if `code` is 0, otherwise use stderr.
-    ([ $code -eq 0 ] && stream=1) || stream=0
+    if [ $code -eq 0 ]; then
+        stream=1
+    else
+        stream=2
+    fi
 
     echo -e "$*" >&$stream
 

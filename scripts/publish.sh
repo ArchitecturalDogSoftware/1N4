@@ -15,11 +15,11 @@
 source "$(dirname "$0")/utilities.sh"
 
 declare -r script_name='publish'
-declare -r script_version='0.2.0'
+declare -r script_version='0.3.0'
 
 declare -r binary_dir="$PWD/bin"
-declare -r target_dir="$PWD/target/release"
-declare -r executable="$target_dir/ina"
+declare target_dir="$PWD/target/release"
+declare executable="$target_dir/ina"
 declare -r checksums="$binary_dir/checksums"
 declare target_triple executable_version
 declare -i clean_build clean_cache super_optimized
@@ -34,9 +34,9 @@ function print_help() {
     print_help_argument 'p' 'Use a build profile that optimizes for performance'
 }
 
-[ -d "$PWD"/.git ] || {
+if [ ! -d "$PWD"/.git ]; then 
     cancel_execution "This script must be run within the project's root directory"
-}
+fi
 
 while getopts 'hvcCt:p' argument; do
     case $argument in
@@ -52,34 +52,40 @@ done
 
 echo -e 'Publishing executable\n'
 
-[ -z "$target_triple" ] && {
+if [ -z "$target_triple" ]; then
     target_triple="$(rustup target list | grep 'installed')"
     target_triple="${target_triple%' (installed)'}"
-}
+fi
 
-[ $clean_build ] && {
+if [ $clean_build ]; then
     eval_step 'Cleaning build directory' 'cargo clean'
-}
-[ $clean_cache ] && {
-    eval_step 'Cleaning Cargo cache' 'cargo cache -r all'
-}
+fi
 
-unset clean_build clean_cache
+unset clean_build
+
+if [ $clean_cache ]; then
+    eval_step 'Cleaning Cargo cache' 'cargo cache -r all'
+fi
+
+unset clean_cache
 
 if [ $super_optimized ]; then
     eval_step 'Compiling optimized executable' 'cargo build --profile=release-super-optimized'
+
+    target_dir="$PWD/target/release-super-optimized"
+    executable="$target_dir/ina"
 else
     eval_step 'Compiling executable' 'cargo build --release'
 fi
 
 unset super_optimized
 
-[ -d "$binary_dir" ] || {
+if [ ! -d "$binary_dir" ]; then
     eval_step 'Creating binary directory' "mkdir -p '$binary_dir' || or_cancel_execution 'Failed to create binary directory'"
-}
-[ -z "$(ls -A "$binary_dir")" ] || {
+fi
+if [ -n "$(ls -A "$binary_dir")" ]; then
     eval_step 'Clearing binary directory' "rm --interactive=once '$binary_dir'/*"
-}
+fi
 
 executable_version="$(eval "$executable -V" | sed 's/ina //')"
 
