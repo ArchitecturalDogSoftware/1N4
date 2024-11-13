@@ -68,7 +68,7 @@ crate::define_entry!("poll", CommandType::ChatInput, struct {
         duration: Integer {
             required: true,
             minimum: 1,
-            maximum: 10080,
+            maximum: 60 * 24 * 7,
         },
     },
     close: SubCommand {},
@@ -139,7 +139,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
             localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?.to_string(),
             TextInputStyle::Paragraph,
         )?
-        .max_length(2048)?
+        .max_length(4096)?
         .required(false),
     )?;
 
