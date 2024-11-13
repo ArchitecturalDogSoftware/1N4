@@ -75,3 +75,4 @@ twilight-http = { git = "https://github.com/twilight-rs/twilight" }
 twilight-mention = { git = "https://github.com/twilight-rs/twilight" }
 twilight-model = { git = "https://github.com/twilight-rs/twilight" }
 twilight-util = { git = "https://github.com/twilight-rs/twilight", features = ["full"] }
+twilight-validate = { git = "https://github.com/twilight-rs/twilight" }
