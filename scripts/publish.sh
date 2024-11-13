@@ -22,7 +22,7 @@ declare -r target_dir="$PWD/target/release"
 declare -r executable="$target_dir/ina"
 declare -r checksums="$binary_dir/checksums"
 declare target_triple executable_version
-declare -i clean_build clean_cache
+declare -i clean_build clean_cache super_optimized
 
 function print_help() {
     print_help_header "$script_name" "$script_version" '[arguments]'
@@ -31,19 +31,21 @@ function print_help() {
     print_help_argument 'c' 'Cleans the build directory before compiling'
     print_help_argument 'C' 'Cleans the Cargo cache before compiling'
     print_help_argument 't' 'Override the target triple appended to the finished binary name.'
+    print_help_argument 'p' 'Use a build profile that optimizes for performance'
 }
 
 [ -d "$PWD"/.git ] || {
     cancel_execution "This script must be run within the project's root directory"
 }
 
-while getopts 'hvcCt:' argument; do
+while getopts 'hvcCt:p' argument; do
     case $argument in
         h) print_help; exit 0;;
         v) print_version "$script_name" "$script_version"; exit 0;;
         t) target_triple="$OPTARG";;
         c) clean_build=1;;
         C) clean_cache=1;;
+        p) super_optimized=1;;
         *) print_help; exit 1;;
     esac
 done
@@ -64,7 +66,13 @@ echo -e 'Publishing executable\n'
 
 unset clean_build clean_cache
 
-eval_step 'Compiling executable' 'cargo build --release'
+if [ $super_optimized ]; then
+    eval_step 'Compiling optimized executable' 'cargo build --profile=release-super-optimized'
+else
+    eval_step 'Compiling executable' 'cargo build --release'
+fi
+
+unset super_optimized
 
 [ -d "$binary_dir" ] || {
     eval_step 'Creating binary directory' "mkdir -p '$binary_dir' || or_cancel_execution 'Failed to create binary directory'"
