@@ -49,6 +49,21 @@ pub enum PollInput {
     Raffle(RaffleInputData),
 }
 
+impl PollInput {
+    /// Returns the label of this [`PollInput`].
+    pub const fn label(&self) -> Option<&str> {
+        match self {
+            Self::Raffle(RaffleInputData { .. }) => None,
+            Self::MultipleChoice(MultipleChoiceInputData { name, .. })
+            | Self::OpenResponse(OpenResponseInputData { name, .. })
+            | Self::Hybrid(
+                HybridInputData::OpenResponse(OpenResponseInputData { name, .. })
+                | HybridInputData::MultipleChoice(MultipleChoiceInputData { name, .. }),
+            ) => Some(name),
+        }
+    }
+}
+
 /// Defines multiple choice input data.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MultipleChoiceInputData {
