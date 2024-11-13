@@ -176,13 +176,7 @@ pub fn procedure_struct(
         impl #impl_generics crate::utility::traits::convert::AsTranslation for #identifier #type_generics
         #where_clause
         {
-            type Error = ::ina_localization::Error<(
-                ::std::option::Option<::std::primitive::usize>,
-                (
-                    ::std::sync::Arc<::tokio::sync::RwLock<::ina_localization::Localizer>>,
-                    ::ina_localization::thread::Request,
-                ),
-            )>;
+            type Error = ::ina_localizing::Error;
 
             fn localizer_category(&self) -> impl ::std::convert::Into<::std::boxed::Box<::std::primitive::str>> {
                 #category
