@@ -29,6 +29,8 @@ crate::define_categories! {
     COMMAND_OPTION => "command-option";
     COMMAND_CHOICE => "command-choice";
 
+    UNIT => "unit";
+
     UI => "ui";
     UI_BUTTON => "ui-button";
     UI_SELECT => "ui-select";
@@ -67,6 +69,8 @@ pub mod types {
     pub mod anchor;
     /// Provides various builders for model types.
     pub mod builder;
+    /// Provides a definition for colors.
+    pub mod color;
     /// A type that defines custom identifiers.
     pub mod id;
     /// A type that defines modal data.
