@@ -213,7 +213,7 @@ impl Poll {
         locale: Option<Locale>,
         page: Option<usize>,
     ) -> Result<Box<[Component]>> {
-        let mut components: Box<dyn Stream<Item = Result<Component>> + Unpin> = match &self.state {
+        let mut components: Box<dyn Stream<Item = Result<Component>> + Send + Unpin> = match &self.state {
             PollState::Builder { .. } => Box::from(self.build_components_for_builder(entry, locale)),
             PollState::Running { .. } => todo!(),
             PollState::Archive { .. } => todo!(),
@@ -228,7 +228,7 @@ impl Poll {
         &'pl self,
         entry: &'pl CommandEntry,
         locale: Option<Locale>,
-    ) -> impl Stream<Item = Result<Component>> + Unpin + 'pl {
+    ) -> impl Stream<Item = Result<Component>> + Unpin + Send + 'pl {
         #[inline]
         async fn button(
             this: &Poll,
