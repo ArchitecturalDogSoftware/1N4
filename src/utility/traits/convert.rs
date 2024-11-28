@@ -15,7 +15,6 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::convert::Infallible;
-use std::future::Future;
 use std::ops::Deref;
 use std::str::FromStr;
 
@@ -397,7 +396,7 @@ impl AsImageSource for EmojiReactionType {
 
                 format!("{DISCORD_CDN_URL}/emojis/{id}.{extension}")
             }
-            Self::Unicode { ref name } => {
+            Self::Unicode { name } => {
                 // Each file is encoded as hex numbers separated by hyphens. Some examples:
                 // - `.../1f3f3-fe0f-200d-26a7-fe0f.png` for the transgender flag.
                 // - `.../1f577-fe0f-fe0f` for the spider emoji.

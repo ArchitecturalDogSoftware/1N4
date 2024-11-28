@@ -83,7 +83,7 @@ impl<'ev> CommandOptionResolver<'ev> {
         let name = name.as_ref();
 
         match self.any(name)? {
-            CommandOptionValue::SubCommand(ref options) => Ok(Self::with_options(self.data, options)),
+            CommandOptionValue::SubCommand(options) => Ok(Self::with_options(self.data, options)),
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommand, other.kind())),
         }
     }
@@ -99,7 +99,7 @@ impl<'ev> CommandOptionResolver<'ev> {
         let name = name.as_ref();
 
         match self.any(name)? {
-            CommandOptionValue::SubCommandGroup(ref options) => Ok(Self::with_options(self.data, options)),
+            CommandOptionValue::SubCommandGroup(options) => Ok(Self::with_options(self.data, options)),
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommandGroup, other.kind())),
         }
     }
@@ -113,7 +113,7 @@ macro_rules! command_option_resolver_getters {
                 let name = name.as_ref();
 
                 match self.any(name)? {
-                    CommandOptionValue::$type(ref value) => Ok(value),
+                    CommandOptionValue::$type(value) => Ok(value),
                     other => Err(Error::InvalidOption(name.into(), CommandOptionType::$type, other.kind())),
                 }
             }

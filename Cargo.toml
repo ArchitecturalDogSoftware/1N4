@@ -17,7 +17,7 @@ repository.workspace = true
 members = ["lib/ina-*"]
 resolver = "2"
 
-package.edition = "2021"
+package.edition = "2024"
 package.license = "AGPL-3.0-or-later"
 package.publish = false
 package.repository = "https://github.com/ArchitecturalDogSoftware/1N4"
