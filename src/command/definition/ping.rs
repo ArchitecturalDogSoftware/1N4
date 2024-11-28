@@ -16,6 +16,7 @@
 
 use ina_localizing::localize;
 use twilight_model::application::command::CommandType;
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
 
@@ -27,7 +28,7 @@ use crate::utility::traits::extension::IdExt;
 use crate::utility::{category, color};
 
 crate::define_entry!("ping", CommandType::ChatInput, struct {
-    allow_dms: true,
+    contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
 }, struct {
     command: on_command,
 }, struct {});

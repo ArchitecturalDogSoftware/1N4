@@ -23,6 +23,7 @@ use ina_logging::{info, warn};
 use twilight_model::application::command::{
     CommandOptionChoice, CommandOptionChoiceValue, CommandOptionType, CommandType,
 };
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_util::builder::embed::EmbedBuilder;
 
@@ -36,6 +37,7 @@ use crate::utility::{category, color};
 
 crate::define_entry!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
+    contexts: [InteractionContextType::Guild],
 }, struct {
     command: on_command,
     autocomplete: on_autocomplete,

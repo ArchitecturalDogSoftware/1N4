@@ -21,6 +21,7 @@ use data::poll::{PollBuilder, PollType};
 use ina_localizing::localize;
 use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
 use twilight_model::channel::message::component::TextInputStyle;
@@ -48,7 +49,7 @@ mod data {
 }
 
 crate::define_entry!("poll", CommandType::ChatInput, struct {
-    allow_dms: false,
+    contexts: [InteractionContextType::Guild],
     permissions: Permissions::SEND_POLLS,
 }, struct {
     command: on_command,

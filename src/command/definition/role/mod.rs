@@ -19,6 +19,7 @@ use data::{Selector, SelectorList};
 use ina_localizing::localize;
 use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::id::Id;
@@ -36,7 +37,7 @@ use crate::utility::types::id::CustomId;
 mod data;
 
 crate::define_entry!("role", CommandType::ChatInput, struct {
-    allow_dms: false,
+    contexts: [InteractionContextType::Guild],
 }, struct {
     command: on_command,
     component: on_component,
