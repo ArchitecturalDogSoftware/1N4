@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::fmt::Write;
 use std::num::NonZeroU16;
 
 use anyhow::{Result, bail};
@@ -35,9 +34,6 @@ use twilight_validate::embed::FIELD_VALUE_LENGTH;
 
 use super::input::PollInput;
 use super::response::PollResponse;
-use crate::command::definition::poll::data::input::{
-    HybridInputData, MultipleChoiceInputData, OpenResponseInputData, RaffleInputData,
-};
 use crate::command::registry::CommandEntry;
 use crate::utility::category;
 use crate::utility::traits::convert::{AsEmoji, AsTranslation};
@@ -79,6 +75,7 @@ impl PollType {
 
 /// A poll.
 #[non_exhaustive]
+#[expect(clippy::unsafe_derive_deserialize, reason = "false positive from async stream macro expansion")]
 #[derive(Clone, Debug, Serialize, Deserialize, Stored)]
 #[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
 #[data_path(fmt = "poll/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
@@ -116,7 +113,7 @@ impl Poll {
         user: &User,
         page: Option<usize>,
     ) -> Result<(Embed, Box<[Component]>)> {
-        Ok((self.build_embed(entry, locale, user, page).await?, self.build_components(entry, locale, page).await?))
+        Ok((self.build_embed(locale, user).await?, self.build_components(entry, locale, page).await?))
     }
 
     /// Builds the poll's embed, which represents its current state.
@@ -124,13 +121,7 @@ impl Poll {
     /// # Errors
     ///
     /// This function will return an error if the poll's embed could not be built.
-    async fn build_embed(
-        &self,
-        entry: &CommandEntry,
-        locale: Option<Locale>,
-        user: &User,
-        page: Option<usize>,
-    ) -> Result<Embed> {
+    async fn build_embed(&self, locale: Option<Locale>, user: &User) -> Result<Embed> {
         match &self.state {
             PollState::Builder { .. } => self.build_embed_for_builder(locale, user).await,
             PollState::Running { .. } => todo!(),
@@ -219,9 +210,13 @@ impl Poll {
             PollState::Archive { .. } => todo!(),
         };
 
-        while let Some(component) = components.try_next().await? {}
+        let mut collection = Vec::with_capacity(components.size_hint().0);
 
-        todo!()
+        while let Some(component) = components.try_next().await? {
+            collection.push(component);
+        }
+
+        Ok(collection.into_boxed_slice())
     }
 
     fn build_components_for_builder<'pl>(
@@ -283,102 +278,4 @@ pub enum PollState {
         /// The poll's responses.
         responses: Box<[PollResponse]>,
     },
-}
-
-/// Builds a poll.
-#[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Stored)]
-#[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
-#[data_path(fmt = "poll/builder/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
-pub struct PollBuilder {
-    /// The identifier of the poll author.
-    pub user_id: Id<UserMarker>,
-    /// The identifier of the poll guild.
-    pub guild_id: Id<GuildMarker>,
-
-    /// The poll's type.
-    pub kind: PollType,
-    /// The poll's title.
-    pub title: Box<str>,
-    /// The poll's description.
-    pub description: Option<Box<str>>,
-    /// The poll's image URL.
-    pub image_url: Option<Box<str>>,
-
-    /// The poll's submission period duration in minutes.
-    pub duration: NonZeroU16,
-
-    /// The poll's inputs.
-    pub inputs: Vec<PollInput>,
-}
-
-impl PollBuilder {
-    pub async fn build_preview(&self, locale: Option<Locale>) -> Result<Embed> {
-        macro_rules! field {
-            ($content:expr, $locale:expr, $key:literal, $value:expr) => {{
-                let key = localize!(async(try in $locale) category::UI, $key).await?;
-
-                writeln!(&mut $content, "**{key}:** {}", $value)?;
-            }};
-        }
-
-        let embed_title = localize!(async(try in locale) category::UI, "poll-builder-title").await?;
-        let mut builder = EmbedBuilder::new().title(embed_title);
-        let mut content = String::new();
-
-        field!(&mut content, locale, "poll-builder-title-field", self.title);
-        field!(
-            &mut content,
-            locale,
-            "poll-builder-type-field",
-            format_args!("{} {}", self.kind.emoji(), self.kind.as_translation(locale).await?)
-        );
-        field!(&mut content, locale, "poll-builder-duration-field", {
-            let minutes = f64::from(self.duration.get());
-
-            let (time, unit) = if minutes < 60.0 {
-                (minutes, localize!(async(try in locale) category::UI, "unit-minutes").await?)
-            } else if minutes < 60.0 * 24.0 {
-                (minutes / 60.0, localize!(async(try in locale) category::UI, "unit-hours").await?)
-            } else {
-                (minutes / (60.0 * 24.0), localize!(async(try in locale) category::UI, "unit-days").await?)
-            };
-
-            format!("{time:.1} {unit}")
-        });
-
-        if let Some(description) = self.description.as_deref() {
-            field!(&mut content, locale, "poll-builder-description-field", format_args!("\n>>> {}", description));
-        }
-
-        if !self.inputs.is_empty() {
-            field!(&mut content, locale, "poll-builder-inputs-field", "\n");
-
-            for input in &self.inputs {
-                write!(&mut content, "- ")?;
-
-                match input {
-                    PollInput::MultipleChoice(MultipleChoiceInputData { name, .. })
-                    | PollInput::OpenResponse(OpenResponseInputData { name, .. })
-                    | PollInput::Hybrid(
-                        HybridInputData::MultipleChoice(MultipleChoiceInputData { name, .. })
-                        | HybridInputData::OpenResponse(OpenResponseInputData { name, .. }),
-                    ) => {
-                        writeln!(&mut content, "{name}")?;
-                    }
-                    PollInput::Raffle(RaffleInputData { winners }) => {
-                        let text = localize!(async(try in locale) category::UI, "poll-builder-winners-field").await?;
-
-                        writeln!(&mut content, "{winners} {text}")?;
-                    }
-                }
-            }
-        }
-
-        if let Some(image_url) = self.image_url.as_deref() {
-            builder = builder.image(ImageSource::url(image_url)?);
-        }
-
-        builder.description(content).validate().map(EmbedBuilder::build).map_err(Into::into)
-    }
 }
