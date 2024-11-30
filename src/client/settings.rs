@@ -43,6 +43,11 @@ pub struct Settings {
     #[arg(short = 'r', long = "reshard-interval", default_value = "8")]
     #[serde(default = "default_reshard_interval")]
     pub reshard_interval: NonZeroU64,
+
+    /// Whether to skip command patching on bot startup.
+    #[arg(long = "skip-command-patching")]
+    #[serde(default)]
+    pub skip_command_patch: bool,
 }
 
 /// Returns the default status file location.

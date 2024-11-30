@@ -107,8 +107,6 @@ pub struct Instance {
     api: Api,
     /// The bot instance's created shards.
     shards: Box<[Shard]>,
-    /// The bot instance's settings.
-    settings: Settings,
     /// The bot's configured status list.
     status: Option<StatusList>,
 }
@@ -129,7 +127,7 @@ impl Instance {
         let config = Self::new_config(discord_token.to_string(), status.as_ref())?;
         let shards = Self::new_shards(&client, config, &settings).await?;
 
-        Ok(Self { api: Api::new(client), shards, settings, status })
+        Ok(Self { api: Api::new(settings, client), shards, status })
     }
 
     /// Creates a new [`StatusList`], returning [`None`] if a file could not be found.
@@ -294,11 +292,11 @@ impl Instance {
                 tasks.spawn(Self::run_shard(self.api.clone(), shard));
             }
 
-            let shards = Self::try_reshard(&self.api.client, &self.settings, self.status.as_ref());
+            let shards = Self::try_reshard(&self.api.client, &self.api.settings, self.status.as_ref());
 
             tokio::pin!(shards);
 
-            let duration = Duration::from_secs(self.settings.status_interval.get().saturating_mul(60));
+            let duration = Duration::from_secs(self.api.settings.status_interval.get().saturating_mul(60));
             let mut status_interval = tokio::time::interval_at((Instant::now() + duration).into(), duration);
 
             loop {

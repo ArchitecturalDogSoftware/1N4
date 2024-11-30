@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::backtrace::BacktraceStatus;
+
 use anyhow::bail;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
@@ -22,8 +24,10 @@ use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, Ready};
+use twilight_model::http::attachment::Attachment;
 use twilight_model::http::interaction::InteractionResponseType;
 use twilight_util::builder::embed::EmbedBuilder;
+use twilight_validate::embed::DESCRIPTION_LENGTH;
 
 use super::api::{Api, ApiRef};
 use crate::command::context::Context;
@@ -134,6 +138,12 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
     }
 
     crate::command::registry::initialize().await?;
+
+    if api.settings.skip_command_patch {
+        info!(async "skipping command patching").await?;
+
+        return self::pass();
+    }
 
     let client = api.client.interaction(event.application.id);
 
@@ -310,6 +320,12 @@ pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Erro
 ///
 /// This function will return an error if the channel could not be notified.
 pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
+    const PREFIX: &str = "```json\n";
+    const ELLIPSES: &str = "...";
+    const SUFFIX: &str = "\n```";
+
+    const MAX_DESCRIPTION_LENGTH: usize = DESCRIPTION_LENGTH - PREFIX.len() - SUFFIX.len();
+
     let Ok(channel_id) = crate::utility::secret::development_channel_id() else {
         warn!(async "skipping channel error notification as no channel has been configured").await?;
 
@@ -319,15 +335,45 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
     let titles = localize!(async category::UI, "error-titles").await?.to_string();
     let titles = titles.lines().collect::<Box<[_]>>();
     let index = thread_rng().gen_range(0 .. titles.len());
-    let error = format!("`{}`\n\n```json\n{error}\n```", event.display_label());
 
-    let mut embed = EmbedBuilder::new().color(color::FAILURE).title(titles[index]).description(error);
+    let header = format!("`{}`\n\n", event.display_label());
+    let mut description = error.to_string();
+
+    if description.len() > MAX_DESCRIPTION_LENGTH - header.len() {
+        description.truncate(MAX_DESCRIPTION_LENGTH - header.len() - ELLIPSES.len());
+        description += ELLIPSES;
+    }
+
+    description = format!("{header}{PREFIX}{description}{SUFFIX}");
+
+    let backtrace = (error.backtrace().status() == BacktraceStatus::Captured).then(|| {
+        let base_dirs = directories::BaseDirs::new();
+        let mut lines = error.backtrace().to_string().lines().map(str::to_string).collect::<Box<[_]>>();
+
+        if let Some(home_dir) = base_dirs.map(|v| v.home_dir().to_path_buf()) {
+            let home_dir = home_dir.to_string_lossy();
+
+            lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), "$HOME"));
+        }
+
+        lines.join("\n")
+    });
+
+    let mut embed = EmbedBuilder::new().color(color::FAILURE).title(titles[index]).description(description);
 
     if let Some(user) = event.author() {
         embed = embed.author(user.as_embed_author()?);
     }
 
-    api.client.create_message(channel_id).embeds(&[embed.build()]).flags(MessageFlags::SUPPRESS_NOTIFICATIONS).await?;
+    let builder = api.client.create_message(channel_id).flags(MessageFlags::SUPPRESS_NOTIFICATIONS);
+    let message = builder.embeds(&[embed.validate()?.build()]).await?;
+
+    if let Some(backtrace) = backtrace {
+        let attachment = Attachment::from_bytes("backtrace.txt".into(), backtrace.into_bytes(), 1);
+        let message = message.model().await?;
+
+        api.client.create_message(channel_id).reply(message.id).attachments(&[attachment]).await?;
+    }
 
     self::pass()
 }

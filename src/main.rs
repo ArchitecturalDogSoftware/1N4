@@ -59,6 +59,19 @@ pub struct Arguments {
 ///
 /// This function will return an error if the program's execution fails.
 pub fn main() -> Result<()> {
+    // Safety:
+    // The requirement here is that this is called in a single-threaded context, or while no other threads are reading
+    // from the environment while this is being set.
+    //
+    // In this case, this is the very first function being called, which means that no other threads are actively
+    // accessing any environment variables.
+    #[cfg(debug_assertions)]
+    #[expect(unsafe_code, reason = "this is safe because this is the very first function being called")]
+    unsafe {
+        // We only want to capture backtraces on debug builds, as this can have a large performance impact.
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
     let arguments = Arguments::parse();
 
     ina_logging::thread::blocking_start(arguments.log_settings.clone())?;

@@ -19,10 +19,14 @@ use std::sync::Arc;
 use twilight_cache_inmemory::DefaultInMemoryCache;
 use twilight_http::Client;
 
+use super::settings::Settings;
+
 /// Contains the HTTP API and its cache.
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub struct Api {
+    /// The bot client's settings.
+    pub settings: Arc<Settings>,
     /// The HTTP client.
     pub client: Arc<Client>,
     /// The cache.
@@ -32,14 +36,14 @@ pub struct Api {
 impl Api {
     /// Creates a new [`Api`] with an empty cache.
     #[must_use]
-    pub fn new(client: Client) -> Self {
-        Self { client: Arc::new(client), cache: Arc::new(DefaultInMemoryCache::new()) }
+    pub fn new(settings: Settings, client: Client) -> Self {
+        Self { settings: Arc::new(settings), client: Arc::new(client), cache: Arc::new(DefaultInMemoryCache::new()) }
     }
 
     /// Returns a reference to this [`Api`].
     #[must_use]
     pub const fn as_ref(&self) -> ApiRef {
-        ApiRef { client: &self.client, cache: &self.cache }
+        ApiRef { settings: &self.settings, client: &self.client, cache: &self.cache }
     }
 }
 
@@ -47,6 +51,8 @@ impl Api {
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug)]
 pub struct ApiRef<'api> {
+    /// The bot client's settings.
+    pub settings: &'api Arc<Settings>,
     /// A reference to the HTTP client.
     pub client: &'api Arc<Client>,
     /// A reference to the cache.
@@ -57,6 +63,6 @@ impl ApiRef<'_> {
     /// Returns a cloned version of this [`ApiRef`].
     #[must_use]
     pub fn into_owned(&self) -> Api {
-        Api { client: Arc::clone(self.client), cache: Arc::clone(self.cache) }
+        Api { settings: Arc::clone(self.settings), client: Arc::clone(self.client), cache: Arc::clone(self.cache) }
     }
 }
