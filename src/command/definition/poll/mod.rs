@@ -29,6 +29,7 @@ use twilight_model::channel::message::component::TextInputStyle;
 use twilight_model::guild::Permissions;
 use twilight_model::http::interaction::InteractionResponseType;
 use twilight_util::builder::embed::ImageSource;
+use twilight_validate::embed::DESCRIPTION_LENGTH;
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
@@ -139,7 +140,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
             localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?.to_string(),
             TextInputStyle::Paragraph,
         )?
-        .max_length(4096)?
+        .max_length(u16::try_from(DESCRIPTION_LENGTH / 2)?)?
         .required(false),
     )?;
 
