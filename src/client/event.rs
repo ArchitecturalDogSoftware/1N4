@@ -17,6 +17,7 @@
 use std::backtrace::BacktraceStatus;
 
 use anyhow::bail;
+use directories::BaseDirs;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
 use rand::{Rng, thread_rng};
@@ -347,16 +348,16 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
     description = format!("{header}{PREFIX}{description}{SUFFIX}");
 
     let backtrace = (error.backtrace().status() == BacktraceStatus::Captured).then(|| {
-        let base_dirs = directories::BaseDirs::new();
+        let errors = error.chain().enumerate().map(|(i, v)| format!("{} {v}", "-".repeat(i + 1))).collect::<Box<[_]>>();
         let mut lines = error.backtrace().to_string().lines().map(str::to_string).collect::<Box<[_]>>();
 
-        if let Some(home_dir) = base_dirs.map(|v| v.home_dir().to_path_buf()) {
+        if let Some(home_dir) = BaseDirs::new().map(|v| v.home_dir().to_path_buf()) {
             let home_dir = home_dir.to_string_lossy();
 
             lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), "$HOME"));
         }
 
-        lines.join("\n")
+        format!("{}\n\n{}", errors.join("\n"), lines.join("\n"))
     });
 
     let mut embed = EmbedBuilder::new().color(color::FAILURE).title(titles[index]).description(description);
