@@ -19,10 +19,10 @@ workspace = true
 default = []
 
 [dependencies]
-clap = { version = "4.5", features = ["cargo", "derive", "env"] }
-ina-logging = { version = "*", path = "../ina-logging/" }
-ina-threading = { version = "*", path = "../ina-threading/" }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "2.0"
-tokio = { version = "1.41", features = ["fs", "macros", "sync"] }
-toml = "0.8"
+clap = { workspace = true, features = ["cargo", "derive", "env"] }
+ina-logging.workspace = true
+ina-threading.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["fs", "macros", "sync"] }
+toml.workspace = true
