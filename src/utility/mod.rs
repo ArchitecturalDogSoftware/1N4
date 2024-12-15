@@ -42,19 +42,19 @@ pub mod color {
     use super::types::color::Color;
 
     /// The bot's branding color (A).
-    pub const BRANDING_A: Color = Color::u32(0x2C_8F_E5);
+    pub const BRANDING_A: Color = Color::from_u32(0x2C_8F_E5);
     /// The bot's branding color (B).
-    pub const BRANDING_B: Color = Color::u32(0xE5_82_2C);
+    pub const BRANDING_B: Color = Color::from_u32(0xE5_82_2C);
 
     /// The bot's backdrop color (A).
-    pub const BACKDROP_A: Color = Color::u32(0x1C_4A_72);
+    pub const BACKDROP_A: Color = Color::from_u32(0x1C_4A_72);
     /// The bot's backdrop color (B).
-    pub const BACKDROP_B: Color = Color::u32(0x72_44_1C);
+    pub const BACKDROP_B: Color = Color::from_u32(0x72_44_1C);
 
     /// The bot's success color.
-    pub const SUCCESS: Color = Color::u32(0x45_E0_51);
+    pub const SUCCESS: Color = Color::from_u32(0x45_E0_51);
     /// The bot's failure color.
-    pub const FAILURE: Color = Color::u32(0xDC_3F_31);
+    pub const FAILURE: Color = Color::from_u32(0xDC_3F_31);
 }
 
 /// Provides commonly-used trait definitions and blanket implementations.
