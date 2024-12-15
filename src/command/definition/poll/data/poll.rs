@@ -250,6 +250,7 @@ impl Poll {
     }
 }
 
+/// A poll's current state.
 #[non_exhaustive]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum PollState {

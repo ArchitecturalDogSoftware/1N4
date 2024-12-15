@@ -19,17 +19,26 @@
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Strictness {
     /// All parts of the string must be found within the base string.
-    Loose(bool),
+    Loose {
+        /// Whether to ignore character casing.
+        ignore_casing: bool,
+    },
     /// String must match fairly well, ignoring non-alphanumeric characters.
-    Firm(bool),
+    Firm {
+        /// Whether to ignore character casing.
+        ignore_casing: bool,
+    },
     /// String must nearly match exactly.
-    Strict(bool),
+    Strict {
+        /// Whether to ignore character casing.
+        ignore_casing: bool,
+    },
 }
 
 /// Returns whether `find` is roughly contained within `base`.
 pub fn fuzzy_contains(strictness: Strictness, base: impl AsRef<str>, find: impl AsRef<str>) -> bool {
     match strictness {
-        Strictness::Loose(ignore_casing) => {
+        Strictness::Loose { ignore_casing } => {
             let mut base = base.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
             let mut find = find.as_ref().replace(|c: char| !(c.is_alphanumeric() || c.is_whitespace()), "");
 
@@ -40,13 +49,13 @@ pub fn fuzzy_contains(strictness: Strictness, base: impl AsRef<str>, find: impl 
 
             find.trim().split(char::is_whitespace).all(|s| base.contains(s))
         }
-        Strictness::Firm(ignore_casing) => {
+        Strictness::Firm { ignore_casing } => {
             let base = base.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
             let find = find.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
 
             if ignore_casing { base.to_lowercase().contains(&find.to_lowercase()) } else { base.contains(&find) }
         }
-        Strictness::Strict(ignore_casing) => {
+        Strictness::Strict { ignore_casing } => {
             let base = base.as_ref();
             let find = find.as_ref();
 

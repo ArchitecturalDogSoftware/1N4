@@ -178,7 +178,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
 async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoice]>> {
     let mut locales = ina_localizing::thread::list().await?.to_vec();
 
-    locales.retain(|l| fuzzy_contains(Strictness::Firm(true), l.to_string(), current));
+    locales.retain(|l| fuzzy_contains(Strictness::Firm { ignore_casing: true }, l.to_string(), current));
 
     let choices = locales.iter().map(|locale| CommandOptionChoice {
         name: locale.to_string(),
@@ -198,7 +198,7 @@ fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
     let mut categories: HashSet<String> = category::LIST.iter().copied().map(Into::into).collect();
 
     if !current.is_empty() {
-        categories.retain(|c| fuzzy_contains(Strictness::Firm(true), c, current));
+        categories.retain(|c| fuzzy_contains(Strictness::Firm { ignore_casing: true }, c, current));
 
         let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
         let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());

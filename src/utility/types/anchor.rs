@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::convert::identity;
 use std::fmt::Display;
 
 use anyhow::Result;
@@ -104,7 +103,7 @@ impl Anchor {
     ///
     /// This function will return an error if the message could not be deleted.
     pub async fn delete_if_present(&mut self, api: ApiRef<'_>) -> Result<()> {
-        if self.message_exists.is_some_and(identity) || self.message(api).await.is_ok() {
+        if self.message(api).await.is_ok() {
             self.delete(api).await?;
         }
 
