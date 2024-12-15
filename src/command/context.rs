@@ -267,6 +267,34 @@ where
         self.finish(color::SUCCESS.rgb(), title, description).await
     }
 
+    /// Finishes an interaction with an embedded completion message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    pub async fn complete<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    where
+        N: Display + Send,
+        D: Display + Send,
+    {
+        self.finish(color::BRANDING_A.rgb(), title, description).await
+    }
+
+    /// Finishes an interaction with an embedded warning message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    pub async fn warning<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    where
+        N: Display + Send,
+        D: Display + Send,
+    {
+        self.finish(color::BRANDING_B.rgb(), title, description).await
+    }
+
     /// Finishes an interaction with an embedded failure message.
     ///
     /// # Errors
