@@ -360,7 +360,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
         format!("{}\n\n{}", errors.join("\n"), lines.join("\n"))
     });
 
-    let mut embed = EmbedBuilder::new().color(color::FAILURE).title(titles[index]).description(description);
+    let mut embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(titles[index]).description(description);
 
     if let Some(user) = event.author() {
         embed = embed.author(user.as_embed_author()?);
@@ -406,7 +406,7 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
     let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
     let description = localize!(async(try in locale) category::UI, "error-inform-description").await?;
     let description = format!("{description}: `{}`", event.display_label());
-    let embed = EmbedBuilder::new().color(color::FAILURE).title(title).description(description);
+    let embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(title).description(description);
 
     // Do our best to ensure that this is handled ephemerally.
     let _ = crate::create_response!(api.client, event, struct {

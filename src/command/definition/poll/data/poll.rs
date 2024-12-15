@@ -35,10 +35,10 @@ use twilight_validate::embed::FIELD_VALUE_LENGTH;
 use super::input::PollInput;
 use super::response::PollResponse;
 use crate::command::registry::CommandEntry;
-use crate::utility::category;
 use crate::utility::traits::convert::{AsEmoji, AsTranslation};
 use crate::utility::types::builder::ButtonBuilder;
 use crate::utility::types::id::CustomId;
+use crate::utility::{category, color};
 
 /// A poll's type.
 #[non_exhaustive]
@@ -153,7 +153,7 @@ impl Poll {
         if let Some(color) = user.accent_color {
             embed = embed.color(color);
         } else {
-            embed = embed.color(crate::utility::color::BRANDING_B);
+            embed = embed.color(color::BRANDING_B.rgb());
         }
 
         let type_field = EmbedFieldBuilder::new(
@@ -202,7 +202,7 @@ impl Poll {
         &self,
         entry: &CommandEntry,
         locale: Option<Locale>,
-        page: Option<usize>,
+        _page: Option<usize>,
     ) -> Result<Box<[Component]>> {
         let mut components: Box<dyn Stream<Item = Result<Component>> + Send + Unpin> = match &self.state {
             PollState::Builder { .. } => Box::from(self.build_components_for_builder(entry, locale)),

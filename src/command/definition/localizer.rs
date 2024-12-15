@@ -99,7 +99,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
     let list = list.iter().map(|l| format!("`{l}`"));
     let locales = format!("{locales}:\n> {}", list.collect::<Box<[_]>>().join(", "));
 
-    let embed = EmbedBuilder::new().title(title).color(color::SUCCESS).description(locales);
+    let embed = EmbedBuilder::new().title(title).color(color::SUCCESS.rgb()).description(locales);
 
     context.embed(embed.build(), Visibility::Ephemeral).await?;
 

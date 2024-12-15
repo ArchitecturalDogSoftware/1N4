@@ -264,7 +264,7 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::SUCCESS, title, description).await
+        self.finish(color::SUCCESS.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded failure message.
@@ -278,7 +278,7 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::FAILURE, title, description).await
+        self.finish(color::FAILURE.rgb(), title, description).await
     }
 }
 
