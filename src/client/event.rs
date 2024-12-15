@@ -203,7 +203,7 @@ pub async fn on_command(api: ApiRef<'_>, event: &Interaction) -> EventResult {
         bail!("missing command data");
     };
 
-    let registry = &registry().await;
+    let registry = registry().await;
 
     let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
@@ -226,7 +226,7 @@ pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
-    let registry = &registry().await;
+    let registry = registry().await;
 
     let Some(command) = registry.command(data_id.name()) else {
         bail!("missing command entry for '{}'", data_id.name());
@@ -249,7 +249,7 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
-    let registry = &registry().await;
+    let registry = registry().await;
 
     let Some(command) = registry.command(data_id.name()) else {
         bail!("missing command entry for '{}'", data_id.name());
@@ -271,7 +271,7 @@ pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResul
         bail!("missing command data");
     };
 
-    let registry = &registry().await;
+    let registry = registry().await;
 
     let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
