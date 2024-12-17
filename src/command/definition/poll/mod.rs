@@ -52,6 +52,8 @@ mod data {
 }
 
 crate::define_entry!("poll", CommandType::ChatInput, struct {
+    // Until this command is finished, it will only be available in the linked development server.
+    dev_only: true,
     contexts: [InteractionContextType::Guild],
     permissions: Permissions::SEND_POLLS,
 }, struct {
