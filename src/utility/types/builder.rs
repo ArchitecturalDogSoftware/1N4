@@ -22,6 +22,7 @@ use twilight_model::channel::message::component::{
 use twilight_model::channel::message::{Component, EmojiReactionType};
 use twilight_model::id::Id;
 use twilight_model::id::marker::SkuMarker;
+use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
 
 /// An error that may be returned when interacting with builders.
 #[non_exhaustive]
@@ -123,8 +124,8 @@ impl ButtonBuilder {
 
         let custom_id: String = custom_id.into();
 
-        if custom_id.len() > super::id::MAX_LENGTH {
-            return Err(Error::LimitExceeded("identifier length", custom_id.len(), super::id::MAX_LENGTH));
+        if custom_id.len() > COMPONENT_CUSTOM_ID_LENGTH {
+            return Err(Error::LimitExceeded("identifier length", custom_id.len(), COMPONENT_CUSTOM_ID_LENGTH));
         }
 
         self.0.custom_id = Some(custom_id);
@@ -241,8 +242,8 @@ impl SelectMenuBuilder {
     pub fn new(custom_id: impl Into<String>, kind: SelectMenuType) -> Result<Self, Error> {
         let custom_id: String = custom_id.into();
 
-        if custom_id.len() > super::id::MAX_LENGTH {
-            return Err(Error::LimitExceeded("identifier length", custom_id.len(), super::id::MAX_LENGTH));
+        if custom_id.len() > COMPONENT_CUSTOM_ID_LENGTH {
+            return Err(Error::LimitExceeded("identifier length", custom_id.len(), COMPONENT_CUSTOM_ID_LENGTH));
         }
 
         Ok(Self(SelectMenu {
@@ -516,8 +517,8 @@ impl TextInputBuilder {
 
         let custom_id: String = custom_id.into();
 
-        if custom_id.len() > super::id::MAX_LENGTH {
-            return Err(Error::LimitExceeded("identifier length", custom_id.len(), super::id::MAX_LENGTH));
+        if custom_id.len() > COMPONENT_CUSTOM_ID_LENGTH {
+            return Err(Error::LimitExceeded("identifier length", custom_id.len(), COMPONENT_CUSTOM_ID_LENGTH));
         }
 
         let label: String = label.into();
