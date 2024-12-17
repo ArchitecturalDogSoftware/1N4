@@ -24,6 +24,7 @@ use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::id::Id;
 use twilight_model::id::marker::RoleMarker;
+use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
@@ -124,7 +125,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
         return crate::client::event::pass();
     }
-    if selectors.inner.len() >= 25 {
+    if selectors.inner.len() >= COMPONENT_COUNT * ACTION_ROW_COMPONENT_COUNT {
         let title = localize!(async(try in locale) category::UI, "role-selector-limit").await?;
 
         context.failure(title, None::<&str>).await?;

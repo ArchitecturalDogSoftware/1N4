@@ -22,6 +22,7 @@ use twilight_model::channel::message::Component;
 use twilight_model::channel::message::component::{Button, ButtonStyle};
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
+use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
@@ -83,12 +84,12 @@ impl SelectorList {
     ///
     /// This function will return an error if a button could not be created.
     pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Box<[Component]>> {
-        let action_row_count = self.inner.len().div_ceil(5).min(5);
+        let action_row_count = self.inner.len().div_ceil(COMPONENT_COUNT).min(COMPONENT_COUNT);
         let mut action_rows = Vec::<Component>::with_capacity(action_row_count);
         let mut action_row = ActionRowBuilder::new();
 
         for (index, selector) in self.inner.iter().enumerate() {
-            if index != 0 && index % 5 == 0 {
+            if index != 0 && index % ACTION_ROW_COMPONENT_COUNT == 0 {
                 action_rows.push(action_row.build().into());
 
                 action_row = ActionRowBuilder::new();
