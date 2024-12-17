@@ -16,7 +16,9 @@
 
 use std::sync::Arc;
 
+#[cfg(feature = "file")]
 pub use self::file::*;
+#[cfg(feature = "terminal")]
 pub use self::terminal::*;
 use crate::entry::Entry;
 use crate::settings::Settings;
