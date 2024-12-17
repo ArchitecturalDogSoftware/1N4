@@ -77,7 +77,7 @@ impl Color {
         let g = (rgb & Self::G_MASK) >> Self::G_SHIFT;
         let b = (rgb & Self::B_MASK) >> Self::B_SHIFT;
 
-        Self::new(r as u8, b as u8, g as u8)
+        Self::new(r as u8, g as u8, b as u8)
     }
 
     /// Creates a new [`Color`] using the given scaled components.
