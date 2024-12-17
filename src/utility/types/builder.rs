@@ -22,7 +22,13 @@ use twilight_model::channel::message::component::{
 use twilight_model::channel::message::{Component, EmojiReactionType};
 use twilight_model::id::Id;
 use twilight_model::id::marker::SkuMarker;
-use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
+use twilight_validate::component::{
+    ACTION_ROW_COMPONENT_COUNT, COMPONENT_BUTTON_LABEL_LENGTH, COMPONENT_CUSTOM_ID_LENGTH, SELECT_MAXIMUM_VALUES_LIMIT,
+    SELECT_MAXIMUM_VALUES_REQUIREMENT, SELECT_MINIMUM_VALUES_LIMIT, SELECT_OPTION_COUNT,
+    SELECT_OPTION_DESCRIPTION_LENGTH, SELECT_OPTION_LABEL_LENGTH, SELECT_OPTION_VALUE_LENGTH,
+    SELECT_PLACEHOLDER_LENGTH, TEXT_INPUT_LABEL_MAX, TEXT_INPUT_LABEL_MIN, TEXT_INPUT_LENGTH_MAX,
+    TEXT_INPUT_LENGTH_MIN, TEXT_INPUT_PLACEHOLDER_MAX,
+};
 
 /// An error that may be returned when interacting with builders.
 #[non_exhaustive]
@@ -57,10 +63,8 @@ impl ActionRowBuilder {
     ///
     /// This function will return an error if the maximum number of permitted components is exceeded.
     pub fn component(mut self, component: impl Into<Component>) -> Result<Self, Error> {
-        const MAX_COMPONENTS: usize = 5;
-
-        if self.0.components.len() >= MAX_COMPONENTS {
-            return Err(Error::LimitExceeded("component", self.0.components.len(), MAX_COMPONENTS));
+        if self.0.components.len() >= ACTION_ROW_COMPONENT_COUNT {
+            return Err(Error::LimitExceeded("component", self.0.components.len(), ACTION_ROW_COMPONENT_COUNT));
         }
 
         self.0.components.push(component.into());
@@ -161,16 +165,14 @@ impl ButtonBuilder {
     ///
     /// This function will return an error if the label exceeds the limit.
     pub fn label(mut self, label: impl Into<String>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 80;
-
         if matches!(self.0.style, ButtonStyle::Premium) {
             return Err(Error::InvalidType("label"));
         }
 
         let label: String = label.into();
 
-        if label.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("label length", label.len(), MAX_LENGTH));
+        if label.len() > COMPONENT_BUTTON_LABEL_LENGTH {
+            return Err(Error::LimitExceeded("label length", label.len(), COMPONENT_BUTTON_LABEL_LENGTH));
         }
 
         self.0.label = Some(label);
@@ -324,14 +326,11 @@ impl SelectMenuBuilder {
     ///
     /// This function will return an error if the value is outside of the valid range.
     pub fn max_values(mut self, max: u8) -> Result<Self, Error> {
-        const MIN: u8 = 1;
-        const MAX: u8 = 25;
-
-        if max < MIN {
-            return Err(Error::LimitExceeded("value", max as usize, MIN as usize));
+        if (max as usize) < SELECT_MAXIMUM_VALUES_REQUIREMENT {
+            return Err(Error::LimitExceeded("value", max as usize, SELECT_MAXIMUM_VALUES_REQUIREMENT));
         }
-        if max > MAX {
-            return Err(Error::LimitExceeded("value", max as usize, MAX as usize));
+        if (max as usize) > SELECT_MAXIMUM_VALUES_LIMIT {
+            return Err(Error::LimitExceeded("value", max as usize, SELECT_MAXIMUM_VALUES_LIMIT));
         }
 
         self.0.max_values = Some(max);
@@ -345,14 +344,11 @@ impl SelectMenuBuilder {
     ///
     /// This function will return an error if the value is outside of the valid range.
     pub fn min_values(mut self, min: u8) -> Result<Self, Error> {
-        const MIN: u8 = 1;
-        const MAX: u8 = 25;
-
-        if min < MIN {
-            return Err(Error::LimitExceeded("value", min as usize, MIN as usize));
+        if (min as usize) < SELECT_MAXIMUM_VALUES_REQUIREMENT {
+            return Err(Error::LimitExceeded("value", min as usize, SELECT_MAXIMUM_VALUES_REQUIREMENT));
         }
-        if min > MAX {
-            return Err(Error::LimitExceeded("value", min as usize, MAX as usize));
+        if (min as usize) > SELECT_MINIMUM_VALUES_LIMIT {
+            return Err(Error::LimitExceeded("value", min as usize, SELECT_MINIMUM_VALUES_LIMIT));
         }
 
         self.0.min_values = Some(min);
@@ -367,8 +363,6 @@ impl SelectMenuBuilder {
     /// This function will return an error if this is used on a non-text selection menu, or if the total number of
     /// options exceeds the limit.
     pub fn option(mut self, option: impl Into<SelectMenuOption>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 25;
-
         if !matches!(self.0.kind, SelectMenuType::Text) {
             return Err(Error::InvalidType("option"));
         }
@@ -376,8 +370,8 @@ impl SelectMenuBuilder {
         let option: SelectMenuOption = option.into();
         let list = self.0.options.get_or_insert(Vec::with_capacity(1));
 
-        if list.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("option", list.len(), MAX_LENGTH));
+        if list.len() > SELECT_OPTION_COUNT {
+            return Err(Error::LimitExceeded("option", list.len(), SELECT_OPTION_COUNT));
         }
 
         list.push(option);
@@ -392,12 +386,10 @@ impl SelectMenuBuilder {
     ///
     /// This function will return an error if the value's length exceeds the limit.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 150;
-
         let placeholder: String = placeholder.into();
 
-        if placeholder.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("placeholder length", placeholder.len(), MAX_LENGTH));
+        if placeholder.len() > SELECT_PLACEHOLDER_LENGTH {
+            return Err(Error::LimitExceeded("placeholder length", placeholder.len(), SELECT_PLACEHOLDER_LENGTH));
         }
 
         self.0.placeholder = Some(placeholder);
@@ -437,18 +429,16 @@ impl SelectMenuOptionBuilder {
     ///
     /// This function will return an error if a value exceeds the character limit.
     pub fn new(label: impl Into<String>, value: impl Into<String>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 100;
-
         let label: String = label.into();
 
-        if label.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("label length", label.len(), MAX_LENGTH));
+        if label.len() > SELECT_OPTION_LABEL_LENGTH {
+            return Err(Error::LimitExceeded("label length", label.len(), SELECT_OPTION_LABEL_LENGTH));
         }
 
         let value: String = value.into();
 
-        if value.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("value length", value.len(), MAX_LENGTH));
+        if value.len() > SELECT_OPTION_VALUE_LENGTH {
+            return Err(Error::LimitExceeded("value length", value.len(), SELECT_OPTION_VALUE_LENGTH));
         }
 
         Ok(Self(SelectMenuOption { default: false, description: None, emoji: None, label, value }))
@@ -467,12 +457,14 @@ impl SelectMenuOptionBuilder {
     ///
     /// This function will return an error if the description exceeds the character limit.
     pub fn description(mut self, description: impl Into<String>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 100;
-
         let description: String = description.into();
 
-        if description.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("description length", description.len(), MAX_LENGTH));
+        if description.len() > SELECT_OPTION_DESCRIPTION_LENGTH {
+            return Err(Error::LimitExceeded(
+                "description length",
+                description.len(),
+                SELECT_OPTION_DESCRIPTION_LENGTH,
+            ));
         }
 
         self.0.description = Some(description);
@@ -513,8 +505,6 @@ impl TextInputBuilder {
     ///
     /// This function will return an error if a value exceeds the character limit.
     pub fn new(custom_id: impl Into<String>, label: impl Into<String>, style: TextInputStyle) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 45;
-
         let custom_id: String = custom_id.into();
 
         if custom_id.len() > COMPONENT_CUSTOM_ID_LENGTH {
@@ -523,8 +513,10 @@ impl TextInputBuilder {
 
         let label: String = label.into();
 
-        if label.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("label length", label.len(), MAX_LENGTH));
+        if label.len() < TEXT_INPUT_LABEL_MIN {
+            return Err(Error::LimitExceeded("label length", label.len(), TEXT_INPUT_LABEL_MIN));
+        } else if label.len() > TEXT_INPUT_LABEL_MAX {
+            return Err(Error::LimitExceeded("label length", label.len(), TEXT_INPUT_LABEL_MAX));
         }
 
         Ok(Self(TextInput {
@@ -545,14 +537,10 @@ impl TextInputBuilder {
     ///
     /// This function will return an error if the value is outside of the valid range.
     pub fn max_length(mut self, max: u16) -> Result<Self, Error> {
-        const MIN: u16 = 1;
-        const MAX: u16 = 4000;
-
-        if max < MIN {
-            return Err(Error::LimitExceeded("value", max as usize, MIN as usize));
-        }
-        if max > MAX {
-            return Err(Error::LimitExceeded("value", max as usize, MAX as usize));
+        if (max as usize) < TEXT_INPUT_LENGTH_MIN {
+            return Err(Error::LimitExceeded("value", max as usize, TEXT_INPUT_LENGTH_MIN));
+        } else if (max as usize) > TEXT_INPUT_LENGTH_MAX {
+            return Err(Error::LimitExceeded("value", max as usize, TEXT_INPUT_LENGTH_MAX));
         }
 
         self.0.max_length = Some(max);
@@ -566,10 +554,10 @@ impl TextInputBuilder {
     ///
     /// This function will return an error if the value is outside of the valid range.
     pub fn min_length(mut self, min: u16) -> Result<Self, Error> {
-        const MAX: u16 = 4000;
-
-        if min > MAX {
-            return Err(Error::LimitExceeded("value", min as usize, MAX as usize));
+        if (min as usize) < TEXT_INPUT_LENGTH_MIN {
+            return Err(Error::LimitExceeded("value", min as usize, TEXT_INPUT_LENGTH_MIN));
+        } else if (min as usize) > TEXT_INPUT_LENGTH_MAX {
+            return Err(Error::LimitExceeded("value", min as usize, TEXT_INPUT_LENGTH_MAX));
         }
 
         self.0.min_length = Some(min);
@@ -583,12 +571,10 @@ impl TextInputBuilder {
     ///
     /// This function will return an error if the value's length exceeds the limit.
     pub fn placeholder(mut self, placeholder: impl Into<String>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 100;
-
         let placeholder: String = placeholder.into();
 
-        if placeholder.len() > MAX_LENGTH {
-            return Err(Error::LimitExceeded("placeholder length", placeholder.len(), MAX_LENGTH));
+        if placeholder.len() > TEXT_INPUT_PLACEHOLDER_MAX {
+            return Err(Error::LimitExceeded("placeholder length", placeholder.len(), TEXT_INPUT_PLACEHOLDER_MAX));
         }
 
         self.0.placeholder = Some(placeholder);
@@ -609,12 +595,11 @@ impl TextInputBuilder {
     ///
     /// This function will return an error if the value's length exceeds the limit.
     pub fn value(mut self, value: impl Into<String>) -> Result<Self, Error> {
-        const MAX_LENGTH: usize = 4000;
-
         let value: String = value.into();
+        let max_len = self.0.max_length.map_or(TEXT_INPUT_LENGTH_MAX, |v| v as usize);
 
-        if value.len() > MAX_LENGTH.max(self.0.max_length.unwrap_or_default() as usize) {
-            return Err(Error::LimitExceeded("value length", value.len(), MAX_LENGTH));
+        if value.len() > max_len {
+            return Err(Error::LimitExceeded("value length", value.len(), max_len));
         }
 
         self.0.value = Some(value);
