@@ -25,15 +25,14 @@ use twilight_model::application::command::{
 };
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
-use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
+use crate::utility::category;
 use crate::utility::search::{Strictness, fuzzy_contains};
 use crate::utility::traits::convert::AsLocale;
-use crate::utility::{category, color};
 
 crate::define_entry!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
@@ -99,9 +98,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
     let list = list.iter().map(|l| format!("`{l}`"));
     let locales = format!("{locales}:\n> {}", list.collect::<Box<[_]>>().join(", "));
 
-    let embed = EmbedBuilder::new().title(title).color(color::SUCCESS.rgb()).description(locales);
-
-    context.embed(embed.build(), Visibility::Ephemeral).await?;
+    context.success(title, Some(locales)).await?;
 
     crate::client::event::pass()
 }
@@ -141,7 +138,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
         localize!(async(try in locale) category, key).await?
     };
 
-    context.text(translated, Visibility::Ephemeral).await?;
+    context.text(format!("`{category}::{key}`\n\n{translated}"), Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
