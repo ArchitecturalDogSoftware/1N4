@@ -86,7 +86,7 @@ impl CommandRegistry {
     /// # Errors
     ///
     /// This function will return an error if a command fails to build.
-    pub async fn collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
+    pub async fn build_and_collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
     where
         T: FromIterator<Command>,
     {
