@@ -29,9 +29,9 @@ mod stored;
 ///
 /// A struct that represents a translatable input field.
 ///
-/// ```
+/// ```ignore
 /// #[derive(AsTranslation)]
-/// #[localizer_category(crate::utility::category::UI_INPUT)]
+/// #[localizer_category(category::UI)]
 /// #[localizer_key(from = title)]
 /// pub struct Field<'s> {
 ///     title: &'s str,
@@ -41,9 +41,9 @@ mod stored;
 ///
 /// An enum of values that can be translated.
 ///
-/// ```
+/// ```ignore
 /// #[derive(AsTranslation)]
-/// #[localizer_category(crate::utility::category::UI)]
+/// #[localizer_category(category::UI)]
 /// pub enum DataType {
 ///     #[localizer_key("boolean")]
 ///     Boolean,
@@ -56,9 +56,9 @@ mod stored;
 ///
 /// A struct with a complex key.
 ///
-/// ```
+/// ```ignore
 /// #[derive(AsTranslation)]
-/// #[localizer_category(crate::utility::category::UI)]
+/// #[localizer_category(category::UI)]
 /// pub enum Type {
 ///     #[localizer_key("string")]
 ///     String,
@@ -67,14 +67,14 @@ mod stored;
 /// }
 ///
 /// impl Display for Type {
-///     fn fmt(&mut self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+///     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 ///         write!(f, "{}", self.localizer_key())
 ///     }
 /// }
 ///
 /// #[derive(AsTranslation)]
-/// #[localizer_category(crate::utility::category::UI)]
-/// #[localizer_key(fmt = "{}-{}", args = [Type, String], from = [kind, name])]
+/// #[localizer_category(category::UI)]
+/// #[localizer_key(fmt = "{}-{}", from = [kind, name])]
 /// pub struct TypedField {
 ///     pub kind: Type,
 ///     pub name: String,
@@ -92,8 +92,11 @@ pub fn as_translation(input: TokenStream) -> TokenStream {
 /// Simple derive:
 ///
 /// ```
+/// # use serde::{Deserialize, Serialize};
+/// # use ina_macro::Stored;
+/// # use ina_storage::format::{Compress, Messagepack};
 /// #[derive(Serialize, Deserialize, Stored)]
-/// #[data_format(Compress<MessagePack>)] // this will use `Compress::default()`
+/// #[data_format(Compress<Messagepack>)] // this will use `Compress::default()`
 /// #[data_path(fmt = "dir/{}", args = [String], from = [name])]
 /// struct DataStructure {
 ///     name: String,
@@ -104,6 +107,9 @@ pub fn as_translation(input: TokenStream) -> TokenStream {
 /// Derive with custom format creation method:
 ///
 /// ```
+/// # use serde::{Deserialize, Serialize};
+/// # use ina_macro::Stored;
+/// # use ina_storage::format::{Compress, Messagepack};
 /// #[derive(Serialize, Deserialize, Stored)]
 /// #[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
 /// #[data_path(fmt = "dir/{}", args = [String], from = [name])]

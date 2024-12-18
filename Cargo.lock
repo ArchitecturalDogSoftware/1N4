@@ -672,8 +672,10 @@ dependencies = [
 name = "ina-macro"
 version = "0.1.0"
 dependencies = [
+ "ina-storage",
  "proc-macro2",
  "quote",
+ "serde",
  "syn",
 ]
 

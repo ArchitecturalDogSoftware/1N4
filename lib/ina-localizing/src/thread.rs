@@ -284,7 +284,12 @@ invoke! {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_localizing::localize;
+/// # use ina_localizing::locale::Locale;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_localizing::Error> {
 /// let locale = "es-MX".parse::<Locale>()?;
 ///
 /// // In the specified optional locale.
@@ -293,6 +298,16 @@ invoke! {
 /// localize!(async(in locale) "ui", "test-key").await?;
 /// // In the default locale ('en-US' by default).
 /// localize!(async "ui", "test-key").await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```no_run
+/// # use ina_localizing::localize;
+/// # use ina_localizing::locale::Locale;
+/// #
+/// # fn main() -> Result<(), ina_localizing::Error> {
+/// let locale = "es-MX".parse::<Locale>()?;
 ///
 /// // In the specified optional locale.
 /// localize!((try in Some(locale)) "ui", "test-key")?;
@@ -300,6 +315,8 @@ invoke! {
 /// localize!((in locale) "ui", "test-key")?;
 /// // In the default locale ('en-US' by default).
 /// localize!("ui", "test-key")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! localize {
