@@ -20,7 +20,7 @@ declare -r script_version='0.3.0'
 declare -r binary_dir="$PWD/bin"
 declare -r target_dir="$PWD/target"
 
-declare -i clean_build clean_cache
+declare -i clean_bin clean_build clean_cache
 declare build_profile='release'
 declare build_target
 
@@ -32,6 +32,7 @@ function print_help() {
     
     print_help_argument 'c' 'Cleans the build directory before compiling'
     print_help_argument 'C' 'Cleans the Cargo cache before compiling'
+    print_help_argument 'r' 'Cleans previously compiled executables'
     
     print_help_argument 't' "Set the build target triple (defaults to '$build_target')"
     print_help_argument 'p' "Set the build profile (defaults to '$build_profile')"
@@ -44,13 +45,14 @@ fi
 build_target="$(rustup target list | grep 'installed')"
 build_target="${build_target%' (installed)'}"
 
-while getopts 'hVcCt:p:' argument; do
+while getopts 'hVcCrt:p:' argument; do
     case "$argument" in
         'h') print_help; exit 0;;
         'V') print_version "$script_name" "$script_version"; exit 0;;
 
         'c') clean_build=1;;
         'C') clean_cache=1;;
+        'r') clean_bin=1;;
 
         't') build_target="$OPTARG";;
         'p') build_profile="$OPTARG";;
@@ -88,6 +90,10 @@ fi
 
 unset clean_cache
 
+if [ $clean_bin ]; then
+    eval_step 'Cleaning previous builds' "[ -e '$binary_dir' ] && rm -r '$binary_dir'"
+fi
+
 eval_step 'Compiling executable' "cargo build --profile='$build_profile' --target='$build_target'"
 
 executable_version="$(eval "$executable_path -V" | sed 's/ina //')"
@@ -97,7 +103,7 @@ if [ ! -d "$binary_dir" ]; then
     eval_step 'Creating binary directory' "mkdir -p '$binary_dir' || or_cancel_execution 'Failed to create binary directory'"
 fi
 if [ -e "$output_path" ]; then
-    eval_step 'Removing previous binary' "rm --interactive=once '$output_path'"
+    eval_step 'Removing previous binary' "rm '$output_path'"
 fi
 
 eval_step 'Copying executable' "cp '$executable_path' '$output_path'"
