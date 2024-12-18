@@ -15,7 +15,6 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::collections::BTreeMap;
-use std::future::Future;
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};

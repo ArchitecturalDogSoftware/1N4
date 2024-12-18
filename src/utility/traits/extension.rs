@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::convert::identity;
 use std::fmt::Display;
 use std::num::NonZeroU16;
 
@@ -164,7 +163,7 @@ pub struct UserNameDisplay<'us> {
 
 impl Display for UserNameDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.nick.map_or(self.name.map_or(self.user, identity), identity))
+        write!(f, "{}", self.nick.or(self.name).unwrap_or(self.user))
     }
 }
 

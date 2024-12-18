@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::future::Future;
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 
@@ -100,6 +99,30 @@ impl Default for StatusDefinition {
     }
 }
 
+/// Handles a task's join result.
+///
+/// # Examples
+///
+/// ```
+/// match_join_result!(join_result, "event", EventOutput::Exit);
+/// ```
+macro_rules! match_join_result {
+    ($result:expr, $type:literal, $exit:expr) => {
+        match $result {
+            // Just keep polling if instructed to pass.
+            Ok(Ok(EventOutput::Pass)) => continue,
+            // If we should exit, return early.
+            Ok(Ok(EventOutput::Exit)) => return Ok($exit),
+            // If the task returns an error, return it.
+            Ok(Err(error)) => return Err(error),
+            // If the task fails to join from a panic, indicate an error.
+            Err(error) if error.is_panic() => return Err(error.into()),
+            // If the task fails to join from a panic, indicate an error.
+            Err(error) => error!(async "{} task failed to join: {error}", $type).await?,
+        }
+    };
+}
+
 /// The bot's instance.
 #[non_exhaustive]
 #[derive(Debug)]
@@ -108,8 +131,6 @@ pub struct Instance {
     api: Api,
     /// The bot instance's created shards.
     shards: Box<[Shard]>,
-    /// The bot instance's settings.
-    settings: Settings,
     /// The bot's configured status list.
     status: Option<StatusList>,
 }
@@ -130,7 +151,7 @@ impl Instance {
         let config = Self::new_config(discord_token.to_string(), status.as_ref())?;
         let shards = Self::new_shards(&client, config, &settings).await?;
 
-        Ok(Self { api: Api::new(client), shards, settings, status })
+        Ok(Self { api: Api::new(settings, client), shards, status })
     }
 
     /// Creates a new [`StatusList`], returning [`None`] if a file could not be found.
@@ -240,12 +261,12 @@ impl Instance {
         let config = Self::new_config(discord_token, status)?;
         let mut shards = Self::new_shards(client, config, settings).await?;
 
-        let timeout = tokio::time::sleep(Self::get_shard_timeout(&connection));
+        let reshard_timeout = tokio::time::sleep(Self::get_shard_timeout(&connection));
 
-        tokio::pin!(timeout);
+        tokio::pin!(reshard_timeout);
 
         std::future::poll_fn(|cx| {
-            let _ = timeout.as_mut().poll(cx);
+            _ = reshard_timeout.as_mut().poll(cx);
 
             std::task::Poll::Ready(())
         })
@@ -260,7 +281,7 @@ impl Instance {
 
             tokio::select! {
                 // Exit early if we time out and at least 75% of the shards are identified.
-                () = &mut timeout, if identified_count >= (identified.len() * 3) / 4 => break,
+                () = &mut reshard_timeout, if identified_count >= (identified.len() * 3) / 4 => break,
                 Some((shard_id, result)) = shard_stream.next() => {
                     if let Err(error) = result {
                         warn!(async "failed to identify shard: {error}").await?;
@@ -295,11 +316,11 @@ impl Instance {
                 tasks.spawn(Self::run_shard(self.api.clone(), shard));
             }
 
-            let shards = Self::try_reshard(&self.api.client, &self.settings, self.status.as_ref());
+            let shards = Self::try_reshard(&self.api.client, &self.api.settings, self.status.as_ref());
 
             tokio::pin!(shards);
 
-            let duration = Duration::from_secs(self.settings.status_interval.get().saturating_mul(60));
+            let duration = Duration::from_secs(self.api.settings.status_interval.get().saturating_mul(60));
             let mut status_interval = tokio::time::interval_at((Instant::now() + duration).into(), duration);
 
             loop {
@@ -330,18 +351,7 @@ impl Instance {
                         debug!(async "updated client presence").await?;
                     }
                     // If a task finishes and indicates that we should exit, return early.
-                    Some(result) = tasks.join_next() => match result {
-                        // Just keep polling if instructed to pass.
-                        Ok(Ok(EventOutput::Pass)) => continue,
-                        // If we should exit, return early.
-                        Ok(Ok(EventOutput::Exit)) => return Ok(()),
-                        // If the task returns an error, return it.
-                        Ok(Err(error)) => return Err(error),
-                        // If the task fails to join from a panic, indicate an error.
-                        Err(error) if error.is_panic() => return Err(error.into()),
-                        // If the task fails to join from a panic, indicate an error.
-                        Err(error) => error!(async "shard task failed to join: {error}").await?,
-                    },
+                    Some(result) = tasks.join_next() => match_join_result!(result, "shard", ()),
                 }
             }
         }
@@ -369,35 +379,13 @@ impl Instance {
                     None => break,
                 },
                 // If a task finishes and indicates that we should exit, return early.
-                Some(result) = tasks.join_next() => match result {
-                    // Just keep polling if instructed to pass.
-                    Ok(Ok(EventOutput::Pass)) => continue,
-                    // If we should exit, return early.
-                    Ok(Ok(EventOutput::Exit)) => return Ok(EventOutput::Exit),
-                    // If the task returns an error, return it.
-                    Ok(Err(error)) => return Err(error),
-                    // If the task fails to join from a panic, indicate an error.
-                    Err(error) if error.is_panic() => return Err(error.into()),
-                    // If the task fails to join from a panic, indicate an error.
-                    Err(error) => error!(async "event task failed to join: {error}").await?,
-                },
+                Some(result) = tasks.join_next() => match_join_result!(result, "event", EventOutput::Exit),
             }
         }
 
         // Wait for all tasks to join naturally.
         while let Some(result) = tasks.join_next().await {
-            match result {
-                // Just keep polling if instructed to pass.
-                Ok(Ok(EventOutput::Pass)) => continue,
-                // If we should exit, return early.
-                Ok(Ok(EventOutput::Exit)) => return Ok(EventOutput::Exit),
-                // If the task returns an error, return it.
-                Ok(Err(error)) => return Err(error),
-                // If the task fails to join from a panic, indicate an error.
-                Err(error) if error.is_panic() => return Err(error.into()),
-                // If the task fails to join from a panic, indicate an error.
-                Err(error) => error!(async "event task failed to join: {error}").await?,
-            };
+            match_join_result!(result, "event", EventOutput::Exit);
         }
 
         self::event::pass()

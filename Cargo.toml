@@ -17,7 +17,7 @@ repository.workspace = true
 members = ["lib/ina-*"]
 resolver = "2"
 
-package.edition = "2021"
+package.edition = "2024"
 package.license = "AGPL-3.0-or-later"
 package.publish = false
 package.repository = "https://github.com/ArchitecturalDogSoftware/1N4"
@@ -38,6 +38,21 @@ clippy.unwrap_used = { level = "deny", priority = 1 }
 rust.missing_docs = "warn"
 rust.unsafe_code = "deny"
 
+[workspace.dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+clap = "4.5"
+ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
+ina-logging = { version = "*", path = "./lib/ina-logging/" }
+ina-macro = { version = "*", path = "./lib/ina-macro/" }
+ina-threading = { version = "*", path = "./lib/ina-threading" }
+ina-storage = { version = "*", path = "./lib/ina-storage" }
+serde = "1.0"
+time = "0.3"
+thiserror = "2.0"
+tokio = "1.42"
+toml = "0.8"
+
 [lints]
 workspace = true
 
@@ -52,23 +67,25 @@ lto = "fat"
 strip = "symbols"
 
 [dependencies]
-anyhow = "1.0"
-async-trait = "0.1"
-clap = { version = "4.5", features = ["cargo", "derive", "env"] }
+anyhow.workspace = true
+async-stream = "0.3"
+async-trait.workspace = true
+clap = { workspace = true, features = ["cargo", "derive", "env"] }
+directories = "5.0"
 dotenvy = { version = "0.15", optional = true }
-ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
-ina-logging = { version = "*", path = "./lib/ina-logging/" }
-ina-macro = { version = "*", path = "./lib/ina-macro/" }
-ina-threading = { version = "*", path = "./lib/ina-threading" }
-ina-storage = { version = "*", path = "./lib/ina-storage", features = ["format-compression", "format-messagepack"] }
+ina-localizing.workspace = true
+ina-logging.workspace = true
+ina-macro.workspace = true
+ina-threading.workspace = true
+ina-storage = { workspace = true, features = ["format-compression", "format-messagepack"] }
 rand = { version = "0.8", features = ["nightly"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "2.0"
-time = { version = "0.3", features = ["local-offset", "serde"] }
-tokio = { version = "1.41", features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+time = { workspace = true, features = ["local-offset", "serde"] }
+tokio = { workspace = true, features = ["full"] }
 tokio-stream = "0.1"
-toml = { version = "0.8", features = ["preserve_order"] }
+toml = { workspace = true, features = ["preserve_order"] }
 twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight" }
 twilight-gateway = { git = "https://github.com/twilight-rs/twilight" }
 twilight-http = { git = "https://github.com/twilight-rs/twilight" }

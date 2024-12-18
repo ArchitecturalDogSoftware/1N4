@@ -19,8 +19,8 @@ use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
 
-/// The maximum length of a finished identifier in bytes.
-pub const MAX_LENGTH: usize = 100;
+use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
+
 /// The byte that separates individual sections of the identifier.
 pub const SECTION_SEPARATOR: char = '$';
 /// The byte that separates individual data sections.
@@ -46,7 +46,7 @@ pub enum Error {
     #[error("missing data section")]
     MissingData,
     /// Returned when the identifier exceeds the maximum length.
-    #[error("maximum length exceeded ({0}/{MAX_LENGTH} bytes)")]
+    #[error("maximum length exceeded ({0}/{COMPONENT_CUSTOM_ID_LENGTH} bytes)")]
     MaximumLength(usize),
 }
 
@@ -109,7 +109,7 @@ where
         let data_len = self.data.iter().map(|s| s.len()).sum::<usize>() + data_sep_len;
         let len = self.name.len() + self.kind.len() + data_len + (SECTION_SEPARATOR.len_utf8() * 2);
 
-        if len > MAX_LENGTH {
+        if len > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::MaximumLength(len));
         }
         if !self.name().chars().all(|c| c.is_alphanumeric() || matches!(c, '-' | '_')) {

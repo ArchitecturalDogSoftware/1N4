@@ -86,7 +86,7 @@ impl CommandRegistry {
     /// # Errors
     ///
     /// This function will return an error if a command fails to build.
-    pub async fn collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
+    pub async fn build_and_collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
     where
         T: FromIterator<Command>,
     {
@@ -210,7 +210,7 @@ macro_rules! define_command_modules {
 /// ```
 /// define_entry!("scream", CommandType::ChatInput, struct {
 ///     dev_only: false,
-///     allow_dms: true,
+///     contexts: [InteractionContextType::BotDm],
 ///     is_nsfw: false,
 ///     permissions: Permissions::USE_SLASH_COMMANDS,
 /// }, struct {
@@ -234,7 +234,7 @@ macro_rules! define_entry {
     (
         $name:literal, $type:expr, struct {
             $(dev_only: $dev_only:literal,)?
-            $(allow_dms: $allow_dms:literal,)?
+            $(contexts: $contexts:expr,)?
             $(is_nsfw: $is_nsfw:literal,)?
             $(permissions: $permissions:expr,)?
         },struct {
@@ -265,7 +265,7 @@ macro_rules! define_entry {
                 let localized_name = ::ina_localizing::localize!(async $crate::utility::category::COMMAND, &(*localizer_description_key)).await?;
                 let mut builder = ::twilight_util::builder::command::CommandBuilder::new(entry.name, localized_name, $type);
 
-                $(builder = builder.dm_permission($allow_dms);)?
+                $(builder = builder.contexts($contexts);)?
                 $(builder = builder.nsfw($is_nsfw);)?
                 $(builder = builder.default_member_permissions($permissions);)?
 

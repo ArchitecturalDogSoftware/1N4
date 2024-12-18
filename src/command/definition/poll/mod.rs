@@ -17,15 +17,19 @@
 use std::num::NonZeroU16;
 
 use anyhow::bail;
-use data::poll::{PollBuilder, PollType};
+use data::poll::{Poll, PollState, PollType};
 use ina_localizing::localize;
 use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
+use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::message::component::TextInputStyle;
 use twilight_model::guild::Permissions;
+use twilight_model::http::interaction::InteractionResponseType;
 use twilight_util::builder::embed::ImageSource;
+use twilight_validate::embed::DESCRIPTION_LENGTH;
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
@@ -48,11 +52,12 @@ mod data {
 }
 
 crate::define_entry!("poll", CommandType::ChatInput, struct {
-    allow_dms: false,
+    // Until this command is finished, it will only be available in the linked development server.
+    dev_only: true,
+    contexts: [InteractionContextType::Guild],
     permissions: Permissions::SEND_POLLS,
 }, struct {
     command: on_command,
-    component: on_component,
     modal: on_modal,
 }, struct {
     create: SubCommand {
@@ -80,8 +85,6 @@ crate::define_commands! {
         close => on_close_command;
     }
 }
-
-crate::define_components! {}
 
 crate::define_modals! {
     create => on_create_modal;
@@ -139,7 +142,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
             localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?.to_string(),
             TextInputStyle::Paragraph,
         )?
-        .max_length(4096)?
+        .max_length(u16::try_from(DESCRIPTION_LENGTH / 2)?)?
         .required(false),
     )?;
 
@@ -154,14 +157,14 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 ///
 /// This function will return an error if the modal could not be handled.
 async fn on_create_modal<'ap: 'ev, 'ev>(
-    event: &CommandEntry,
+    entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev ModalInteractionData>,
     custom_id: CustomId,
 ) -> EventResult {
     let Some(guild_id) = context.interaction.guild_id else {
         bail!("this command must be used in a guild");
     };
-    let Some(user_id) = context.interaction.author_id() else {
+    let Some(user) = context.interaction.author() else {
         bail!("this command must be used by a user");
     };
     let locale = match context.as_locale() {
@@ -183,9 +186,9 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
     };
 
     let resolver = ModalFieldResolver::new(context.data);
-    let image_url = resolver.get(CustomId::<Box<str>>::new(event.name, "image_url")?.to_string())?;
-    let description = resolver.get(CustomId::<Box<str>>::new(event.name, "description")?.to_string())?;
-    let Some(title) = resolver.get(CustomId::<Box<str>>::new(event.name, "title")?.to_string())? else {
+    let image_url = resolver.get(CustomId::<Box<str>>::new(entry.name, "image_url")?.to_string())?;
+    let description = resolver.get(CustomId::<Box<str>>::new(entry.name, "description")?.to_string())?;
+    let Some(title) = resolver.get(CustomId::<Box<str>>::new(entry.name, "title")?.to_string())? else {
         bail!("failed to resolve poll title");
     };
 
@@ -197,20 +200,28 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
         return crate::client::event::pass();
     }
 
-    let poll = PollBuilder {
-        user_id,
+    let poll = Poll {
+        user_id: user.id,
         guild_id,
-        kind,
         title: title.into(),
-        description: description.map(Into::into),
-        image_url: image_url.map(Into::into),
-        duration,
-        inputs: vec![],
+        about: description.map(Into::into),
+        image: image_url.map(Into::into),
+        kind,
+        minutes: duration,
+        state: PollState::Builder { inputs: Vec::new() },
     };
 
     poll.as_async_api().write().await?;
 
-    context.embed(poll.build_preview(locale).await?, Visibility::Ephemeral).await?;
+    let (embed, components) = poll.build(entry, locale, user, None).await?;
+
+    crate::create_response!(context, struct {
+        kind: InteractionResponseType::ChannelMessageWithSource,
+        components: components,
+        embeds: [embed],
+        flags: MessageFlags::EPHEMERAL,
+    })
+    .await?;
 
     crate::client::event::pass()
 }

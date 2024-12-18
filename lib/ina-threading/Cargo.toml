@@ -19,5 +19,5 @@ workspace = true
 default = []
 
 [dependencies]
-thiserror = "2.0"
-tokio = { version = "1.41", features = ["rt", "sync", "time"] }
+thiserror.workspace = true
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
