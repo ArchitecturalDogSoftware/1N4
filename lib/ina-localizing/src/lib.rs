@@ -19,10 +19,12 @@
 #![feature(array_try_from_fn)]
 
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::path::Path;
 
 use ina_threading::threads::invoker::{Nonce, State};
 use serde::{Deserialize, Serialize};
+use text::Text;
 use thread::Request;
 
 use self::locale::Locale;
@@ -39,7 +41,7 @@ pub mod text;
 pub mod thread;
 
 /// A result alias with a defaulted error type.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// An error that may be returned when using this library.
 #[non_exhaustive]
@@ -283,5 +285,55 @@ impl Language {
             Ok(TextRef::Present(value)) => Ok(TextRef::Inherit(*locale, value)),
             other => other,
         }
+    }
+}
+
+/// Converts the implementing type into an owned translation.
+pub trait AsTranslation<I = text::TextInner>
+where
+    I: Deref<Target = str> + for<'s> From<&'s str>,
+{
+    /// The error that may be returned when converting.
+    type Error: From<Error>;
+
+    /// Returns this value's localizer category.
+    fn localizer_category(&self) -> impl Into<Box<str>>;
+
+    /// Returns this value's localizer key.
+    fn localizer_key(&self) -> impl Into<Box<str>>;
+
+    /// Fallibly localizes this value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be localized.
+    fn as_translation(&self, locale: Option<Locale>) -> impl Future<Output = Result<Text<I>, Self::Error>> + Send
+    where
+        Self: Sync,
+    {
+        async move {
+            let category = self.localizer_category().into();
+            let key = self.localizer_key().into();
+
+            Ok(localize!(async(try in locale) category, key).await?.cast_inner())
+        }
+    }
+
+    /// Fallibly localizes this value.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called from within an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be localized.
+    fn blocking_as_translation(&self, locale: Option<Locale>) -> Result<Text<I>, Self::Error> {
+        let category = self.localizer_category().into();
+        let key = self.localizer_key().into();
+
+        Ok(localize!((try in locale) category, key)?.cast_inner())
     }
 }

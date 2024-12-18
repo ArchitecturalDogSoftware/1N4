@@ -18,7 +18,7 @@ use std::num::NonZeroU16;
 
 use anyhow::{Result, bail};
 use ina_localizing::locale::Locale;
-use ina_localizing::localize;
+use ina_localizing::{AsTranslation, localize};
 use ina_macro::{AsTranslation, Stored};
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ use twilight_validate::embed::FIELD_VALUE_LENGTH;
 use super::input::PollInput;
 use super::response::PollResponse;
 use crate::command::registry::CommandEntry;
-use crate::utility::traits::convert::{AsEmoji, AsTranslation};
+use crate::utility::traits::convert::AsEmoji;
 use crate::utility::types::builder::ButtonBuilder;
 use crate::utility::types::id::CustomId;
 use crate::utility::{category, color};

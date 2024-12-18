@@ -173,7 +173,7 @@ pub fn procedure_struct(
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics crate::utility::traits::convert::AsTranslation for #identifier #type_generics
+        impl #impl_generics ::ina_localizing::AsTranslation for #identifier #type_generics
         #where_clause
         {
             type Error = ::ina_localizing::Error;
@@ -235,7 +235,7 @@ pub fn procedure_enum(
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics crate::utility::traits::convert::AsTranslation for #identifier #type_generics
+        impl #impl_generics ::ina_localizing::AsTranslation for #identifier #type_generics
         #where_clause
         {
             type Error = ::ina_localizing::Error;
