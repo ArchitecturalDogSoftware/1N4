@@ -18,43 +18,62 @@ declare -r script_name='publish'
 declare -r script_version='0.3.0'
 
 declare -r binary_dir="$PWD/bin"
-declare target_dir="$PWD/target/release"
-declare executable="$target_dir/ina"
-declare -r checksums="$binary_dir/checksums"
-declare target_triple executable_version
-declare -i clean_build clean_cache super_optimized
+declare -r target_dir="$PWD/target"
+
+declare -i clean_build clean_cache
+declare build_profile='release'
+declare build_target
 
 function print_help() {
     print_help_header "$script_name" "$script_version" '[arguments]'
+    
     print_help_argument 'h' 'Displays this screen.'
-    print_help_argument 'v' 'Displays the current script version.'
+    print_help_argument 'V' 'Displays the current script version.'
+    
     print_help_argument 'c' 'Cleans the build directory before compiling'
     print_help_argument 'C' 'Cleans the Cargo cache before compiling'
-    print_help_argument 't' 'Override the target triple appended to the finished binary name.'
-    print_help_argument 'p' 'Use a build profile that optimizes for performance'
+    
+    print_help_argument 't' "Set the build target triple (defaults to '$build_target')"
+    print_help_argument 'p' "Set the build profile (defaults to '$build_profile')"
 }
 
 if [ ! -d "$PWD"/.git ]; then 
     cancel_execution "This script must be run within the project's root directory"
 fi
 
-while getopts 'hvcCt:p' argument; do
-    case $argument in
-        h) print_help; exit 0;;
-        v) print_version "$script_name" "$script_version"; exit 0;;
-        t) target_triple="$OPTARG";;
-        c) clean_build=1;;
-        C) clean_cache=1;;
-        p) super_optimized=1;;
+build_target="$(rustup target list | grep 'installed')"
+build_target="${build_target%' (installed)'}"
+
+while getopts 'hVcCt:p:' argument; do
+    case "$argument" in
+        'h') print_help; exit 0;;
+        'V') print_version "$script_name" "$script_version"; exit 0;;
+
+        'c') clean_build=1;;
+        'C') clean_cache=1;;
+
+        't') build_target="$OPTARG";;
+        'p') build_profile="$OPTARG";;
+
         *) print_help; exit 1;;
     esac
 done
 
+if [ "$build_profile" = 'dev' ]; then
+    declare -r executable_path="$target_dir/$build_target/debug/ina"
+else
+    declare -r executable_path="$target_dir/$build_target/$build_profile/ina"
+fi
+declare -r checksum_path="$binary_dir/checksums"
+
 echo -e 'Publishing executable\n'
 
-if [ -z "$target_triple" ]; then
-    target_triple="$(rustup target list | grep 'installed')"
-    target_triple="${target_triple%' (installed)'}"
+if [ -z "$build_profile" ]; then
+    build_profile='release'
+fi
+if [ -z "$build_target" ]; then
+    build_target="$(rustup target list | grep 'installed')"
+    build_target="${build_target%' (installed)'}"
 fi
 
 if [ $clean_build ]; then
@@ -69,46 +88,42 @@ fi
 
 unset clean_cache
 
-if [ $super_optimized ]; then
-    eval_step 'Compiling optimized executable' 'cargo build --profile=release-super-optimized'
+eval_step 'Compiling executable' "cargo build --profile='$build_profile' --target='$build_target'"
 
-    target_dir="$PWD/target/release-super-optimized"
-    executable="$target_dir/ina"
-else
-    eval_step 'Compiling executable' 'cargo build --release'
-fi
-
-unset super_optimized
+executable_version="$(eval "$executable_path -V" | sed 's/ina //')"
+output_path="$binary_dir/ina-$executable_version+$build_profile.$build_target"
 
 if [ ! -d "$binary_dir" ]; then
     eval_step 'Creating binary directory' "mkdir -p '$binary_dir' || or_cancel_execution 'Failed to create binary directory'"
 fi
-if [ -n "$(ls -A "$binary_dir")" ]; then
-    eval_step 'Clearing binary directory' "rm --interactive=once '$binary_dir'/*"
+if [ -e "$output_path" ]; then
+    eval_step 'Removing previous binary' "rm --interactive=once '$output_path'"
 fi
 
-executable_version="$(eval "$executable -V" | sed 's/ina //')"
+eval_step 'Copying executable' "cp '$executable_path' '$output_path'"
 
-eval_step 'Copying executable' "cp '$executable' '$binary_dir/ina-$executable_version+$target_triple'"
-
-unset executable_version target_triple
+unset build_profile build_target executable_version output_path
 
 escaped_binary_dir="$(echo "$binary_dir" | sed 's/\//\\\//g')"
 
-eval_step 'Generating checksums' "sha256sum '$binary_dir'/* | sed \"s/$escaped_binary_dir\///\" > '$checksums'"
+if [ -e "$checksum_path" ]; then
+    rm --interactive=once "$checksum_path"
+fi
+
+eval_step 'Generating checksums' "sha256sum '$binary_dir'/* | sed \"s/$escaped_binary_dir\///\" > '$checksum_path'"
 
 unset escaped_binary_dir
 
 echo -ne '\nChecksums'
 
 if [ -n "$(which clip.exe)" ]; then
-    clip.exe < "$checksums"
+    clip.exe < "$checksum_path"
     echo -n ' (also copied to your clipboard)'
 elif [ -n "$(which xclip)" ]; then
-    xclip -selection clipboard < "$checksums"
+    xclip -selection clipboard < "$checksum_path"
     echo -n ' (also copied to your clipboard)'
 fi
 
 echo -e ":\n"
-cat "$checksums"
+cat "$checksum_path"
 echo -e "\nFiles located within: '${binary_dir/"$PWD"/'.'}'"
