@@ -18,17 +18,20 @@
 #![feature(impl_trait_in_fn_trait_return)]
 
 use std::convert::Infallible;
-use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
 
 use clap::ValueEnum;
+use ina_threading::threads::invoker::{Nonce, State};
 use serde::{Deserialize, Serialize};
+use thread::Request;
 use tokio::sync::mpsc::error::SendError;
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::settings::Settings;
 use crate::system::{DataReader, DataSystem, DataWriter};
+
+#[cfg(all(not(feature = "system-file"), not(feature = "system-memory")))]
+compile_error!("at least one storage system feature must be enabled");
 
 /// Defines data storage formats.
 pub mod format;
@@ -38,22 +41,11 @@ pub mod settings;
 pub mod stored;
 /// Defines data storage systems.
 pub mod system;
+/// Defines the library's thread implementation.
+pub mod thread;
 
-/// The global instance of the storage interface.
-///
-/// TODO: Look into making this run on a separate thread.
-static STORAGE: RwLock<Option<Storage>> = RwLock::const_new(None);
-
-/// Initializes the storage instance.
-///
-/// # Panics
-///
-/// Panics if the storage instance has already been initialized.
-pub async fn initialize(settings: Settings) {
-    assert!(STORAGE.read().await.is_none(), "the instance has already been initialized");
-
-    *STORAGE.write().await = Some(Storage { settings });
-}
+/// A result alias with a defaulted error type.
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// An error that may occur when using this library.
 #[non_exhaustive]
@@ -62,12 +54,12 @@ pub enum Error<S = Infallible> {
     /// An IO error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    /// A threading error.
-    #[error(transparent)]
-    Threading(#[from] ina_threading::Error<S>),
     /// A sending error.
     #[error(transparent)]
     Send(#[from] SendError<S>),
+    /// An error from communicating with a thread.
+    #[error(transparent)]
+    Thread(#[from] ina_threading::Error<Nonce<(State<Storage>, Request)>>),
 }
 
 /// A storage instance.
@@ -76,28 +68,6 @@ pub struct Storage {
     /// The storage instance's settings.
     settings: Settings,
 }
-
-#[expect(clippy::expect_used, reason = "allow panics to ensure that the storage system is set up")]
-impl DataSystem for Storage {
-    fn blocking_get() -> impl Deref<Target = Self> {
-        RwLockReadGuard::map(STORAGE.blocking_read(), |v| v.as_ref().expect("the instance has not been initialized"))
-    }
-
-    async fn get() -> impl Deref<Target = Self> {
-        RwLockReadGuard::map(STORAGE.read().await, |v| v.as_ref().expect("the instance has not been initialized"))
-    }
-
-    fn blocking_get_mut() -> impl DerefMut<Target = Self> {
-        RwLockWriteGuard::map(STORAGE.blocking_write(), |v| v.as_mut().expect("the instance has not been initialized"))
-    }
-
-    async fn get_mut() -> impl DerefMut<Target = Self> {
-        RwLockWriteGuard::map(STORAGE.write().await, |v| v.as_mut().expect("the instance has not been initialized"))
-    }
-}
-
-#[cfg(all(not(feature = "system-file"), not(feature = "system-memory")))]
-compile_error!("at least one storage system feature must be enabled");
 
 /// The preference for the storage backend system.
 #[non_exhaustive]

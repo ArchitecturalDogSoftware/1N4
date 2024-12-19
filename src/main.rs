@@ -117,7 +117,7 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
 
     info!(async "loaded {loaded_locales} localization locales").await?;
 
-    ina_storage::initialize(arguments.data_settings).await;
+    ina_storage::thread::start(arguments.data_settings).await?;
 
     info!(async "initialized storage instance").await?;
 
