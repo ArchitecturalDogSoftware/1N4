@@ -21,6 +21,7 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::Path;
+use std::sync::Arc;
 
 use ina_threading::threads::invoker::{Nonce, State};
 use serde::{Deserialize, Serialize};
@@ -29,7 +30,6 @@ use thread::Request;
 
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
-use self::text::TextRef;
 
 /// Defines the format for locales.
 pub mod locale;
@@ -198,12 +198,7 @@ impl Localizer {
     ///
     /// This function will return an error if the text is not found and the configured behavior specifies to return an
     /// error.
-    pub fn get<'tx: 'fc, 'fc>(
-        &'tx self,
-        locale: Locale,
-        category: &'fc str,
-        key: &'fc str,
-    ) -> Result<TextRef<'tx, 'fc>> {
+    pub fn get<'tx: 'fc, 'fc>(&'tx self, locale: Locale, category: &'fc str, key: &'fc str) -> Result<Text> {
         let Some(language) = self.languages.get(&locale) else {
             return if self.settings.default_locale == locale {
                 self.settings.miss_behavior.call(category, key)
@@ -224,7 +219,7 @@ pub struct Language {
     pub inherit: Option<Locale>,
     /// The language's defined text categories and their defined keys.
     #[serde(default, flatten, skip_serializing_if = "HashMap::is_empty")]
-    pub categories: HashMap<Box<str>, HashMap<Box<str>, Box<str>>>,
+    pub categories: HashMap<Box<str>, HashMap<Arc<str>, Arc<str>>>,
 }
 
 impl Language {
@@ -236,16 +231,11 @@ impl Language {
     /// # Errors
     ///
     /// This function will return an error if the text is not present and the behavior specifies to return an error.
-    pub fn get<'tx: 'fc, 'fc>(
-        &'tx self,
-        category: &'fc str,
-        key: &'fc str,
-        behavior: MissingBehavior,
-    ) -> Result<TextRef<'tx, 'fc>> {
+    pub fn get<'tx: 'fc, 'fc>(&'tx self, category: &'fc str, key: &'fc str, behavior: MissingBehavior) -> Result<Text> {
         self.categories
             .get(category)
             .and_then(|k| k.get(key))
-            .map_or_else(|| behavior.call(category, key), |s| Ok(TextRef::Present(s)))
+            .map_or_else(|| behavior.call(category, key), |s| Ok(Text::Present(Arc::clone(s))))
     }
 
     /// Returns the text for a key within the given category as written within this or a parent language file.
@@ -260,7 +250,7 @@ impl Language {
         behavior: MissingBehavior,
         languages: &'tx HashMap<Locale, Self>,
         max_depth: usize,
-    ) -> Result<TextRef<'tx, 'fc>> {
+    ) -> Result<Text> {
         if max_depth == 0 {
             return behavior.call(category, key).map_err(|_| Error::RecursionLimit);
         }
@@ -268,7 +258,7 @@ impl Language {
         let text = self.get(category, key, behavior);
 
         // Only continue if the resolved text is missing.
-        let (Ok(TextRef::Missing(..)) | Err(Error::MissingText(..))) = text else {
+        let (Ok(Text::Missing(..)) | Err(Error::MissingText(..))) = text else {
             return text;
         };
 
@@ -282,7 +272,7 @@ impl Language {
 
         // Convert `Present` variants to `Inherit` variants.
         match parent.get_recursive(category, key, behavior, languages, max_depth - 1) {
-            Ok(TextRef::Present(value)) => Ok(TextRef::Inherit(*locale, value)),
+            Ok(Text::Present(value)) => Ok(Text::Inherit(*locale, value)),
             other => other,
         }
     }

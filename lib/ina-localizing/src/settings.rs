@@ -15,13 +15,14 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::num::NonZeroUsize;
+use std::ops::Deref;
 use std::path::Path;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 use crate::locale::Locale;
-use crate::text::TextRef;
+use crate::text::Text;
 use crate::{Error, Result};
 
 /// The localizer's settings.
@@ -70,9 +71,12 @@ impl MissingBehavior {
     /// # Errors
     ///
     /// This function will return an error if the miss behavior specifies that outcome.
-    pub fn call<'tx: 'fc, 'fc>(&self, category: &'fc str, key: &'fc str) -> Result<TextRef<'tx, 'fc>> {
+    pub fn call<'tx: 'fc, 'fc, I>(&self, category: &'fc str, key: &'fc str) -> Result<Text<I>>
+    where
+        I: Deref<Target = str> + for<'a> From<&'a str>,
+    {
         match self {
-            Self::Return => Ok(TextRef::Missing(category, key)),
+            Self::Return => Ok(Text::Missing(category.into(), key.into())),
             Self::Error => Err(Error::MissingText(category.into(), key.into())),
         }
     }

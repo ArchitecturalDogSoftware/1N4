@@ -22,7 +22,7 @@ default = []
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
 ina-logging.workspace = true
 ina-threading.workspace = true
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive", "rc"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "macros", "sync"] }
 toml.workspace = true
