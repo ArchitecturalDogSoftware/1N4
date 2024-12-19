@@ -12,7 +12,9 @@
 #
 # You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see <https://www.gnu.org/licenses/>.
 
-source "$(dirname "$0")/utilities.sh"
+set -euo pipefail
+
+. "$(dirname "$0")/utilities.sh"
 
 declare -r script_name='publish'
 declare -r script_version='0.3.0'
@@ -20,79 +22,86 @@ declare -r script_version='0.3.0'
 declare -r binary_dir="$PWD/bin"
 declare -r target_dir="$PWD/target"
 
-declare -i clean_bin clean_build clean_cache
-declare build_profile='release'
-declare build_target
+declare -i clean_bin=0
+declare -i clean_build=0
+declare -i clean_cache=0
+
+build_profile='release'
+build_target="$(rustc -vV | sed -n 's/host: //p')"
 
 function print_help() {
     print_help_header "$script_name" "$script_version" '[arguments]'
-    
+
     print_help_argument 'h' 'Displays this screen.'
     print_help_argument 'V' 'Displays the current script version.'
-    
+
     print_help_argument 'c' 'Cleans the build directory before compiling'
     print_help_argument 'C' 'Cleans the Cargo cache before compiling'
     print_help_argument 'r' 'Cleans previously compiled executables'
-    
-    print_help_argument 't' "Set the build target triple (defaults to '$build_target')"
-    print_help_argument 'p' "Set the build profile (defaults to '$build_profile')"
+
+    print_help_argument 't' "Set the build target triple (defaults to '$build_target')" 'target'
+    print_help_argument 'p' "Set the build profile (defaults to '$build_profile')" 'profile'
 }
 
-if [ ! -d "$PWD"/.git ]; then 
+if [ ! -d "$PWD"/.git ]; then
     cancel_execution "This script must be run within the project's root directory"
 fi
 
-build_target="$(rustup target list | grep 'installed')"
-build_target="${build_target%' (installed)'}"
-
 while getopts 'hVcCrt:p:' argument; do
     case "$argument" in
-        'h') print_help; exit 0;;
-        'V') print_version "$script_name" "$script_version"; exit 0;;
+    'h')
+        print_help
+        exit 0
+        ;;
+    'V')
+        print_version "$script_name" "$script_version"
+        exit 0
+        ;;
 
-        'c') clean_build=1;;
-        'C') clean_cache=1;;
-        'r') clean_bin=1;;
+    'c') clean_build=1 ;;
+    'C') clean_cache=1 ;;
+    'r') clean_bin=1 ;;
 
-        't') build_target="$OPTARG";;
-        'p') build_profile="$OPTARG";;
+    't') build_target="$OPTARG" ;;
+    'p') build_profile="$OPTARG" ;;
 
-        *) print_help; exit 1;;
+    *)
+        print_help
+        exit 1
+        ;;
     esac
 done
+
+declare -r checksum_path="$binary_dir/checksums"
+
+build_profile="${build_profile:-'release'}"
+build_target="${build_target:-"$(rustc -vV | sed -n 's|host: ||p')"}"
 
 if [ "$build_profile" = 'dev' ]; then
     declare -r executable_path="$target_dir/$build_target/debug/ina"
 else
     declare -r executable_path="$target_dir/$build_target/$build_profile/ina"
 fi
-declare -r checksum_path="$binary_dir/checksums"
 
 echo -e 'Publishing executable\n'
 
-if [ -z "$build_profile" ]; then
-    build_profile='release'
-fi
-if [ -z "$build_target" ]; then
-    build_target="$(rustup target list | grep 'installed')"
-    build_target="${build_target%' (installed)'}"
-fi
-
-if [ $clean_build ]; then
+if [ "$clean_build" -eq 1 ]; then
     eval_step 'Cleaning build directory' 'cargo clean'
 fi
 
 unset clean_build
 
-if [ $clean_cache ]; then
+if [ "$clean_cache" -eq 1 ]; then
     eval_step 'Cleaning Cargo cache' 'cargo cache -r all'
 fi
 
 unset clean_cache
 
-if [ $clean_bin ]; then
-    eval_step 'Cleaning previous builds' "[ -e '$binary_dir' ] && rm -r '$binary_dir'"
+if [ "$clean_bin" -eq 1 ] && [ -e "$binary_dir" ]; then
+    eval_step 'Cleaning previous builds' "rm -r '$binary_dir'"
 fi
+
+unset clean_bin
 
 eval_step 'Compiling executable' "cargo build --profile='$build_profile' --target='$build_target'"
 
@@ -123,10 +132,10 @@ unset escaped_binary_dir
 echo -ne '\nChecksums'
 
 if [ -n "$(which clip.exe)" ]; then
-    clip.exe < "$checksum_path"
+    clip.exe <"$checksum_path"
     echo -n ' (also copied to your clipboard)'
 elif [ -n "$(which xclip)" ]; then
-    xclip -selection clipboard < "$checksum_path"
+    xclip -selection clipboard <"$checksum_path"
     echo -n ' (also copied to your clipboard)'
 fi
 
