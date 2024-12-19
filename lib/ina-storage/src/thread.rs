@@ -240,9 +240,7 @@ pub async fn read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
     let response = THREAD.async_api().get_mut().await.invoke(Request::Read(path)).await?;
 
     match response {
-        Response::Read(bytes) => tokio::runtime::Handle::current()
-            .block_on(async move { T::data_format().decode(&bytes) })
-            .map_err(Into::into),
+        Response::Read(bytes) => T::data_format().decode(&bytes).map_err(Into::into),
         Response::Error(error) => Err(error),
         _ => unreachable!("unexpected response: '{response:?}'"),
     }
@@ -273,7 +271,7 @@ pub fn blocking_read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
 ///
 /// This function will return an error if the message could not be sent.
 pub async fn write<T: Stored>(path: Box<Path>, value: &T) -> anyhow::Result<()> {
-    let bytes = tokio::runtime::Handle::current().block_on(async move { T::data_format().encode(value) })?;
+    let bytes = T::data_format().encode(value)?;
     let response = THREAD.async_api().get_mut().await.invoke(Request::Write(path, bytes)).await?;
 
     match response {

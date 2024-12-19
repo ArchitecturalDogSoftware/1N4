@@ -296,7 +296,7 @@ impl DataWriter for Storage {
             let result = system_call!(match self.settings.system, async mut => .rename(&from, &into));
 
             if result.is_ok() {
-                let mut cache = self.cache.blocking_write();
+                let mut cache = self.cache.write().await;
                 let Some(value) = cache.remove(&(*from)) else { return result };
 
                 cache.insert(into.into_boxed_path(), value);
