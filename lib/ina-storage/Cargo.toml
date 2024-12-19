@@ -16,14 +16,23 @@ repository.workspace = true
 workspace = true
 
 [features]
-default = ["system-file", "system-memory"]
+default = ["caching", "system-file", "system-memory"]
+caching = []
 format-compression = ["dep:flate2"]
 format-json = ["dep:serde_json"]
 format-messagepack = ["dep:rmp-serde"]
 format-postcard = ["dep:postcard"]
 system-file = ["tokio/fs"]
 system-memory = []
-full = ["format-compression", "format-json", "format-messagepack", "format-postcard", "system-file", "system-memory"]
+full = [
+    "caching",
+    "format-compression",
+    "format-json",
+    "format-messagepack",
+    "format-postcard",
+    "system-file",
+    "system-memory",
+]
 
 [dependencies]
 anyhow.workspace = true

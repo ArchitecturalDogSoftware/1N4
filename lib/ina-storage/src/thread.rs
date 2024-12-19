@@ -78,7 +78,7 @@ pub async fn start(settings: Settings) -> Result<()> {
     assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
-    let storage = Storage { settings };
+    let storage = Storage::new(settings);
 
     THREAD.async_api().set(StatefulInvoker::spawn_with_runtime("storage", storage, self::run, capacity)?).await;
 
@@ -98,7 +98,7 @@ pub fn blocking_start(settings: Settings) -> Result<()> {
     assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
 
     let capacity = settings.queue_capacity.get();
-    let storage = Storage { settings };
+    let storage = Storage::new(settings);
 
     THREAD.sync_api().set(StatefulInvoker::spawn_with_runtime("storage", storage, self::run, capacity)?);
 
