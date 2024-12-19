@@ -43,7 +43,7 @@ release = [
     # Listening to your wishes!
     { status = "online", activity = 2, content = "your wishes!" },
     # Listening to the static!
-    { status = "dnd", activity = 2, content = "your wishes!" },
+    { status = "dnd", activity = 2, content = "the static!" },
     # Watching the sparks!
     { status = "online", activity = 3, content = "the sparks!" },
     # Watching your back!
@@ -53,5 +53,5 @@ release = [
     # Watching for runaways!
     { status = "dnd", activity = 3, content = "for runaways!" },
     # Watching the factory!
-    { status = "online", activity = 3, content = "the factory!" },
+    { status = "dnd", activity = 3, content = "the factory!" },
 ]
