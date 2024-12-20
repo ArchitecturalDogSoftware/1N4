@@ -45,8 +45,11 @@ pub enum ParseError {
 /// An RGB color.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Color {
+    /// The R component.
     r: u8,
+    /// The G component.
     g: u8,
+    /// The B component.
     b: u8,
 }
 
