@@ -49,26 +49,26 @@ fi
 
 while getopts 'hVcCrt:p:' argument; do
     case "$argument" in
-    'h')
-        print_help
-        exit 0
-        ;;
-    'V')
-        print_version "$script_name" "$script_version"
-        exit 0
-        ;;
+        'h')
+            print_help
+            exit 0
+            ;;
+        'V')
+            print_version "$script_name" "$script_version"
+            exit 0
+            ;;
 
-    'c') clean_build=1 ;;
-    'C') clean_cache=1 ;;
-    'r') clean_bin=1 ;;
+        'c') clean_build=1 ;;
+        'C') clean_cache=1 ;;
+        'r') clean_bin=1 ;;
 
-    't') build_target="$OPTARG" ;;
-    'p') build_profile="$OPTARG" ;;
+        't') build_target="$OPTARG" ;;
+        'p') build_profile="$OPTARG" ;;
 
-    *)
-        print_help
-        exit 1
-        ;;
+        *)
+            print_help
+            exit 1
+            ;;
     esac
 done
 
@@ -132,10 +132,10 @@ unset escaped_binary_dir
 echo -ne '\nChecksums'
 
 if [ -n "$(which clip.exe)" ]; then
-    clip.exe <"$checksum_path"
+    clip.exe < "$checksum_path"
     echo -n ' (also copied to your clipboard)'
 elif [ -n "$(which xclip)" ]; then
-    xclip -selection clipboard <"$checksum_path"
+    xclip -selection clipboard < "$checksum_path"
     echo -n ' (also copied to your clipboard)'
 fi
 
