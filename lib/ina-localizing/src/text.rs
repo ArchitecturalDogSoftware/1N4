@@ -132,9 +132,9 @@ where
     I: Deref<Target = str> + for<'a> From<&'a str>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Present(t) | Self::Inherit(_, t) => write!(f, "{}", &(***t)),
-            Self::Missing(c, k) => write!(f, "{}::{}", &(***c), &(***k)),
+        match *self {
+            Self::Present(t) | Self::Inherit(_, t) => write!(f, "{}", &(**t)),
+            Self::Missing(c, k) => write!(f, "{}::{}", &(**c), &(**k)),
         }
     }
 }
