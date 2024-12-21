@@ -18,7 +18,7 @@
 
 #![feature(array_try_from_fn)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
@@ -108,7 +108,7 @@ impl Localizer {
 
     /// Clears the specified locales if they have been loaded, clearing all locales if given [`None`].
     pub fn clear_locales(&mut self, locales: Option<impl IntoIterator<Item = Locale>>) {
-        if let Some(locales) = locales.map(|l| l.into_iter().collect::<Box<[_]>>()) {
+        if let Some(locales) = locales.map(|l| l.into_iter().collect::<HashSet<_>>()) {
             self.languages.retain(|l, _| !locales.contains(l));
         } else {
             self.languages.clear();
@@ -207,7 +207,7 @@ impl Localizer {
             };
         };
 
-        language.get_recursive(category, key, self.settings.miss_behavior, &self.languages, Language::DEFAULT_MAX_DEPTH)
+        language.get_recursive(category, key, self.settings.miss_behavior, &self.languages, self.settings.search_depth)
     }
 }
 
@@ -223,9 +223,6 @@ pub struct Language {
 }
 
 impl Language {
-    /// The default amount of depth at which to search for a key before giving up.
-    const DEFAULT_MAX_DEPTH: usize = 4;
-
     /// Returns the text for a key within the given category as written within this language file.
     ///
     /// # Errors

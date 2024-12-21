@@ -51,6 +51,11 @@ pub struct Settings {
     #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value = "8")]
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
+
+    /// The amount of depth at which to search for a translation key in language files with inherited translations.
+    #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth", default_value = "2")]
+    #[serde(default = "default_search_depth")]
+    pub search_depth: usize,
 }
 
 /// The behavior to follow when the localizer is unable to translate a key.
@@ -92,4 +97,9 @@ const fn default_queue_capacity() -> NonZeroUsize {
 /// Returns the default language file directory.
 fn default_directory() -> Box<Path> {
     std::path::PathBuf::from("./res/lang/").into_boxed_path()
+}
+
+/// Returns the default recursive search depth.
+const fn default_search_depth() -> usize {
+    2
 }
