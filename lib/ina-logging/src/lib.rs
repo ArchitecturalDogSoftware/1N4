@@ -16,6 +16,7 @@
 
 //! Provides logging solutions for 1N4.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -75,7 +76,7 @@ pub struct Logger {
     /// The logger's settings.
     settings: Settings,
     /// The logger's endpoints.
-    endpoints: Vec<Arc<RwLock<Box<dyn Endpoint>>>>,
+    endpoints: HashMap<&'static str, Arc<RwLock<Box<dyn Endpoint>>>>,
     /// The logger's entry queue.
     queue: Vec<Arc<Entry<'static>>>,
     /// Whether the logger has been initialized.
@@ -88,7 +89,7 @@ impl Logger {
     pub fn new(settings: Settings) -> Self {
         let queue = Vec::with_capacity(settings.queue_capacity.get());
 
-        Self { settings, endpoints: vec![], queue, initialized: false }
+        Self { settings, endpoints: HashMap::new(), queue, initialized: false }
     }
 
     /// Returns whether this [`Logger`] is enabled.
@@ -149,7 +150,7 @@ impl Logger {
             return Err(Error::AlreadyInitialized);
         }
 
-        for endpoint in &self.endpoints {
+        for endpoint in self.endpoints.values() {
             endpoint.write().await.setup(&self.settings).await?;
         }
 
@@ -163,18 +164,16 @@ impl Logger {
     /// # Errors
     ///
     /// This function will return an error if the endpoint was already added.
-    pub async fn push_endpoint(&mut self, endpoint: Box<dyn Endpoint>) -> Result<()> {
+    pub fn push_endpoint(&mut self, endpoint: Box<dyn Endpoint>) -> Result<()> {
         if self.initialized {
             return Err(Error::AlreadyInitialized);
         }
 
-        for contained in &self.endpoints {
-            if contained.read().await.name() == endpoint.name() {
-                return Err(Error::DuplicateEndpoint(endpoint.name()));
-            }
+        if self.endpoints.contains_key(endpoint.name()) {
+            return Err(Error::DuplicateEndpoint(endpoint.name()));
         }
 
-        self.endpoints.push(Arc::new(RwLock::new(endpoint)));
+        self.endpoints.insert(endpoint.name(), Arc::new(RwLock::new(endpoint)));
 
         Ok(())
     }
@@ -213,7 +212,7 @@ impl Logger {
         let mut tasks = JoinSet::<Result<(), Error>>::new();
 
         #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
-        for endpoint in self.endpoints.iter().cloned() {
+        for endpoint in self.endpoints.values().cloned() {
             let iterator: Box<[_]> = self.queue.iter().cloned().collect();
 
             tasks.spawn(async move {
@@ -250,7 +249,7 @@ impl Logger {
 
         self.flush().await?;
 
-        for endpoint in self.endpoints {
+        for endpoint in self.endpoints.into_values() {
             endpoint.write().await.close().await?;
         }
 

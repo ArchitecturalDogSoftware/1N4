@@ -283,7 +283,7 @@ async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> 
             request = receiver.recv() => match request {
                 Some(Request::Entry(entry)) => logger.push_entry(entry).await?,
                 Some(Request::Flush) => logger.flush().await?,
-                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint).await?,
+                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint)?,
                 Some(Request::Setup) => logger.setup().await?,
                 None | Some(Request::Close) => return logger.close().await,
             },
