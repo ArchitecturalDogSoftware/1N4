@@ -78,17 +78,17 @@ pub struct Storage {
 
 impl Storage {
     /// Creates a new [`Storage`].
-    #[cfg(not(feature = "caching"))]
-    #[must_use]
-    pub const fn new(settings: Settings) -> Self {
-        Self { settings }
-    }
-
-    /// Creates a new [`Storage`].
     #[cfg(feature = "caching")]
     #[must_use]
     pub fn new(settings: Settings) -> Self {
-        Self { settings, cache: RwLock::new(HashMap::new()) }
+        #[cfg(feature = "caching")]
+        {
+            Self { settings, cache: RwLock::new(HashMap::new()) }
+        }
+        #[cfg(not(feature = "caching"))]
+        {
+            Self { settings }
+        }
     }
 }
 
@@ -98,7 +98,7 @@ impl Storage {
 pub enum System {
     /// The file system.
     #[cfg(feature = "system-file")]
-    #[default]
+    #[cfg_attr(feature = "system-file", default)]
     File,
     /// The memory system. This should only be used for testing, as data does not persist between runs.
     #[cfg(feature = "system-memory")]
