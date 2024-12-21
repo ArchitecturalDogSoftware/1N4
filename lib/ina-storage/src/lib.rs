@@ -78,7 +78,6 @@ pub struct Storage {
 
 impl Storage {
     /// Creates a new [`Storage`].
-    #[cfg(feature = "caching")]
     #[must_use]
     pub fn new(settings: Settings) -> Self {
         #[cfg(feature = "caching")]
