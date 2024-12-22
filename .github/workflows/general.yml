@@ -1,0 +1,33 @@
+name: General Lints
+
+on: [push, pull_request]
+
+jobs:
+    toml:
+        runs-on: ubuntu-latest
+        container: docker://tamasfe/taplo:0.9
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Action - Check TOML formatting
+              run: taplo format --check
+            - name: Action - Lint TOML files
+              run: taplo lint --default-schema-catalogs
+
+    shell:
+        runs-on: ubuntu-latest
+        container: docker://mvdan/shfmt:v3
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup - Install shellcheck
+              run: echo maybe preinstalled? # sudo apt install -y shellcheck
+
+            - name: Action - Lint shell scripts with shellcheck
+              run: shfmt --find . | xargs --delimiter=$'\n' shellcheck
+            - name: Action - Check shell script formatting
+              run: shfmt --diff .
+
+    yaml:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
