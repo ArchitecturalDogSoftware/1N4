@@ -33,8 +33,6 @@ jobs:
         container: golang:1-alpine
         steps:
             - uses: actions/checkout@v4
-            - name: DEBUG - Check if workflows are present when run with GH Actions proper
-              run: ls -lahR .github
             - name: Setup - Install yamlfmt
               run: go install github.com/google/yamlfmt/cmd/yamlfmt@v0.14
             - name: Setup - Install actionlint
@@ -42,8 +40,10 @@ jobs:
 
             - name: Action - Check YAML formatting
               run: yamlfmt -lint .
+            - run: pwd
+            - run: ls -lAhR .
             - name: Action - Lint GitHub Actions workflows
-              run: actionlint
+              run: actionlint -verbose
 
     markdown:
         runs-on: ubuntu-latest
