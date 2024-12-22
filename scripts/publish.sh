@@ -14,6 +14,7 @@
 
 set -euo pipefail
 
+# shellcheck disable=1091
 . "$(dirname "$0")/utilities.sh"
 
 declare -r script_name='publish'
