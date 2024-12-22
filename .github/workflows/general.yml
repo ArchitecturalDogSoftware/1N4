@@ -40,10 +40,15 @@ jobs:
 
             - name: Action - Check YAML formatting
               run: yamlfmt -lint .
-            - run: pwd
-            - run: ls -lAhR .
             - name: Action - Lint GitHub Actions workflows
-              run: actionlint -verbose
+              # actionlint cannot recurse on its own without `.git/`, which `actions/checkout` does not provide.
+              # Accordingly, we do that ourselves.
+              #
+              # It is necessary to use `find` instead of just `actionlint .github/workflows/*` because GitHub is
+              # considering allowing subdirectories:
+              #
+              # <https://github.com/orgs/community/discussions/4174>
+              run: find .github/workflows/ \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 actionlint
 
     markdown:
         runs-on: ubuntu-latest
