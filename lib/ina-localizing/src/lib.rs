@@ -23,6 +23,7 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 
+use ina_logging::warn;
 use ina_threading::threads::invoker::{Nonce, State};
 use serde::{Deserialize, Serialize};
 use text::Text;
@@ -186,6 +187,8 @@ impl Localizer {
 
             if let Ok(locale) = name.to_string_lossy().parse() {
                 locales.push(locale);
+            } else {
+                warn!(async "invalid locale file name: {}", path.to_string_lossy()).await?;
             }
         }
 
