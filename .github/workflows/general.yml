@@ -5,6 +5,7 @@ on: [push, pull_request]
 jobs:
     toml:
         runs-on: ubuntu-latest
+        # Doesn't have a SemVer tag for v0.9.*, we will have to update patch-by-patch.
         container: tamasfe/taplo:0.9.3
         steps:
             - uses: actions/checkout@v4
@@ -27,7 +28,24 @@ jobs:
             - name: Action - Check shell script formatting
               run: shfmt --diff .
 
-# yaml:
-#     runs-on: ubuntu-latest
-#     steps:
-#         - uses: actions/checkout@v4
+    yaml:
+        runs-on: ubuntu-latest
+        container: golang:1-alpine
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup - Install yamlfmt
+              run: go install github.com/google/yamlfmt/cmd/yamlfmt@v0.14
+            - name: Setup - Install actionlint
+              run: go install github.com/rhysd/actionlint/cmd/actionlint@v1
+
+            - name: Action - Check YAML formatting
+              run: yamlfmt -lint .
+            - name: Action - Lint GitHub Actions workflows
+              run: actionlint
+
+    markdown:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Action - Install and check files with mdformat
+              run: pipx run mdformat~=0.7 --check .
