@@ -29,7 +29,10 @@ mod stored;
 ///
 /// A struct that represents a translatable input field.
 ///
-/// ```ignore
+/// ```
+/// # use ina_macro::AsTranslation;
+/// # use ina_localizing::AsTranslation;
+/// # mod category { pub const UI: &str = ""; }
 /// #[derive(AsTranslation)]
 /// #[localizer_category(category::UI)]
 /// #[localizer_key(from = title)]
@@ -41,7 +44,10 @@ mod stored;
 ///
 /// An enum of values that can be translated.
 ///
-/// ```ignore
+/// ```
+/// # use ina_macro::AsTranslation;
+/// # use ina_localizing::AsTranslation;
+/// # mod category { pub const UI: &str = ""; }
 /// #[derive(AsTranslation)]
 /// #[localizer_category(category::UI)]
 /// pub enum DataType {
@@ -56,7 +62,10 @@ mod stored;
 ///
 /// A struct with a complex key.
 ///
-/// ```ignore
+/// ```
+/// # use ina_macro::AsTranslation;
+/// # use ina_localizing::AsTranslation;
+/// # mod category { pub const UI: &str = ""; }
 /// #[derive(AsTranslation)]
 /// #[localizer_category(category::UI)]
 /// pub enum Type {
@@ -66,9 +75,9 @@ mod stored;
 ///     Number,
 /// }
 ///
-/// impl Display for Type {
+/// impl std::fmt::Display for Type {
 ///     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-///         write!(f, "{}", self.localizer_key())
+///         write!(f, "{}", self.localizer_key().into())
 ///     }
 /// }
 ///

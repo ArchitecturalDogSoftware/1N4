@@ -24,5 +24,6 @@ quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
 [dev-dependencies]
+ina-localizing.workspace = true
 ina-storage = { workspace = true, features = ["format-compression", "format-messagepack"] }
 serde.workspace = true
