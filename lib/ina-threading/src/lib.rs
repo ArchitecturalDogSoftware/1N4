@@ -144,7 +144,7 @@ where
 
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
 
-            runtime.block_on(async move { f().await })
+            runtime.block_on(f())
         })
     }
 }
