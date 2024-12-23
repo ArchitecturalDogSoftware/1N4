@@ -39,6 +39,28 @@ where
 {
     /// Spawns a new [`Exchanger<S, R, T>`] with the given name and task.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::{Handle, ReceiverHandle, SenderHandle};
+    /// # use ina_threading::threads::exchanger::Exchanger;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Exchanger::spawn("worker", capacity, |s, mut r| {
+    ///     assert_eq!(r.blocking_recv(), Some(123));
+    ///
+    ///     s.blocking_send(456).expect("the channel should not be closed");
+    /// })?;
+    ///
+    /// thread.as_sender().blocking_send(123).expect("the channel should not be closed");
+    ///
+    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(456));
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
@@ -57,6 +79,28 @@ where
     /// Spawns a new [`Exchanger<S, R, T>`] with the given name and asynchronous task.
     ///
     /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::{Handle, ReceiverHandle, SenderHandle};
+    /// # use ina_threading::threads::exchanger::Exchanger;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Exchanger::spawn_with_runtime("worker", capacity, |s, mut r| async move {
+    ///     assert_eq!(r.recv().await, Some(123));
+    ///
+    ///     s.send(456).await.expect("the channel should not be closed");
+    /// })?;
+    ///
+    /// thread.as_sender().blocking_send(123).expect("the channel should not be closed");
+    ///
+    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(456));
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///

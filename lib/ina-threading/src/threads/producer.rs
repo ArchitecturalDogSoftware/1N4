@@ -36,6 +36,26 @@ where
 {
     /// Spawns a new [`Producer<R, T>`] with the given name and task.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::{Handle, ReceiverHandle};
+    /// # use ina_threading::threads::producer::Producer;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Producer::spawn("worker", capacity, |s| {
+    ///     std::thread::sleep(std::time::Duration::from_secs(1));
+    ///
+    ///     s.blocking_send(123).expect("the channel should not be closed");
+    /// })?;
+    ///
+    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(123));
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
@@ -52,6 +72,26 @@ where
     /// Spawns a new [`Producer<R, T>`] with the given name and asynchronous task.
     ///
     /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::{Handle, ReceiverHandle};
+    /// # use ina_threading::threads::producer::Producer;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Producer::spawn_with_runtime("worker", capacity, |s| async move {
+    ///     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    ///
+    ///     s.send(123).await.expect("the channel should not be closed");
+    /// })?;
+    ///
+    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(123));
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///

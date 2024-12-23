@@ -28,16 +28,73 @@ pub struct Static<H> {
 
 impl<H> Static<H> {
     /// Creates a new [`Static<H>`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{Handle, Thread};
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<u8>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Thread::spawn("worker", || 2 + 2)?);
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    ///
+    /// let thread = THREAD.sync_api().take().unwrap().into_join_handle();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(thread.join().unwrap(), 4);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn new() -> Self {
         Self { inner: RwLock::const_new(None) }
     }
 
     /// Creates a new [`Static<H>`] containing the given handle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{Handle, Thread};
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let thread = Static::wrap(Thread::spawn("worker", || 2 + 2)?);
+    ///
+    /// assert!(thread.sync_api().is_initialized());
+    ///
+    /// let actual_thread = thread.sync_api().take().unwrap();
+    ///
+    /// assert!(!thread.sync_api().is_initialized());
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(actual_thread.into_join_handle().join().unwrap(), 4);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn wrap(handle: H) -> Self {
         Self { inner: RwLock::const_new(Some(handle)) }
     }
 
     /// Returns an asynchronous API for this [`Static<H>`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// static THREAD: Static<Thread<u8>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// # }
+    /// ```
     pub const fn async_api(&self) -> AsyncStaticApi<H>
     where
         H: Send + Sync,
@@ -46,6 +103,16 @@ impl<H> Static<H> {
     }
 
     /// Returns a synchronous API for this [`Static<H>`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// static THREAD: Static<Thread<u8>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    /// ```
     pub const fn sync_api(&self) -> SyncStaticApi<H> {
         SyncStaticApi { inner: &self.inner }
     }
@@ -66,16 +133,70 @@ where
     H: Handle,
 {
     /// Creates a new [`StaticJoining<H>`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{Handle, Thread};
+    /// # use ina_threading::joining::Joining;
+    /// # use ina_threading::statics::StaticJoining;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: StaticJoining<Thread<()>> = StaticJoining::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Joining::new(Thread::spawn("worker", || {})?));
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().close();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn new() -> Self {
         Self { inner: RwLock::const_new(None) }
     }
 
     /// Creates a new [`StaticJoining<H>`] containing the given handle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{Handle, Thread};
+    /// # use ina_threading::joining::Joining;
+    /// # use ina_threading::statics::StaticJoining;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let joining = Joining::new(Thread::spawn("worker", || {})?);
+    /// let thread = StaticJoining::wrap(joining);
+    ///
+    /// assert!(thread.sync_api().is_initialized());
+    ///
+    /// thread.sync_api().close();
+    ///
+    /// assert!(!thread.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn wrap(handle: Joining<H>) -> Self {
         Self { inner: RwLock::const_new(Some(handle)) }
     }
 
     /// Returns an asynchronous API for this [`StaticJoining<H>`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::StaticJoining;
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// static THREAD: StaticJoining<Thread<u8>> = StaticJoining::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// # }
+    /// ```
     pub const fn async_api(&self) -> AsyncStaticApi<Joining<H>>
     where
         H: Send + Sync,
@@ -84,6 +205,16 @@ where
     }
 
     /// Returns a synchronous API for this [`StaticJoining<H>`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::StaticJoining;
+    /// static THREAD: StaticJoining<Thread<u8>> = StaticJoining::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    /// ```
     pub const fn sync_api(&self) -> SyncStaticApi<Joining<H>> {
         SyncStaticApi { inner: &self.inner }
     }
@@ -106,11 +237,43 @@ where
     H: Send + Sync,
 {
     /// Returns whether the inner thread handle has been initialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn is_initialized(&self) -> bool {
         self.inner.read().await.is_some()
     }
 
     /// Initializes the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -123,6 +286,28 @@ where
 
     /// Closes the thread.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().close().await;
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
@@ -131,6 +316,28 @@ where
     }
 
     /// Returns a reference to the inner thread handle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().get().await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -141,6 +348,28 @@ where
 
     /// Returns a mutable reference to the inner thread handle.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().get_mut().await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
@@ -149,6 +378,28 @@ where
     }
 
     /// Returns the inner thread handle, if it has been initialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    ///
+    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
+    ///
+    /// assert!(THREAD.async_api().is_initialized().await);
+    ///
+    /// let _thread = THREAD.async_api().take().await.unwrap();
+    ///
+    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn take(&self) -> Option<H> {
         self.inner.write().await.take()
     }
@@ -165,12 +416,39 @@ pub struct SyncStaticApi<'sth, H> {
 #[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
 impl<H> SyncStaticApi<'_, H> {
     /// Returns whether the inner thread handle has been initialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    /// ```
     #[must_use]
     pub fn is_initialized(&self) -> bool {
         self.inner.blocking_read().is_some()
     }
 
     /// Initializes the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -183,6 +461,27 @@ impl<H> SyncStaticApi<'_, H> {
 
     /// Closes the thread.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().close();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
@@ -191,6 +490,27 @@ impl<H> SyncStaticApi<'_, H> {
     }
 
     /// Returns a reference to the inner thread handle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().get();
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -201,6 +521,27 @@ impl<H> SyncStaticApi<'_, H> {
 
     /// Returns a mutable reference to the inner thread handle.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().get_mut();
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
@@ -210,6 +551,27 @@ impl<H> SyncStaticApi<'_, H> {
     }
 
     /// Returns the inner thread handle, if it has been initialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::statics::Static;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// static THREAD: Static<Thread<()>> = Static::new();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    ///
+    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
+    ///
+    /// assert!(THREAD.sync_api().is_initialized());
+    ///
+    /// let _thread = THREAD.sync_api().take().unwrap();
+    ///
+    /// assert!(!THREAD.sync_api().is_initialized());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
