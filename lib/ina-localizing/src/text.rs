@@ -27,16 +27,22 @@ pub type TextInner = Arc<str>;
 
 /// A borrowed translation key.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize)]
-pub enum TextRef<'tx: 'fc, 'fc> {
+pub enum TextRef<'tx: 'fc, 'fc, I = TextInner>
+where
+    I: Deref<Target = str> + for<'a> From<&'a str>,
+{
     /// The text was present within the initial map.
-    Present(&'tx str),
+    Present(&'tx I),
     /// The text was present within a parent map.
-    Inherit(Locale, &'tx str),
+    Inherit(Locale, &'tx I),
     /// The text was not present.
-    Missing(&'fc str, &'fc str),
+    Missing(&'fc I, &'fc I),
 }
 
-impl<'tx: 'fc, 'fc> TextRef<'tx, 'fc> {
+impl<'tx: 'fc, 'fc, I> TextRef<'tx, 'fc, I>
+where
+    I: Deref<Target = str> + for<'a> From<&'a str>,
+{
     /// Returns `true` if the text ref is [`Present`].
     ///
     /// [`Present`]: TextRef::Present
@@ -100,29 +106,35 @@ impl<'tx: 'fc, 'fc> TextRef<'tx, 'fc> {
     ///
     /// This may be a cheap or expensive conversion depending on the typing of the `I` generic.
     #[must_use]
-    pub fn into_owned<I>(self) -> Text<I>
+    pub fn into_owned(self) -> Text<I>
     where
-        I: Deref<Target = str> + for<'a> From<&'a str>,
+        I: Clone,
     {
         match self {
-            Self::Present(t) => Text::Present(t.into()),
-            Self::Inherit(l, t) => Text::Inherit(l, t.into()),
-            Self::Missing(c, k) => Text::Missing(c.into(), k.into()),
+            Self::Present(t) => Text::Present(t.clone()),
+            Self::Inherit(l, t) => Text::Inherit(l, t.clone()),
+            Self::Missing(c, k) => Text::Missing(c.clone(), k.to_owned()),
         }
     }
 }
 
-impl<'tx: 'fc, 'fc> From<TextRef<'tx, 'fc>> for String {
-    fn from(value: TextRef<'tx, 'fc>) -> Self {
+impl<'tx: 'fc, 'fc, I> From<TextRef<'tx, 'fc, I>> for String
+where
+    I: Deref<Target = str> + for<'a> From<&'a str>,
+{
+    fn from(value: TextRef<'tx, 'fc, I>) -> Self {
         value.to_string()
     }
 }
 
-impl<'tx: 'fc, 'fc> Display for TextRef<'tx, 'fc> {
+impl<'tx: 'fc, 'fc, I> Display for TextRef<'tx, 'fc, I>
+where
+    I: Deref<Target = str> + for<'a> From<&'a str>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Present(t) | Self::Inherit(_, t) => write!(f, "{t}"),
-            Self::Missing(c, k) => write!(f, "{c}::{k}"),
+        match *self {
+            Self::Present(t) | Self::Inherit(_, t) => write!(f, "{}", &(**t)),
+            Self::Missing(c, k) => write!(f, "{}::{}", &(**c), &(**k)),
         }
     }
 }
@@ -218,7 +230,7 @@ where
     }
 
     /// Returns a borrowed version of this [`Text`].
-    pub fn as_borrowed(&self) -> TextRef {
+    pub const fn as_borrowed(&self) -> TextRef<I> {
         match self {
             Self::Present(t) => TextRef::Present(t),
             Self::Inherit(l, t) => TextRef::Inherit(*l, t),
@@ -229,7 +241,7 @@ where
 
 impl<I> From<Text<I>> for String
 where
-    I: Deref<Target = str> + for<'a> From<&'a str>,
+    I: Clone + Deref<Target = str> + for<'a> From<&'a str>,
 {
     fn from(value: Text<I>) -> Self {
         Self::from(value.as_borrowed())

@@ -142,9 +142,27 @@ pub async fn registry() -> impl Deref<Target = CommandRegistry> {
     REGISTRY.read().await
 }
 
+/// Returns a reference to the command registry.
+///
+/// # Panics
+///
+/// Panics if used from within an asynchronous context.
+pub fn blocking_registry() -> impl Deref<Target = CommandRegistry> {
+    REGISTRY.blocking_read()
+}
+
 /// Returns a mutable reference to the command registry.
 pub async fn registry_mut() -> impl DerefMut<Target = CommandRegistry> {
     REGISTRY.write().await
+}
+
+/// Returns a mutable reference to the command registry.
+///
+/// # Panics
+///
+/// Panics if used from within an asynchronous context.
+pub fn blocking_registry_mut() -> impl DerefMut<Target = CommandRegistry> {
+    REGISTRY.blocking_write()
 }
 
 /// Initializes the command registry.

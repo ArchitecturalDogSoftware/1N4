@@ -15,13 +15,14 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::num::NonZeroUsize;
+use std::ops::Deref;
 use std::path::Path;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
 
 use crate::locale::Locale;
-use crate::text::TextRef;
+use crate::text::Text;
 use crate::{Error, Result};
 
 /// The localizer's settings.
@@ -50,6 +51,11 @@ pub struct Settings {
     #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value = "8")]
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
+
+    /// The amount of depth at which to search for a translation key in language files with inherited translations.
+    #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth", default_value = "2")]
+    #[serde(default = "default_search_depth")]
+    pub search_depth: usize,
 }
 
 /// The behavior to follow when the localizer is unable to translate a key.
@@ -70,9 +76,12 @@ impl MissingBehavior {
     /// # Errors
     ///
     /// This function will return an error if the miss behavior specifies that outcome.
-    pub fn call<'tx: 'fc, 'fc>(&self, category: &'fc str, key: &'fc str) -> Result<TextRef<'tx, 'fc>> {
+    pub fn call<'tx: 'fc, 'fc, I>(&self, category: &'fc str, key: &'fc str) -> Result<Text<I>>
+    where
+        I: Deref<Target = str> + for<'a> From<&'a str>,
+    {
         match self {
-            Self::Return => Ok(TextRef::Missing(category, key)),
+            Self::Return => Ok(Text::Missing(category.into(), key.into())),
             Self::Error => Err(Error::MissingText(category.into(), key.into())),
         }
     }
@@ -88,4 +97,9 @@ const fn default_queue_capacity() -> NonZeroUsize {
 /// Returns the default language file directory.
 fn default_directory() -> Box<Path> {
     std::path::PathBuf::from("./res/lang/").into_boxed_path()
+}
+
+/// Returns the default recursive search depth.
+const fn default_search_depth() -> usize {
+    2
 }

@@ -20,9 +20,7 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use crate::Storage;
-use crate::format::{DataDecode, DataEncode, DataFormat};
-use crate::system::{DataReader, DataSystem, DataWriter};
+use crate::format::DataFormat;
 
 /// A value that can be stored within the storage system.
 pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {
@@ -80,7 +78,7 @@ impl<T: Stored> AsyncApi<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
 
-        Storage::get().await.exists(&path).await
+        crate::thread::exists(path.into_boxed_path()).await
     }
 
     /// Returns the size of the stored data for the value represented by the given path arguments.
@@ -92,7 +90,7 @@ impl<T: Stored> AsyncApi<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
 
-        Storage::get().await.size(&path).await
+        crate::thread::size(path.into_boxed_path()).await
     }
 
     /// Returns the stored value represented by the given path arguments.
@@ -103,9 +101,8 @@ impl<T: Stored> AsyncApi<T> {
     pub async fn read(self, arguments: T::PathArguments) -> Result<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-        let bytes = Storage::get().await.read(&path).await?;
 
-        T::data_format().decode(&bytes).map_err(Into::into)
+        crate::thread::read(path.into_boxed_path()).await
     }
 
     /// Writes the given value into the storage system at the path represented by the given path arguments.
@@ -116,9 +113,8 @@ impl<T: Stored> AsyncApi<T> {
     pub async fn write(self, arguments: T::PathArguments, value: &T) -> Result<()> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-        let bytes = format.encode(value)?;
 
-        Storage::get_mut().await.write(&path, &bytes).await
+        crate::thread::write(path.into_boxed_path(), value).await
     }
 
     /// Renames the value represented by the given path arguments.
@@ -131,7 +127,7 @@ impl<T: Stored> AsyncApi<T> {
         let from = T::data_path_for(from).as_ref().with_extension(format.extension());
         let into = T::data_path_for(into).as_ref().with_extension(format.extension());
 
-        Storage::get_mut().await.rename(&from, &into).await
+        crate::thread::rename(from.into_boxed_path(), into.into_boxed_path()).await
     }
 
     /// Deletes the value represented by the given path arguments.
@@ -143,7 +139,7 @@ impl<T: Stored> AsyncApi<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
 
-        Storage::get_mut().await.delete(&path).await
+        crate::thread::delete(path.into_boxed_path()).await
     }
 }
 
@@ -163,7 +159,7 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
-        Storage::get().await.exists(&path).await
+        crate::thread::exists(path.into_boxed_path()).await
     }
 
     /// Returns the size of the stored data for this value.
@@ -175,7 +171,7 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
-        Storage::get().await.size(&path).await
+        crate::thread::size(path.into_boxed_path()).await
     }
 
     /// Returns the value as saved within the storage system.
@@ -186,9 +182,8 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
     pub async fn read(self) -> Result<T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
-        let bytes = Storage::get().await.read(&path).await?;
 
-        T::data_format().decode(&bytes).map_err(Into::into)
+        crate::thread::read(path.into_boxed_path()).await
     }
 
     /// Writes this value into the storage system.
@@ -199,9 +194,8 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
     pub async fn write(self) -> Result<()> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
-        let bytes = format.encode(self.0)?;
 
-        Storage::get_mut().await.write(&path, &bytes).await
+        crate::thread::write(path.into_boxed_path(), self.0).await
     }
 
     /// Renames this value.
@@ -214,7 +208,7 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
         let from = self.0.data_path().as_ref().with_extension(format.extension());
         let into = T::data_path_for(into).as_ref().with_extension(format.extension());
 
-        Storage::get_mut().await.rename(&from, &into).await
+        crate::thread::rename(from.into_boxed_path(), into.into_boxed_path()).await
     }
 
     /// Deletes this value.
@@ -226,7 +220,7 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
-        Storage::get_mut().await.delete(&path).await
+        crate::thread::delete(path.into_boxed_path()).await
     }
 }
 
@@ -257,7 +251,7 @@ impl<T: Stored> SyncApi<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
 
-        Storage::blocking_get().blocking_exists(&path)
+        crate::thread::blocking_exists(path.into_boxed_path())
     }
 
     /// Returns the size of the stored data for the value represented by the given path arguments.
@@ -275,7 +269,7 @@ impl<T: Stored> SyncApi<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
 
-        Storage::blocking_get().blocking_size(&path)
+        crate::thread::blocking_size(path.into_boxed_path())
     }
 
     /// Returns the stored value represented by the given path arguments.
@@ -292,9 +286,8 @@ impl<T: Stored> SyncApi<T> {
     pub fn read(self, arguments: T::PathArguments) -> Result<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-        let bytes = Storage::blocking_get().blocking_read(&path)?;
 
-        T::data_format().decode(&bytes).map_err(Into::into)
+        crate::thread::blocking_read(path.into_boxed_path())
     }
 
     /// Writes the given value into the storage system at the path represented by the given path arguments.
@@ -311,9 +304,8 @@ impl<T: Stored> SyncApi<T> {
     pub fn write(self, arguments: T::PathArguments, value: &T) -> Result<()> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-        let bytes = format.encode(value)?;
 
-        Storage::blocking_get_mut().blocking_write(&path, &bytes)
+        crate::thread::blocking_write(path.into_boxed_path(), value)
     }
 
     /// Renames the value represented by the given path arguments.
@@ -332,7 +324,7 @@ impl<T: Stored> SyncApi<T> {
         let from = T::data_path_for(from).as_ref().with_extension(format.extension());
         let into = T::data_path_for(into).as_ref().with_extension(format.extension());
 
-        Storage::blocking_get_mut().blocking_rename(&from, &into)
+        crate::thread::blocking_rename(from.into_boxed_path(), into.into_boxed_path())
     }
 
     /// Deletes the value represented by the given path arguments.
@@ -350,7 +342,7 @@ impl<T: Stored> SyncApi<T> {
         let format = T::data_format();
         let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
 
-        Storage::blocking_get_mut().blocking_delete(&path)
+        crate::thread::blocking_delete(path.into_boxed_path())
     }
 }
 
@@ -376,7 +368,7 @@ impl<T: Stored> SyncHolderApi<'_, T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
-        Storage::blocking_get().blocking_exists(&path)
+        crate::thread::blocking_exists(path.into_boxed_path())
     }
 
     /// Returns the size of the stored data for this value.
@@ -394,7 +386,7 @@ impl<T: Stored> SyncHolderApi<'_, T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
-        Storage::blocking_get().blocking_size(&path)
+        crate::thread::blocking_size(path.into_boxed_path())
     }
 
     /// Returns the value as saved within the storage system.
@@ -411,9 +403,8 @@ impl<T: Stored> SyncHolderApi<'_, T> {
     pub fn read(self) -> Result<T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
-        let bytes = Storage::blocking_get().blocking_read(&path)?;
 
-        T::data_format().decode(&bytes).map_err(Into::into)
+        crate::thread::blocking_read(path.into_boxed_path())
     }
 
     /// Writes this value into the storage system.
@@ -430,9 +421,8 @@ impl<T: Stored> SyncHolderApi<'_, T> {
     pub fn write(self) -> Result<()> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
-        let bytes = format.encode(self.0)?;
 
-        Storage::blocking_get_mut().blocking_write(&path, &bytes)
+        crate::thread::blocking_write(path.into_boxed_path(), self.0)
     }
 
     /// Renames this value.
@@ -451,7 +441,7 @@ impl<T: Stored> SyncHolderApi<'_, T> {
         let from = self.0.data_path().as_ref().with_extension(format.extension());
         let into = T::data_path_for(into).as_ref().with_extension(format.extension());
 
-        Storage::blocking_get_mut().blocking_rename(&from, &into)
+        crate::thread::blocking_rename(from.into_boxed_path(), into.into_boxed_path())
     }
 
     /// Deletes this value.
@@ -469,6 +459,6 @@ impl<T: Stored> SyncHolderApi<'_, T> {
         let format = T::data_format();
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
-        Storage::blocking_get_mut().blocking_delete(&path)
+        crate::thread::blocking_delete(path.into_boxed_path())
     }
 }

@@ -14,27 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::thread::JoinHandle;
+use std::num::NonZeroUsize;
 
-use tokio::runtime::Builder;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{ConsumingThread, HandleHolder, ProducingThread, Result, Thread};
+use crate::{Handle, ReceiverHandle, Result, SenderHandle, Thread};
 
-/// A thread that consumes and produces values.
+/// A thread that both consumes and produces values through channels.
 #[derive(Debug)]
-pub struct Exchanger<S, R, T>
-where
-    S: Send + 'static,
-    R: Send + 'static,
-    T: Send + 'static,
-{
-    /// The sending channel.
-    sender: Sender<S>,
-    /// The receiving channel.
-    receiver: Receiver<R>,
-    /// The inner thread.
+pub struct Exchanger<S, R, T> {
+    /// The inner thread handle.
     thread: Thread<T>,
+    /// The inner sending channel.
+    sender: Sender<S>,
+    /// The inner receiving channel.
+    receiver: Receiver<R>,
 }
 
 impl<S, R, T> Exchanger<S, R, T>
@@ -43,69 +37,66 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    /// Spawns a new thread with the given name and task.
+    /// Spawns a new [`Exchanger<S, R, T>`] with the given name and task.
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self, S>
+    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce(Sender<R>, Receiver<S>) -> T + Send + 'static,
     {
-        let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(size);
-        let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(size);
-        let thread = Thread::spawn(name, || call(thread_sender, thread_receiver))?;
+        let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        let thread = Thread::spawn(name, move || f(thread_sender, thread_receiver))?;
 
-        Ok(Self { sender: local_sender, receiver: local_receiver, thread })
+        Ok(Self { thread, sender: local_sender, receiver: local_receiver })
     }
 
-    /// Spawns a new thread with the given name and asynchronous task.
+    /// Spawns a new [`Exchanger<S, R, T>`] with the given name and asynchronous task.
+    ///
+    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[expect(clippy::missing_panics_doc, reason = "false-positive; the thread will just exit immediately, not panic")]
-    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, S>
+    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce(Sender<R>, Receiver<S>) -> O + Send + 'static,
         O: Future<Output = T> + Send,
     {
-        let call = |sender: Sender<R>, receiver: Receiver<S>| {
-            #[expect(clippy::expect_used, reason = "if the runtime fails to spawn, we can't execute any code")]
-            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
+        let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        let thread = Thread::spawn_with_runtime(name, || f(thread_sender, thread_receiver))?;
 
-            runtime.block_on(async move { call(sender, receiver).await })
-        };
-
-        Self::spawn(name, call, size)
+        Ok(Self { thread, sender: local_sender, receiver: local_receiver })
     }
 }
 
-impl<S, R, T> HandleHolder<T> for Exchanger<S, R, T>
+impl<S, R, T> Handle for Exchanger<S, R, T>
 where
-    S: Send + 'static,
-    R: Send + 'static,
     T: Send + 'static,
 {
-    fn as_handle(&self) -> &JoinHandle<T> {
-        self.thread.as_handle()
+    type Output = T;
+
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
+        self.thread.as_join_handle()
     }
 
-    fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
-        self.thread.as_handle_mut()
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
+        self.thread.as_join_handle_mut()
     }
 
-    fn into_handle(self) -> JoinHandle<T> {
-        self.thread.into_handle()
+    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output> {
+        self.thread.into_join_handle()
     }
 }
 
-impl<S, R, T> ConsumingThread<S> for Exchanger<S, R, T>
+impl<S, R, T> SenderHandle<S> for Exchanger<S, R, T>
 where
     S: Send + 'static,
-    R: Send + 'static,
     T: Send + 'static,
 {
     fn as_sender(&self) -> &Sender<S> {
@@ -119,15 +110,10 @@ where
     fn into_sender(self) -> Sender<S> {
         self.sender
     }
-
-    fn clone_sender(&self) -> Sender<S> {
-        self.sender.clone()
-    }
 }
 
-impl<S, R, T> ProducingThread<R> for Exchanger<S, R, T>
+impl<S, R, T> ReceiverHandle<R> for Exchanger<S, R, T>
 where
-    S: Send + 'static,
     R: Send + 'static,
     T: Send + 'static,
 {
