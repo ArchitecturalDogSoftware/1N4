@@ -19,17 +19,13 @@
 
 #[cfg(feature = "caching")]
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::path::Path;
 use std::sync::Arc;
 
 use clap::ValueEnum;
-use ina_threading::threads::invoker::{Nonce, State};
 use serde::{Deserialize, Serialize};
-use thread::Request;
 #[cfg(feature = "caching")]
 use tokio::sync::RwLock;
-use tokio::sync::mpsc::error::SendError;
 
 use crate::settings::Settings;
 use crate::system::{DataReader, DataSystem, DataWriter};
@@ -54,16 +50,13 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 /// An error that may occur when using this library.
 #[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
-pub enum Error<S = Infallible> {
+pub enum Error {
     /// An IO error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    /// A sending error.
+    /// An error from spawning the storage thread.
     #[error(transparent)]
-    Send(#[from] SendError<S>),
-    /// An error from communicating with a thread.
-    #[error(transparent)]
-    Thread(#[from] ina_threading::Error<Nonce<(State<Storage>, Request)>>),
+    ThreadSpawn(#[from] ina_threading::Error),
 }
 
 /// A storage instance.

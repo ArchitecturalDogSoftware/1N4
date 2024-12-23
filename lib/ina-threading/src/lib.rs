@@ -16,102 +16,91 @@
 
 //! Provides concurrency solutions for 1N4.
 
-use std::convert::Infallible;
 use std::thread::{Builder, JoinHandle};
 
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-/// Provides utilities for automatically joining threads.
-pub mod join;
-/// Provides utilities for static threads.
+/// Defines wrappers for join-on-drop threads.
+pub mod joining;
+/// Defines wrappers for threads that are stored statically.
 pub mod statics;
-/// Provides definitions for custom threads.
+
+/// Defines specialized thread implementations.
 pub mod threads {
-    /// Defines threads that consume values.
+    /// Defines threads that can receive values.
     pub mod consumer;
-    /// Defines threads that consume and produce values.
+    /// Defines threads that can send and receive values.
     pub mod exchanger;
     /// Defines threads that can be called like functions.
     pub mod invoker;
-    /// Defines threads that produce values.
+    /// Defines threads that can send values.
     pub mod producer;
 }
 
 /// A result alias with a defaulted error type.
-pub type Result<T, S = Infallible> = std::result::Result<T, Error<S>>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// An error that may occur when using this library.
 #[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
-pub enum Error<S = Infallible> {
+pub enum Error {
     /// An IO error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    /// A send error.
-    #[error(transparent)]
-    Send(#[from] SendError<S>),
-    /// The thread was disconnected while awaiting a response.
-    #[error("the thread was disconnected whilst awaiting a response")]
-    Disconnected,
 }
 
-/// A thread with an associated join handle.
-pub trait HandleHolder<T>
+/// A type that contains a [`JoinHandle`] that represents a possibly running thread.
+pub trait Handle {
+    /// The type that is returned when the thread is closed.
+    type Output: Send + 'static;
+
+    /// Returns a reference to the contained [`JoinHandle`].
+    fn as_join_handle(&self) -> &JoinHandle<Self::Output>;
+
+    /// Returns a mutable reference to the contained [`JoinHandle`].
+    fn as_join_handle_mut(&mut self) -> &mut JoinHandle<Self::Output>;
+
+    /// Returns the contained [`JoinHandle`], dropping this value.
+    fn into_join_handle(self) -> JoinHandle<Self::Output>;
+}
+
+/// A [`Handle`] type where the running thread may receive values through a [`Sender<T>`].
+pub trait SenderHandle<T>
 where
+    Self: Handle,
     T: Send + 'static,
 {
-    /// Returns a reference to the inner thread handle.
-    fn as_handle(&self) -> &JoinHandle<T>;
+    /// Returns a reference to the contained [`Sender<T>`].
+    fn as_sender(&self) -> &Sender<T>;
 
-    /// Returns a mutable reference to the inner thread handle.
-    fn as_handle_mut(&mut self) -> &mut JoinHandle<T>;
+    /// Returns a mutable reference to the contained [`Sender<T>`].
+    fn as_sender_mut(&mut self) -> &mut Sender<T>;
 
-    /// Unwraps this structure into the inner thread handle.
-    fn into_handle(self) -> JoinHandle<T>;
+    /// Returns the contained [`Sender<T>`], dropping this value.
+    fn into_sender(self) -> Sender<T>;
 }
 
-/// A thread that consumes values.
-pub trait ConsumingThread<S>
+/// A [`Handle`] type where the running thread may send values through a [`Receiver<T>`].
+pub trait ReceiverHandle<T>
 where
-    S: Send + 'static,
+    Self: Handle,
+    T: Send + 'static,
 {
-    /// Returns a reference to the inner sender channel.
-    fn as_sender(&self) -> &Sender<S>;
+    /// Returns a reference to the contained [`Receiver<T>`].
+    fn as_receiver(&self) -> &Receiver<T>;
 
-    /// Returns a mutable reference to the inner sender channel.
-    fn as_sender_mut(&mut self) -> &mut Sender<S>;
+    /// Returns a mutable reference to the contained [`Receiver<T>`].
+    fn as_receiver_mut(&mut self) -> &mut Receiver<T>;
 
-    /// Unwraps this structure into the inner sender channel.
-    fn into_sender(self) -> Sender<S>;
-
-    /// Returns a clone of the inner sender.
-    fn clone_sender(&self) -> Sender<S>;
+    /// Returns the contained [`Receiver<T>`], dropping this value.
+    fn into_receiver(self) -> Receiver<T>;
 }
 
-/// A thread that produces values.
-pub trait ProducingThread<R>
-where
-    R: Send + 'static,
-{
-    /// Returns a reference to the inner receiver channel.
-    fn as_receiver(&self) -> &Receiver<R>;
-
-    /// Returns a mutable reference to the inner receiver channel.
-    fn as_receiver_mut(&mut self) -> &mut Receiver<R>;
-
-    /// Unwraps this structure into the inner receiver channel.
-    fn into_receiver(self) -> Receiver<R>;
-}
-
-/// A thread.
+/// A simple thread with an associated handle.
 #[repr(transparent)]
 #[derive(Debug)]
-pub struct Thread<T>
-where
-    T: Send + 'static,
-{
-    /// The inner join handle.
+pub struct Thread<T> {
+    /// The inner [`JoinHandle<T>`].
     inner: JoinHandle<T>,
 }
 
@@ -119,36 +108,62 @@ impl<T> Thread<T>
 where
     T: Send + 'static,
 {
-    /// Spawns a new thread with the given name and task.
+    /// Spawns a new [`Thread`] with the given name and task.
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F, S>(name: N, call: F) -> Result<Self, S>
+    pub fn spawn<N, F>(name: N, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce() -> T + Send + 'static,
     {
         let name = name.as_ref().replace('\0', r"\0");
-        let inner = Builder::new().name(name).spawn(call)?;
+        let inner = Builder::new().name(name).spawn(f)?;
 
         Ok(Self { inner })
     }
+
+    /// Spawns a new [`Thread`] with the given name and asynchronous task.
+    ///
+    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread fails to spawn.
+    #[expect(clippy::expect_used, reason = "if the runtime fails to spawn, we can't run the thread body")]
+    #[expect(clippy::missing_panics_doc, reason = "the panic does not cause a crash, only stops the thread")]
+    pub fn spawn_with_runtime<N, F, O>(name: N, f: F) -> Result<Self>
+    where
+        N: AsRef<str>,
+        F: FnOnce() -> O + Send + 'static,
+        O: Future<Output = T>,
+    {
+        Self::spawn(name, || {
+            use tokio::runtime::Builder;
+
+            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
+
+            runtime.block_on(async move { f().await })
+        })
+    }
 }
 
-impl<T> HandleHolder<T> for Thread<T>
+impl<T> Handle for Thread<T>
 where
     T: Send + 'static,
 {
-    fn as_handle(&self) -> &JoinHandle<T> {
+    type Output = T;
+
+    fn as_join_handle(&self) -> &JoinHandle<Self::Output> {
         &self.inner
     }
 
-    fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
+    fn as_join_handle_mut(&mut self) -> &mut JoinHandle<Self::Output> {
         &mut self.inner
     }
 
-    fn into_handle(self) -> JoinHandle<T> {
+    fn into_join_handle(self) -> JoinHandle<Self::Output> {
         self.inner
     }
 }

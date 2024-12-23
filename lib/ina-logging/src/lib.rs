@@ -66,9 +66,9 @@ pub enum Error {
     /// A request failed to send.
     #[error("a request failed to send")]
     Send(#[from] SendError<Request>),
-    /// A threading error.
+    /// The thread failed to spawn.
     #[error(transparent)]
-    Thread(#[from] ina_threading::Error<Request>),
+    ThreadSpawn(#[from] ina_threading::Error),
 }
 
 /// A logger with buffered output.

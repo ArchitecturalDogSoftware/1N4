@@ -14,243 +14,208 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::marker::PhantomData;
-
 use tokio::sync::{RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::HandleHolder;
-use crate::join::Join;
+use crate::Handle;
+use crate::joining::Joining;
 
-/// A static thread handle.
-#[derive(Debug)]
-pub struct Static<H, T>
-where
-    H: Send + Sync + HandleHolder<T>,
-    T: Send + Sync + 'static,
-{
-    /// The inner handle, locked for mutability purposes.
+/// A thread handle that can be stored within a static variable.
+#[derive(Debug, Default)]
+pub struct Static<H> {
+    /// The inner thread handle.
     inner: RwLock<Option<H>>,
-    /// The type marker for `T`.
-    _marker: PhantomData<fn(H) -> T>,
 }
 
-impl<H, T> Static<H, T>
-where
-    H: Send + Sync + HandleHolder<T>,
-    T: Send + Sync + 'static,
-{
-    /// Creates a new [`Static<H, T>`].
+impl<H> Static<H> {
+    /// Creates a new [`Static<H>`].
     pub const fn new() -> Self {
-        Self { inner: RwLock::const_new(None), _marker: PhantomData }
+        Self { inner: RwLock::const_new(None) }
     }
 
-    /// Creates a new [`Static<H, T>`] containing the given handle.
-    pub const fn with_handle(handle: H) -> Self {
-        Self { inner: RwLock::const_new(Some(handle)), _marker: PhantomData }
+    /// Creates a new [`Static<H>`] containing the given handle.
+    pub const fn wrap(handle: H) -> Self {
+        Self { inner: RwLock::const_new(Some(handle)) }
     }
 
-    /// Returns the asynchronous API for this [`Static<H, T>`].
-    pub const fn async_api(&self) -> AsyncStaticApi<H> {
+    /// Returns an asynchronous API for this [`Static<H>`].
+    pub const fn async_api(&self) -> AsyncStaticApi<H>
+    where
+        H: Send + Sync,
+    {
         AsyncStaticApi { inner: &self.inner }
     }
 
-    /// Returns the synchronous API for this [`Static<H, T>`].
+    /// Returns a synchronous API for this [`Static<H>`].
     pub const fn sync_api(&self) -> SyncStaticApi<H> {
         SyncStaticApi { inner: &self.inner }
     }
 }
 
-impl<H, T> Default for Static<H, T>
+/// A joining thread handle that can be stored within a static variable.
+#[derive(Default)]
+pub struct StaticJoining<H>
 where
-    H: Send + Sync + HandleHolder<T>,
-    T: Send + Sync + 'static,
+    H: Handle,
 {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// The inner thread handle.
+    inner: RwLock<Option<Joining<H>>>,
 }
 
-/// A joining static thread handle.
-#[derive(Debug)]
-pub struct JoinStatic<H, T>
+impl<H> StaticJoining<H>
 where
-    H: Send + Sync + HandleHolder<T>,
-    T: Send + Sync + 'static,
+    H: Handle,
 {
-    /// The inner handle, locked for mutability purposes.
-    inner: RwLock<Option<Join<H, T>>>,
-}
-
-impl<H, T> JoinStatic<H, T>
-where
-    H: Send + Sync + HandleHolder<T>,
-    T: Send + Sync + 'static,
-{
-    /// Creates a new [`JoinStatic<H, T>`].
+    /// Creates a new [`StaticJoining<H>`].
     pub const fn new() -> Self {
         Self { inner: RwLock::const_new(None) }
     }
 
-    /// Creates a new [`JoinStatic<H, T>`] containing the given handle.
-    pub const fn with_handle(handle: Join<H, T>) -> Self {
+    /// Creates a new [`StaticJoining<H>`] containing the given handle.
+    pub const fn wrap(handle: Joining<H>) -> Self {
         Self { inner: RwLock::const_new(Some(handle)) }
     }
 
-    /// Returns the asynchronous API for this [`JoinStatic<H, T>`].
-    pub const fn async_api(&self) -> AsyncStaticApi<Join<H, T>> {
+    /// Returns an asynchronous API for this [`StaticJoining<H>`].
+    pub const fn async_api(&self) -> AsyncStaticApi<Joining<H>>
+    where
+        H: Send + Sync,
+    {
         AsyncStaticApi { inner: &self.inner }
     }
 
-    /// Returns the synchronous API for this [`JoinStatic<H, T>`].
-    pub const fn sync_api(&self) -> SyncStaticApi<Join<H, T>> {
+    /// Returns a synchronous API for this [`StaticJoining<H>`].
+    pub const fn sync_api(&self) -> SyncStaticApi<Joining<H>> {
         SyncStaticApi { inner: &self.inner }
     }
 }
 
-impl<H, T> Default for JoinStatic<H, T>
-where
-    H: Send + Sync + HandleHolder<T>,
-    T: Send + Sync + 'static,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// An asynchronous API for a static thread.
+/// An API for a static thread that provides its functionality through asynchronous calls.
 #[repr(transparent)]
-#[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug)]
-pub struct AsyncStaticApi<'s, T>
+pub struct AsyncStaticApi<'sth, H>
 where
-    T: Send + Sync,
+    H: Send + Sync,
 {
-    /// The inner locked handle.
-    inner: &'s RwLock<Option<T>>,
+    /// The inner lock.
+    inner: &'sth RwLock<Option<H>>,
 }
 
-#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized")]
-impl<T> AsyncStaticApi<'_, T>
+#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
+impl<H> AsyncStaticApi<'_, H>
 where
-    T: Send + Sync,
+    H: Send + Sync,
 {
-    /// Returns whether the inner thread is initialized.
-    pub async fn has(&self) -> bool {
+    /// Returns whether the inner thread handle has been initialized.
+    pub async fn is_initialized(&self) -> bool {
         self.inner.read().await.is_some()
     }
 
-    /// Returns a reference to the inner thread.
+    /// Initializes the thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the thread is already initialized.
+    pub async fn initialize(&self, handle: H) {
+        assert!(!self.is_initialized().await, "the thread is already initialized");
+
+        *self.inner.write().await = Some(handle);
+    }
+
+    /// Closes the thread.
     ///
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
-    pub async fn get(&self) -> RwLockReadGuard<T> {
-        RwLockReadGuard::map(self.inner.read().await, |v| v.as_ref().expect("the thread is not initialized"))
+    pub async fn close(&self) {
+        self.inner.write().await.take().expect("the thread has not been initialized");
     }
 
-    /// Returns a mutable reference to the inner thread.
+    /// Returns a reference to the inner thread handle.
     ///
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
-    pub async fn get_mut(&self) -> RwLockMappedWriteGuard<T> {
-        RwLockWriteGuard::map(self.inner.write().await, |v| v.as_mut().expect("the thread is not initialized"))
+    pub async fn get(&self) -> RwLockReadGuard<H> {
+        RwLockReadGuard::map(self.inner.read().await, |v| v.as_ref().expect("the thread has not been initialized"))
     }
 
-    /// Sets the inner thread handle, dropping the old value.
-    pub async fn set(&self, handle: T) {
-        drop(self.inner.write().await.replace(handle));
-    }
-
-    /// Returns the inner thread handle.
+    /// Returns a mutable reference to the inner thread handle.
     ///
-    /// This returns [`None`] if the thread was never initialized.
-    pub async fn take(&self) -> Option<T> {
+    /// # Panics
+    ///
+    /// Panics if the thread has not been initialized.
+    pub async fn get_mut(&self) -> RwLockMappedWriteGuard<H> {
+        RwLockWriteGuard::map(self.inner.write().await, |v| v.as_mut().expect("the thread has not been initialized"))
+    }
+
+    /// Returns the inner thread handle, if it has been initialized.
+    pub async fn take(&self) -> Option<H> {
         self.inner.write().await.take()
     }
-
-    /// Drops the inner thread handle.
-    ///
-    /// This does nothing if the thread was never initialized.
-    pub async fn drop(&self) {
-        drop(self.inner.write().await.take());
-    }
 }
 
-/// A synchronous API for a static thread.
+/// An API for a static thread that provides its functionality through synchronous calls.
 #[repr(transparent)]
-#[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug)]
-pub struct SyncStaticApi<'s, T> {
-    inner: &'s RwLock<Option<T>>,
+pub struct SyncStaticApi<'sth, H> {
+    /// The inner lock.
+    inner: &'sth RwLock<Option<H>>,
 }
 
-#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized")]
-impl<T> SyncStaticApi<'_, T> {
-    /// Returns whether the inner thread is initialized.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the thread has not been initialized or this is called in an asynchronous context.
+#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
+impl<H> SyncStaticApi<'_, H> {
+    /// Returns whether the inner thread handle has been initialized.
     #[must_use]
-    pub fn has(&self) -> bool {
+    pub fn is_initialized(&self) -> bool {
         self.inner.blocking_read().is_some()
     }
 
-    /// Returns a reference to the inner thread.
-    ///
-    /// This blocks the current thread.
+    /// Initializes the thread.
     ///
     /// # Panics
     ///
-    /// Panics if the thread has not been initialized or this is called in an asynchronous context.
-    pub fn get(&self) -> RwLockReadGuard<T> {
-        RwLockReadGuard::map(self.inner.blocking_read(), |v| v.as_ref().expect("the thread is not initialized"))
+    /// Panics if the thread is already initialized or this is called from within an asynchronous context.
+    pub fn initialize(&self, handle: H) {
+        assert!(!self.is_initialized(), "the thread is already initialized");
+
+        *self.inner.blocking_write() = Some(handle);
     }
 
-    /// Returns a mutable reference to the inner thread.
-    ///
-    /// This blocks the current thread.
+    /// Closes the thread.
     ///
     /// # Panics
     ///
-    /// Panics if the thread has not been initialized or this is called in an asynchronous context.
+    /// Panics if the thread has not been initialized.
+    pub fn close(&self) {
+        self.inner.blocking_write().take().expect("the thread has not been initialized");
+    }
+
+    /// Returns a reference to the inner thread handle.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
+    pub fn get(&self) -> RwLockReadGuard<H> {
+        RwLockReadGuard::map(self.inner.blocking_read(), |v| v.as_ref().expect("the thread has not been initialized"))
+    }
+
+    /// Returns a mutable reference to the inner thread handle.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
     #[must_use]
-    pub fn get_mut(&self) -> RwLockMappedWriteGuard<T> {
-        RwLockWriteGuard::map(self.inner.blocking_write(), |v| v.as_mut().expect("the thread is not initialized"))
+    pub fn get_mut(&self) -> RwLockMappedWriteGuard<H> {
+        RwLockWriteGuard::map(self.inner.blocking_write(), |v| v.as_mut().expect("the thread has not been initialized"))
     }
 
-    /// Sets the inner thread handle, dropping the old value.
+    /// Returns the inner thread handle, if it has been initialized.
     ///
     /// # Panics
     ///
-    /// Panics if this is called in an asynchronous context.
-    pub fn set(&self, handle: T) {
-        drop(self.inner.blocking_write().replace(handle));
-    }
-
-    /// Returns the inner thread handle.
-    ///
-    /// This returns [`None`] if the thread was never initialized.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
+    /// Panics if this is called from within an asynchronous context.
     #[must_use]
-    pub fn take(&self) -> Option<T> {
+    pub fn take(&self) -> Option<H> {
         self.inner.blocking_write().take()
-    }
-
-    /// Drops the inner thread handle.
-    ///
-    /// This does nothing if the thread was never initialized.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    pub fn drop(&self) {
-        drop(self.inner.blocking_write().take());
     }
 }

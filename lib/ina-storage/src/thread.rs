@@ -18,7 +18,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use ina_threading::statics::Static;
-use ina_threading::threads::invoker::StatefulInvoker;
+use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
 use tokio::sync::RwLock;
 
 use crate::format::{DataDecode, DataEncode};
@@ -31,7 +31,7 @@ use crate::{Result, Storage};
 static THREAD: StorageThread = StorageThread::new();
 
 /// The storage thread's type.
-pub type StorageThread = Static<StatefulInvoker<Storage, Request, Response>, ()>;
+pub type StorageThread = Static<StatefulInvoker<RwLock<Storage>, Request, Response>>;
 
 /// A request sent to the storage thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -75,12 +75,11 @@ pub enum Response {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
+    let capacity = settings.queue_capacity;
+    let storage = RwLock::new(Storage::new(settings));
+    let handle = StatefulInvoker::spawn_with_runtime("storage", capacity, storage, self::run)?;
 
-    let capacity = settings.queue_capacity.get();
-    let storage = Storage::new(settings);
-
-    THREAD.async_api().set(StatefulInvoker::spawn_with_runtime("storage", storage, self::run, capacity)?).await;
+    THREAD.async_api().initialize(handle).await;
 
     Ok(())
 }
@@ -95,12 +94,11 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
+    let capacity = settings.queue_capacity;
+    let storage = RwLock::new(Storage::new(settings));
+    let handle = StatefulInvoker::spawn_with_runtime("storage", capacity, storage, self::run)?;
 
-    let capacity = settings.queue_capacity.get();
-    let storage = Storage::new(settings);
-
-    THREAD.sync_api().set(StatefulInvoker::spawn_with_runtime("storage", storage, self::run, capacity)?);
+    THREAD.sync_api().initialize(handle);
 
     Ok(())
 }
@@ -111,9 +109,7 @@ pub fn blocking_start(settings: Settings) -> Result<()> {
 ///
 /// Panics if the storage thread is not initialized.
 pub async fn close() {
-    assert!(THREAD.async_api().has().await, "the thread is not initialized");
-
-    THREAD.async_api().drop().await;
+    THREAD.async_api().close().await;
 }
 
 /// Closes the storage thread.
@@ -124,25 +120,23 @@ pub async fn close() {
 ///
 /// Panics if the storage thread is not initialized or if this is called in an asynchronous context.
 pub fn blocking_close() {
-    assert!(THREAD.sync_api().has(), "the thread is not initialized");
-
-    THREAD.sync_api().drop();
+    THREAD.sync_api().close();
 }
 
 /// Runs the thread's process.
-async fn run(storage: Arc<RwLock<Storage>>, input: Request) -> Response {
-    match &input {
-        Request::Exists(path) => storage.read().await.exists(path).await.map_or_else(Response::Error, Response::Exists),
-        Request::Size(path) => storage.read().await.size(path).await.map_or_else(Response::Error, Response::Size),
-        Request::Read(path) => storage.read().await.read(path).await.map_or_else(Response::Error, Response::Read),
+async fn run(Stateful { state, value }: Stateful<RwLock<Storage>, Request>) -> Response {
+    match &value {
+        Request::Exists(path) => state.read().await.exists(path).await.map_or_else(Response::Error, Response::Exists),
+        Request::Size(path) => state.read().await.size(path).await.map_or_else(Response::Error, Response::Size),
+        Request::Read(path) => state.read().await.read(path).await.map_or_else(Response::Error, Response::Read),
         Request::Write(path, bytes) => {
-            storage.write().await.write(path, bytes).await.map_or_else(Response::Error, |()| Response::Acknowledge)
+            state.write().await.write(path, bytes).await.map_or_else(Response::Error, |()| Response::Acknowledge)
         }
         Request::Rename(from, into) => {
-            storage.write().await.rename(from, into).await.map_or_else(Response::Error, |()| Response::Acknowledge)
+            state.write().await.rename(from, into).await.map_or_else(Response::Error, |()| Response::Acknowledge)
         }
         Request::Delete(path) => {
-            storage.write().await.delete(path).await.map_or_else(Response::Error, |()| Response::Acknowledge)
+            state.write().await.delete(path).await.map_or_else(Response::Error, |()| Response::Acknowledge)
         }
     }
 }
@@ -159,7 +153,7 @@ macro_rules! invoke {
     )*) => {$(
         $(#[$attribute])*
         pub async fn $name($($($input: $type),*)?) -> anyhow::Result<$return> {
-            let response = THREAD.async_api().get_mut().await.invoke($($request)*).await?;
+            let response = THREAD.async_api().get_mut().await.call($($request)*).await?;
 
             match response {
                 $($response)*
@@ -174,7 +168,7 @@ macro_rules! invoke {
         ///
         /// Panics if this is called from within a synchronous context.
         pub fn $blocking_name($($($input: $type),*)?) -> anyhow::Result<$return> {
-            let response = THREAD.sync_api().get_mut().blocking_invoke($($request)*)?;
+            let response = THREAD.sync_api().get_mut().blocking_call($($request)*)?;
 
             match response {
                 $($response)*
@@ -237,7 +231,7 @@ invoke! {
 ///
 /// This function will return an error if the message could not be sent.
 pub async fn read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
-    let response = THREAD.async_api().get_mut().await.invoke(Request::Read(path)).await?;
+    let response = THREAD.async_api().get_mut().await.call(Request::Read(path)).await?;
 
     match response {
         Response::Read(bytes) => T::data_format().decode(&bytes).map_err(Into::into),
@@ -256,7 +250,7 @@ pub async fn read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
 ///
 /// Panics if this is called from within a synchronous context.
 pub fn blocking_read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
-    let response = THREAD.sync_api().get_mut().blocking_invoke(Request::Read(path))?;
+    let response = THREAD.sync_api().get_mut().blocking_call(Request::Read(path))?;
 
     match response {
         Response::Read(bytes) => T::data_format().decode(&bytes).map_err(Into::into),
@@ -272,7 +266,7 @@ pub fn blocking_read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
 /// This function will return an error if the message could not be sent.
 pub async fn write<T: Stored>(path: Box<Path>, value: &T) -> anyhow::Result<()> {
     let bytes = T::data_format().encode(value)?;
-    let response = THREAD.async_api().get_mut().await.invoke(Request::Write(path, bytes)).await?;
+    let response = THREAD.async_api().get_mut().await.call(Request::Write(path, bytes)).await?;
 
     match response {
         Response::Acknowledge => Ok(()),
@@ -292,7 +286,7 @@ pub async fn write<T: Stored>(path: Box<Path>, value: &T) -> anyhow::Result<()> 
 /// Panics if this is called from within a synchronous context.
 pub fn blocking_write<T: Stored>(path: Box<Path>, value: &T) -> anyhow::Result<()> {
     let bytes = T::data_format().encode(value)?;
-    let response = THREAD.sync_api().get_mut().blocking_invoke(Request::Write(path, bytes))?;
+    let response = THREAD.sync_api().get_mut().blocking_call(Request::Write(path, bytes))?;
 
     match response {
         Response::Acknowledge => Ok(()),

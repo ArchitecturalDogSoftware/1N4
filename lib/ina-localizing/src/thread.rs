@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use ina_threading::statics::Static;
-use ina_threading::threads::invoker::StatefulInvoker;
+use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
 use tokio::sync::RwLock;
 
 use crate::locale::Locale;
@@ -29,7 +27,7 @@ use crate::{Localizer, Result};
 static THREAD: LocalizationThread = LocalizationThread::new();
 
 /// The localization thread's type.
-pub type LocalizationThread = Static<StatefulInvoker<Localizer, Request, Response>, ()>;
+pub type LocalizationThread = Static<StatefulInvoker<RwLock<Localizer>, Request, Response>>;
 
 /// A request sent to the localization thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -52,7 +50,7 @@ pub enum Response {
     /// Acknowledges a request.
     Acknowledge,
     /// Fails a request.
-    Error(crate::Error),
+    Error(Box<crate::Error>),
     /// Lists locales.
     List(Box<[Locale]>),
     /// Returns whether the locales were loaded.
@@ -73,12 +71,11 @@ pub enum Response {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
+    let capacity = settings.queue_capacity;
+    let localizer = RwLock::new(Localizer::new(settings));
+    let handle = StatefulInvoker::spawn_with_runtime("localizing", capacity, localizer, self::run)?;
 
-    let capacity = settings.queue_capacity.get();
-    let localizer = Localizer::new(settings);
-
-    THREAD.async_api().set(StatefulInvoker::spawn_with_runtime("localizing", localizer, self::run, capacity)?).await;
+    THREAD.async_api().initialize(handle).await;
 
     Ok(())
 }
@@ -93,12 +90,13 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
+    assert!(!THREAD.sync_api().is_initialized(), "the thread has already been initialized");
 
-    let capacity = settings.queue_capacity.get();
-    let localizer = Localizer::new(settings);
+    let capacity = settings.queue_capacity;
+    let localizer = RwLock::new(Localizer::new(settings));
+    let handle = StatefulInvoker::spawn_with_runtime("localizing", capacity, localizer, self::run)?;
 
-    THREAD.sync_api().set(StatefulInvoker::spawn_with_runtime("localizing", localizer, self::run, capacity)?);
+    THREAD.sync_api().initialize(handle);
 
     Ok(())
 }
@@ -109,9 +107,7 @@ pub fn blocking_start(settings: Settings) -> Result<()> {
 ///
 /// Panics if the localization thread is not initialized.
 pub async fn close() {
-    assert!(THREAD.async_api().has().await, "the thread is not initialized");
-
-    THREAD.async_api().drop().await;
+    THREAD.async_api().close().await;
 }
 
 /// Closes the localization thread.
@@ -122,19 +118,17 @@ pub async fn close() {
 ///
 /// Panics if the localization thread is not initialized or if this is called in an asynchronous context.
 pub fn blocking_close() {
-    assert!(THREAD.sync_api().has(), "the thread is not initialized");
-
-    THREAD.sync_api().drop();
+    THREAD.sync_api().close();
 }
 
 /// Runs the thread's process.
-async fn run(localizer: Arc<RwLock<Localizer>>, input: Request) -> Response {
-    match input {
+async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) -> Response {
+    match value {
         Request::Get(locale, category, key) => {
-            let localizer = localizer.read().await;
-            let locale = locale.unwrap_or_else(|| localizer.settings.default_locale);
+            let state = state.read().await;
+            let locale = locale.unwrap_or_else(|| state.settings.default_locale);
 
-            match localizer.get(locale, &category, &key) {
+            match state.get(locale, &category, &key) {
                 Ok(text) => {
                     if text.is_missing() && ina_logging::thread::is_started().await {
                         let Text::Missing(category, key) = &text else { unreachable!() };
@@ -146,40 +140,40 @@ async fn run(localizer: Arc<RwLock<Localizer>>, input: Request) -> Response {
 
                     Response::Text(text)
                 }
-                Err(error) => Response::Error(error),
+                Err(error) => Response::Error(Box::new(error)),
             }
         }
         Request::Has(locales) => {
-            let localizer = localizer.read().await;
+            let state = state.read().await;
 
-            Response::Has(locales.iter().all(|l| localizer.has_locale(l)))
+            Response::Has(locales.iter().all(|l| state.has_locale(l)))
         }
         Request::List => {
-            let localizer = localizer.read().await;
+            let state = state.read().await;
 
-            Response::List(localizer.locales().collect())
+            Response::List(state.locales().collect())
         }
         Request::Clear(locales) => {
-            let mut localizer = localizer.write().await;
+            let mut state = state.write().await;
 
-            localizer.clear_locales(locales);
+            state.clear_locales(locales);
 
             Response::Acknowledge
         }
         Request::Load(Some(locales)) => {
-            let mut localizer = localizer.write().await;
+            let mut state = state.write().await;
 
-            match localizer.load_locales(locales).await {
+            match state.load_locales(locales).await {
                 Ok(count) => Response::Load(count),
-                Err(error) => Response::Error(error),
+                Err(error) => Response::Error(Box::new(error)),
             }
         }
         Request::Load(None) => {
-            let mut localizer = localizer.write().await;
+            let mut state = state.write().await;
 
-            match localizer.load_directory().await {
+            match state.load_directory().await {
                 Ok(count) => Response::Load(count),
-                Err(error) => Response::Error(error),
+                Err(error) => Response::Error(Box::new(error)),
             }
         }
     }
@@ -197,11 +191,11 @@ macro_rules! invoke {
     )*) => {$(
         $(#[$attribute])*
         pub async fn $name($($($input: $type),*)?) -> Result<$return> {
-            let response = THREAD.async_api().get_mut().await.invoke($($request)*).await?;
+            let response = THREAD.async_api().get_mut().await.call($($request)*).await?;
 
             match response {
                 $($response)*
-                Response::Error(error) => Err(error),
+                Response::Error(error) => Err(*error),
                 _ => unreachable!("unexpected response: '{response:?}'"),
             }
         }
@@ -212,11 +206,11 @@ macro_rules! invoke {
         ///
         /// Panics if this is called from within a synchronous context.
         pub fn $blocking_name($($($input: $type),*)?) -> Result<$return> {
-            let response = THREAD.sync_api().get_mut().blocking_invoke($($request)*)?;
+            let response = THREAD.sync_api().get_mut().blocking_call($($request)*)?;
 
             match response {
                 $($response)*
-                Response::Error(error) => Err(error),
+                Response::Error(error) => Err(*error),
                 _ => unreachable!("unexpected response: '{response:?}'"),
             }
         }

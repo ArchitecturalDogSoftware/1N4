@@ -24,10 +24,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use ina_logging::warn;
-use ina_threading::threads::invoker::{Nonce, State};
+use ina_threading::threads::invoker::{CallError, Stateful};
 use serde::{Deserialize, Serialize};
 use text::Text;
-use thread::Request;
+use thread::{Request, Response};
+use tokio::sync::RwLock;
 
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
@@ -72,9 +73,12 @@ pub enum Error {
     /// A TOML deserialization error.
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
-    /// An error from communicating with a thread.
+    /// An error from spawning the thread.
     #[error(transparent)]
-    Thread(#[from] ina_threading::Error<Nonce<(State<Localizer>, Request)>>),
+    ThreadSpawn(#[from] ina_threading::Error),
+    /// An error from calling a function on the thread.
+    #[error(transparent)]
+    ThreadCall(#[from] CallError<Stateful<RwLock<Localizer>, Request>, Response>),
     /// An error from interacting with the logging system.
     #[error(transparent)]
     Logging(#[from] ina_logging::Error),
