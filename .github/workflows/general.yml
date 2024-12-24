@@ -36,7 +36,7 @@ jobs:
         container: mvdan/shfmt:v3-alpine
         steps:
             - uses: actions/checkout@v4
-            - name: Setup - Install shellcheck
+            - name: Setup - Install ShellCheck
               run: apk add shellcheck
 
             - name: Action - Lint shell scripts with shellcheck
