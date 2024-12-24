@@ -287,10 +287,16 @@ async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> 
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::debug;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// debug!(async "This is an asynchronous debug log!").await?;
 ///
 /// debug!("This is a synchronous debug log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! debug {
@@ -324,10 +330,16 @@ macro_rules! debug {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::info;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// info!(async "This is an asynchronous information log!").await?;
 ///
 /// info!("This is a synchronous information log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! info {
@@ -343,10 +355,16 @@ macro_rules! info {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::warn;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// warn!(async "This is an asynchronous warning log!").await?;
 ///
 /// warn!("This is a synchronous warning log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! warn {
@@ -362,10 +380,16 @@ macro_rules! warn {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::error;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// error!(async "This is an asynchronous error log!").await?;
 ///
 /// error!("This is a synchronous error log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! error {

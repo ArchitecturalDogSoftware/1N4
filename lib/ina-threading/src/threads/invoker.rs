@@ -81,6 +81,27 @@ where
 {
     /// Spawns a new [`Invoker<S, R>`] with the given name and task.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |n| {
+    ///     assert_eq!(n, 123);
+    ///     456
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(123).expect("the channel should not be closed");
+    ///
+    /// assert_eq!(response, 456);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
@@ -108,6 +129,30 @@ where
     /// Spawns a new [`Invoker<S, R>`] with the given name and asynchronous task.
     ///
     /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn_with_runtime("worker", capacity, |n| async move {
+    ///     assert_eq!(n, 123);
+    ///
+    ///     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    ///
+    ///     456
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(123).expect("the channel should not be closed");
+    ///
+    /// assert_eq!(response, 456);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
@@ -137,6 +182,26 @@ where
     }
 
     /// Invokes the thread, returning the response of the inner function when available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| a + b)?;
+    ///
+    /// let response = thread.call((2, 2)).await.expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -172,6 +237,25 @@ where
     }
 
     /// Invokes the thread, blocking the current thread until the response of the inner function is available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| a + b)?;
+    ///
+    /// let response = thread.blocking_call((2, 2)).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -209,6 +293,26 @@ where
 
     /// Invokes the thread, executing the method but ignoring the return value.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| {
+    ///     println!("{a} + {b} = {}", a + b);
+    /// })?;
+    ///
+    /// thread.call_and_forget((2, 2)).await.expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread's receiving channel is closed.
@@ -217,6 +321,25 @@ where
     }
 
     /// Invokes the thread, executing the method but ignoring the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| {
+    ///     println!("{a} + {b} = {}", a + b);
+    /// })?;
+    ///
+    /// thread.blocking_call_and_forget((2, 2)).expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -309,6 +432,28 @@ where
 {
     /// Spawns a new [`StatefulInvoker<T, S, R>`] with the given name and task.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     // `args` carries both the value and the thread's state.
+    ///     args.value + *args.state
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(2).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
@@ -325,6 +470,30 @@ where
     ///
     /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread =
+    ///     StatefulInvoker::spawn_with_runtime("worker", capacity, 2, |args| async move {
+    ///         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    ///
+    ///         args.value + *args.state
+    ///     })?;
+    ///
+    /// let response = thread.blocking_call(2).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
@@ -340,6 +509,29 @@ where
 
     /// Invokes the thread, returning the response of the inner function when available.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     // `args` carries both the value and the thread's state.
+    ///     args.value + *args.state
+    /// })?;
+    ///
+    /// let response = thread.call(2).await.expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Panics
     ///
     /// Panics if [`usize::MAX`] tasks have their responses queued, causing a response to be overwritten.
@@ -352,6 +544,28 @@ where
     }
 
     /// Invokes the thread, blocking the current thread until the response of the inner function is available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     // `args` carries both the value and the thread's state.
+    ///     args.value + *args.state
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(2).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
@@ -367,6 +581,26 @@ where
 
     /// Invokes the thread, executing the method but ignoring the return value.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     println!("{} + {} = {}", args.value, args.state, args.value + *args.state);
+    /// })?;
+    ///
+    /// thread.call_and_forget(2).await.expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread's receiving channel is closed.
@@ -375,6 +609,25 @@ where
     }
 
     /// Invokes the thread, executing the method but ignoring the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     println!("{} + {} = {}", args.value, args.state, args.value + *args.state);
+    /// })?;
+    ///
+    /// thread.blocking_call_and_forget(2).expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///

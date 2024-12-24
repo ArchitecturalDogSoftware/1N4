@@ -110,6 +110,20 @@ where
 {
     /// Spawns a new [`Thread`] with the given name and task.
     ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{Handle, Thread};
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let thread = Thread::spawn("worker", || 2 + 2)?;
+    /// let result = thread.into_join_handle().join().unwrap();
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(4, result);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
@@ -127,6 +141,20 @@ where
     /// Spawns a new [`Thread`] with the given name and asynchronous task.
     ///
     /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{Handle, Thread};
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let thread = Thread::spawn_with_runtime("worker", || async { 2 + 2 })?;
+    /// let result = thread.into_join_handle().join().unwrap();
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(4, result);
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///

@@ -38,11 +38,45 @@ where
     H: Handle,
 {
     /// Creates a new [`Joining<H, T>`] thread handle.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::joining::Joining;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let thread = Thread::spawn("worker", || 2 + 2)?;
+    /// let joining = Joining::new(thread).inspect_result(|n| {
+    ///     // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    ///     assert_eq!(n, 4);
+    /// });
+    ///
+    /// drop(joining);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn new(handle: H) -> Self {
         Self { handle: Some(handle), inspect_handle: None, inspect_result: None }
     }
 
     /// Runs the given function before joining the thread on drop.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::joining::Joining;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let thread = Thread::spawn("worker", || {})?;
+    /// let joining = Joining::new(thread).inspect_handle(|_| {
+    ///     // Do something with the handle here.
+    ///     println!("the thread is being dropped");
+    /// });
+    ///
+    /// drop(joining);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn inspect_handle(mut self, f: fn(&mut H)) -> Self {
         self.inspect_handle = Some(f);
 
@@ -50,6 +84,23 @@ where
     }
 
     /// Runs the given function after joining the thread on drop.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::Thread;
+    /// # use ina_threading::joining::Joining;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let thread = Thread::spawn("worker", || 2 + 2)?;
+    /// let joining = Joining::new(thread).inspect_result(|n| {
+    ///     // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    ///     assert_eq!(n, 4);
+    /// });
+    ///
+    /// drop(joining);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn inspect_result(mut self, f: fn(H::Output)) -> Self {
         self.inspect_result = Some(f);
 

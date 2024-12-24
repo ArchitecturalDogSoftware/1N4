@@ -95,19 +95,6 @@ impl LocalizerKeyAttribute {
 }
 
 /// Applies the procedural macro.
-///
-/// ```
-/// #[derive(AsTranslation)]
-/// #[localizer_category(crate::utility::category::UI)]
-/// pub enum DataType {
-///     #[localizer_key("boolean")]
-///     Boolean,
-///     #[localizer_key("integer")]
-///     Integer,
-///     #[localizer_key("string")]
-///     String,
-/// }
-/// ```
 pub fn procedure(input: TokenStream) -> TokenStream {
     let DeriveInput { attrs, ident, generics, data, .. } = parse_macro_input!(input as DeriveInput);
 
