@@ -1,45 +1,61 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Copyright © 2024 Jaxydog
+#
+# This file is part of 1N4.
+#
+# 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+# License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# 1N4 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
+# <https://www.gnu.org/licenses/>.
+
 name: Rust
 
 on:
-  push:
-    branches-ignore:
-      - 'doc-improvements'
-      - 'script-improvements'
-  pull_request:
-    branches-ignore:
-      - 'doc-improvements'
-      - 'script-improvements'
+    push:
+        branches-ignore:
+            - 'doc-improvements'
+            - 'script-improvements'
+    pull_request:
+        branches-ignore:
+            - 'doc-improvements'
+            - 'script-improvements'
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/cache@v4
+              with:
+                path: |
+                    ~/.cargo/bin/
+                    ~/.cargo/registry/index/
+                    ~/.cargo/registry/cache/
+                    ~/.cargo/git/db/
+                    target/
+                key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Setup - Install Nightly
-      run: rustup toolchain install nightly
-    - name: Setup - Install Clippy
-      run: rustup component add clippy --toolchain nightly
-    - name: Setup - install RustFmt
-      run: rustup component add rustfmt --toolchain nightly
+            - name: Setup - Install Nightly
+              run: rustup toolchain install nightly
+            - name: Setup - Install Clippy
+              run: rustup component add clippy --toolchain nightly
+            - name: Setup - install RustFmt
+              run: rustup component add rustfmt --toolchain nightly
 
-    - name: Action - Run build
-      run: cargo build --verbose
-    - name: Action - Run tests
-      run: cargo test --verbose
-    - name: Action - Run Clippy
-      run: cargo clippy --verbose
-    - name: Action - Run RustFmt
-      run: cargo fmt --all -- --check
+            - name: Action - Run build
+              run: cargo build --verbose
+            - name: Action - Run tests
+              run: cargo test --all --verbose
+            - name: Action - Run Clippy
+              run: cargo clippy --verbose
+            - name: Action - Run RustFmt
+              run: cargo fmt --all -- --check
