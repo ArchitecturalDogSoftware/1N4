@@ -46,6 +46,11 @@ This exists to ensure that added code is high quality, consistent, performant, a
 If you feel that these rules are incomplete or should be modified, feel free to make a pull request,
 and if there is any confusion, feel free to ask me directly or view pre-existing files within the repository.
 
+Many of these conventions are enforced by linters and formatters,
+all of which are present in GitHub Actions workflows.
+Accordingly, all the lints and tests can be run without installation and configuration
+using [`act`](https://nektosact.com/).
+
 ### Data
 
 - All configuration data files should be in the TOML format (`.toml`).
