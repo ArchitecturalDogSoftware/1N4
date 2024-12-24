@@ -63,3 +63,152 @@ pub fn fuzzy_contains(strictness: Strictness, base: impl AsRef<str>, find: impl 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::utility::search::Strictness;
+
+    const HAYSTACK: &str = "AaAbBbCcC!@#123";
+
+    fn search(strictness: Strictness, needle: &'static str, pass: bool) {
+        assert_eq!(super::fuzzy_contains(strictness, HAYSTACK, needle), pass);
+    }
+
+    #[test]
+    fn search_loose() {
+        let sensitive = Strictness::Loose { ignore_casing: false };
+        let insensitive = Strictness::Loose { ignore_casing: true };
+
+        self::search(sensitive, "aaabbbccc123", false);
+        self::search(insensitive, "aaabbbccc123", true);
+        self::search(sensitive, "aaa bbb ccc 123", false);
+        self::search(insensitive, "aaa bbb ccc 123", true);
+
+        self::search(sensitive, "AAABBBCCC123", false);
+        self::search(insensitive, "AAABBBCCC123", true);
+        self::search(sensitive, "AAA BBB CCC 123", false);
+        self::search(insensitive, "AAA BBB CCC 123", true);
+
+        self::search(sensitive, "AaAbBbCcC123", true);
+        self::search(insensitive, "AaAbBbCcC123", true);
+        self::search(sensitive, "AaA bBb CcC 123", true);
+        self::search(insensitive, "AaA bBb CcC 123", true);
+
+        self::search(sensitive, "AaAbBbCcC!@#123", true);
+        self::search(insensitive, "AaAbBbCcC!@#123", true);
+        self::search(sensitive, "AaA bBb CcC !@# 123", true);
+        self::search(insensitive, "AaA bBb CcC !@# 123", true);
+
+        self::search(sensitive, "AaAbBbCcC123CcCbBbAaA", false);
+        self::search(insensitive, "AaAbBbCcC123CcCbBbAaA", false);
+        self::search(sensitive, "AaA bBb CcC 123 CcC bBb AaA", true);
+        self::search(insensitive, "AaA bBb CcC 123 CcC bBb AaA", true);
+
+        self::search(sensitive, "c?!?!?!?!??!?! 123...", true);
+        self::search(insensitive, "c?!?!?!?!??!?! 123...", true);
+
+        self::search(sensitive, "?", true);
+        self::search(insensitive, "?", true);
+
+        self::search(sensitive, "", true);
+        self::search(insensitive, "", true);
+
+        self::search(sensitive, "🦀", true);
+        self::search(insensitive, "🦀", true);
+
+        self::search(sensitive, "unrelated string", false);
+        self::search(insensitive, "unrelated string", false);
+    }
+
+    #[test]
+    fn search_firm() {
+        let sensitive = Strictness::Firm { ignore_casing: false };
+        let insensitive = Strictness::Firm { ignore_casing: true };
+
+        self::search(sensitive, "aaabbbccc123", false);
+        self::search(insensitive, "aaabbbccc123", true);
+        self::search(sensitive, "aaa bbb ccc 123", false);
+        self::search(insensitive, "aaa bbb ccc 123", true);
+
+        self::search(sensitive, "AAABBBCCC123", false);
+        self::search(insensitive, "AAABBBCCC123", true);
+        self::search(sensitive, "AAA BBB CCC 123", false);
+        self::search(insensitive, "AAA BBB CCC 123", true);
+
+        self::search(sensitive, "AaAbBbCcC123", true);
+        self::search(insensitive, "AaAbBbCcC123", true);
+        self::search(sensitive, "AaA bBb CcC 123", true);
+        self::search(insensitive, "AaA bBb CcC 123", true);
+
+        self::search(sensitive, "AaAbBbCcC!@#123", true);
+        self::search(insensitive, "AaAbBbCcC!@#123", true);
+        self::search(sensitive, "AaA bBb CcC !@# 123", true);
+        self::search(insensitive, "AaA bBb CcC !@# 123", true);
+
+        self::search(sensitive, "AaAbBbCcC123CcCbBbAaA", false);
+        self::search(insensitive, "AaAbBbCcC123CcCbBbAaA", false);
+        self::search(sensitive, "AaA bBb CcC 123 CcC bBb AaA", false);
+        self::search(insensitive, "AaA bBb CcC 123 CcC bBb AaA", false);
+
+        self::search(sensitive, "c?!?!?!?!??!?! 123...", false);
+        self::search(insensitive, "c?!?!?!?!??!?! 123...", true);
+
+        self::search(sensitive, "?", true);
+        self::search(insensitive, "?", true);
+
+        self::search(sensitive, "", true);
+        self::search(insensitive, "", true);
+
+        self::search(sensitive, "🦀", true);
+        self::search(insensitive, "🦀", true);
+
+        self::search(sensitive, "unrelated string", false);
+        self::search(insensitive, "unrelated string", false);
+    }
+
+    #[test]
+    fn search_strict() {
+        let sensitive = Strictness::Strict { ignore_casing: false };
+        let insensitive = Strictness::Strict { ignore_casing: true };
+
+        self::search(sensitive, "aaabbbccc123", false);
+        self::search(insensitive, "aaabbbccc123", false);
+        self::search(sensitive, "aaa bbb ccc 123", false);
+        self::search(insensitive, "aaa bbb ccc 123", false);
+
+        self::search(sensitive, "AAABBBCCC123", false);
+        self::search(insensitive, "AAABBBCCC123", false);
+        self::search(sensitive, "AAA BBB CCC 123", false);
+        self::search(insensitive, "AAA BBB CCC 123", false);
+
+        self::search(sensitive, "AaAbBbCcC123", false);
+        self::search(insensitive, "AaAbBbCcC123", false);
+        self::search(sensitive, "AaA bBb CcC 123", false);
+        self::search(insensitive, "AaA bBb CcC 123", false);
+
+        self::search(sensitive, "AaAbBbCcC!@#123", true);
+        self::search(insensitive, "AaAbBbCcC!@#123", true);
+        self::search(sensitive, "AaA bBb CcC !@# 123", false);
+        self::search(insensitive, "AaA bBb CcC !@# 123", false);
+
+        self::search(sensitive, "AaAbBbCcC123CcCbBbAaA", false);
+        self::search(insensitive, "AaAbBbCcC123CcCbBbAaA", false);
+        self::search(sensitive, "AaA bBb CcC 123 CcC bBb AaA", false);
+        self::search(insensitive, "AaA bBb CcC 123 CcC bBb AaA", false);
+
+        self::search(sensitive, "c?!?!?!?!??!?! 123...", false);
+        self::search(insensitive, "c?!?!?!?!??!?! 123...", false);
+
+        self::search(sensitive, "?", false);
+        self::search(insensitive, "?", false);
+
+        self::search(sensitive, "", true);
+        self::search(insensitive, "", true);
+
+        self::search(sensitive, "🦀", false);
+        self::search(insensitive, "🦀", false);
+
+        self::search(sensitive, "unrelated string", false);
+        self::search(insensitive, "unrelated string", false);
+    }
+}
