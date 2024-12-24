@@ -209,7 +209,7 @@ impl Color {
             _ => chroma / (1.0 - ((2.0 * lightness) - 1.0).abs()),
         };
 
-        (hue, saturation, lightness)
+        (hue * 60.0, saturation, lightness)
     }
 }
 
@@ -320,5 +320,97 @@ impl LowerHex for Color {
 impl UpperHex for Color {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "#{:06X}", self.rgb())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::Color;
+
+    const RED: Color = Color::new(255, 0, 0);
+    const GREEN: Color = Color::new(0, 255, 0);
+    const BLUE: Color = Color::new(0, 0, 255);
+
+    #[test]
+    fn convert_u32() {
+        assert_eq!(RED, Color::from_u32(0xFF_00_00));
+        assert_eq!(GREEN, Color::from_u32(0x00_FF_00));
+        assert_eq!(BLUE, Color::from_u32(0x00_00_FF));
+
+        assert_eq!(RED.rgb(), 0xFF_00_00);
+        assert_eq!(GREEN.rgb(), 0x00_FF_00);
+        assert_eq!(BLUE.rgb(), 0x00_00_FF);
+    }
+
+    #[test]
+    fn format_hex_strings() {
+        assert_eq!(format!("{RED:X}"), "#FF0000");
+        assert_eq!(format!("{GREEN:X}"), "#00FF00");
+        assert_eq!(format!("{BLUE:X}"), "#0000FF");
+
+        assert_eq!(format!("{RED:x}"), "#ff0000");
+        assert_eq!(format!("{GREEN:x}"), "#00ff00");
+        assert_eq!(format!("{BLUE:x}"), "#0000ff");
+    }
+
+    #[test]
+    fn format_rgb_strings() {
+        assert_eq!(format!("{RED}"), "rgb(255, 0, 0)");
+        assert_eq!(format!("{GREEN}"), "rgb(0, 255, 0)");
+        assert_eq!(format!("{BLUE}"), "rgb(0, 0, 255)");
+    }
+
+    #[test]
+    fn format_hsl_strings() {
+        fn format_hsl(color: Color) -> String {
+            let (h, s, l) = color.hsl();
+
+            format!("hsl({h:.1}, {s:.1}, {l:.1})")
+        }
+
+        assert_eq!(format_hsl(RED), "hsl(0.0, 1.0, 0.5)");
+        assert_eq!(format_hsl(GREEN), "hsl(120.0, 1.0, 0.5)");
+        assert_eq!(format_hsl(BLUE), "hsl(240.0, 1.0, 0.5)");
+    }
+
+    #[test]
+    fn parse_hex_strings() -> Result<(), <Color as FromStr>::Err> {
+        assert_eq!(RED, "#FF0000".parse()?);
+        assert_eq!(GREEN, "#00FF00".parse()?);
+        assert_eq!(BLUE, "#0000FF".parse()?);
+
+        assert_eq!(RED, "#ff0000".parse()?);
+        assert_eq!(GREEN, "#00ff00".parse()?);
+        assert_eq!(BLUE, "#0000ff".parse()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_rgb_strings() -> Result<(), <Color as FromStr>::Err> {
+        assert_eq!(RED, "rgb(255, 0, 0)".parse()?);
+        assert_eq!(GREEN, "rgb(0, 255, 0)".parse()?);
+        assert_eq!(BLUE, "rgb(0, 0, 255)".parse()?);
+
+        assert_eq!(RED, "rgb(255,0,0)".parse()?);
+        assert_eq!(GREEN, "rgb(0,255,0)".parse()?);
+        assert_eq!(BLUE, "rgb(0,0,255)".parse()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_hsl_strings() -> Result<(), <Color as FromStr>::Err> {
+        assert_eq!(RED, "hsl(0, 1, 0.5)".parse()?);
+        assert_eq!(GREEN, "hsl(120, 1, 0.5)".parse()?);
+        assert_eq!(BLUE, "hsl(240, 1, 0.5)".parse()?);
+
+        assert_eq!(RED, "hsl(0,1,0.5)".parse()?);
+        assert_eq!(GREEN, "hsl(120,1,0.5)".parse()?);
+        assert_eq!(BLUE, "hsl(240,1,0.5)".parse()?);
+
+        Ok(())
     }
 }
