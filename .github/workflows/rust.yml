@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Copyright © 2024 Jaxydog
+# Copyright © 2024 RemasteredArch
 #
 # This file is part of 1N4.
 #
@@ -43,7 +44,31 @@ jobs:
                     ~/.cargo/git/db/
                     target/
                 key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            - name: Setup - Install Rustup
+              run: |
+                has() {
+                  [ "$(type "$1" 2> /dev/null)" ]
+                }
 
+                download() {
+                    if has curl; then
+                        curl --proto '=https' --tlsv1.2 --silent --show-error --fail "$1"
+                    elif has wget; then
+                        wget -O - "$1"
+                    else
+                        echo 'Wget and cURL are both unavailable!' >&2
+                        exit 1
+                    fi
+                }
+
+                if has rustup; then
+                    exit 0;
+                fi
+
+                download 'https://sh.rustup.rs' | sh -s -- --verbose -y --default-toolchain none
+
+                cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+                echo "${cargo_home%/}/bin" >> "$GITHUB_PATH"
             - name: Setup - Install Nightly
               run: rustup toolchain install nightly
             - name: Setup - Install Clippy
