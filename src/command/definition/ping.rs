@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use ina_localizing::localize;
+use ina_logging::debug;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
@@ -56,6 +57,8 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     let embed = EmbedBuilder::new().title(format!("{title} ({delay})")).color(color::BRANDING_A.rgb());
 
     context.client().update_response(&context.interaction.token).embeds(Some(&[embed.build()])).await?;
+
+    debug!(async "received ping command: response delayed by {delay}").await?;
 
     crate::client::event::pass()
 }
