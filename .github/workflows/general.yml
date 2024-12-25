@@ -20,7 +20,7 @@ on: [push, pull_request]
 
 jobs:
     toml:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         # Doesn't have a SemVer tag for v0.9.*, we will have to update patch-by-patch.
         container: tamasfe/taplo:0.9.3
         steps:
@@ -32,7 +32,7 @@ jobs:
               run: taplo lint --default-schema-catalogs
 
     shell:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         container: mvdan/shfmt:v3-alpine
         steps:
             - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
               run: shfmt --diff .
 
     yaml:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
             - name: Setup - Install go
@@ -274,7 +274,7 @@ jobs:
               run: find .github/workflows/ \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 actionlint
 
     markdown:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v4
             - name: Action - Install and check files with mdformat
