@@ -19,13 +19,15 @@ name: Rust
 
 on:
     push:
-        branches-ignore:
-            - 'doc-improvements'
-            - 'script-improvements'
+        paths:
+            - '**.rs'
+            - '**.toml'
+            - '**.lock'
     pull_request:
-        branches-ignore:
-            - 'doc-improvements'
-            - 'script-improvements'
+        paths:
+            - '**.rs'
+            - '**.toml'
+            - '**.lock'
 
 env:
     CARGO_TERM_COLOR: always
