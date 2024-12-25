@@ -63,8 +63,28 @@ jobs:
                 MIN_HASH_LEN: '16'
               run: |
                 output() {
-                    echo "$1" >&2
-                    echo "$1" >> "$GITHUB_OUTPUT"
+                    local key_or_pair="$1"
+
+                    # Avoids `set -u` errors.
+                    local value="${2:-}"
+
+                    local delimeter="${3:-EOF}"
+
+                    local output
+                    output="$(
+                        if [ -z "$value" ]; then
+                            # Single line output, `key_or_pair` is a key/value pair.
+                            echo "$key_or_pair"
+                        else
+                            # Multiline output, `key_or_pair` is just a key.
+                            echo "$key_or_pair<<$delimeter"
+                            echo "$value"
+                            echo "$delimeter"
+                        fi
+                    )"
+
+                    echo "$output" >&2
+                    echo "$output" >> "$GITHUB_OUTPUT"
                 }
 
                 resolve_package() {
@@ -141,7 +161,7 @@ jobs:
                     output "${package_bin_upper}_GOMOD_SHA256=$hash"
                     output "${package_bin_upper}_VERSION=$version"
 
-                    echo "$hash"
+                    printf '%s\n%s\n' "$version" "$hash"
                 }
 
                 get_column() {
@@ -174,24 +194,28 @@ jobs:
                 hash_len="$(( HASH_LEN_TARGET / package_count ))"
                 hash_len="$(( hash_len > MIN_HASH_LEN ? hash_len : MIN_HASH_LEN ))"
 
+                exact_packages=''
                 cumulative_hash=''
                 while read -r package; do
                     package_bin="$(get_column "$package" 1)"
                     package_path="$(get_column "$package" 2)"
                     package_semver="$(get_column "$package" 3)"
 
-                    # `head -n 1` is unnecessary because `resolve_package` should return a single line Base64 string,
-                    # but it does not hurt to be sure.
-                    hash="$(resolve_package "$package_bin" "$package_path" "$package_semver" | head -n 1)"
+                    {
+                        read -r version
+                        read -r hash
+                    } < <(resolve_package "$package_bin" "$package_path" "$package_semver")
 
                     # Previously I used `expr substr "$hash" 1 "$hash_len"`, but that is not POSIX. `cut` operates per
                     # line, but I am certain that there will only ever be one line, so it is equivalent.
                     hash="$(echo "$hash" | cut -c "-$hash_len")"
 
                     cumulative_hash="$cumulative_hash$hash"
+                    exact_packages="$(printf '%s\n%s' "$exact_packages" "$package_bin:$package_path:$package_semver")"
                 done < <(echo "$PACKAGES")
 
                 output "CUMULATIVE_GOMOD_SHA256=$cumulative_hash"
+                output "PACKAGES" "$exact_packages"
 
                 for var in GOCACHE GOMODCACHE GOVERSION; do
                     output "$var=$(go env $var)"
@@ -204,10 +228,38 @@ jobs:
                 path: |
                     ${{ steps.goenv.outputs.GOCACHE }}
                     ${{ steps.goenv.outputs.GOMODCACHE }}
-            - name: Setup - Install yamlfmt
-              run: go install github.com/google/yamlfmt/cmd/yamlfmt@v0.14
-            - name: Setup - Install actionlint
-              run: go install github.com/rhysd/actionlint/cmd/actionlint@v1
+            - name: Setup - Install packages
+              run: |
+                start_group() {
+                    local title="$1"
+                    echo "::group::$title"
+                }
+
+                end_group() {
+                    echo '::endgroup::'
+                }
+
+                get_column() {
+                    local line
+                    line="$1"
+
+                    local column
+                    column="$2"
+
+                    echo "$line" | awk -F ':' "{ print \$$column }"
+                }
+
+                while read -r package; do
+                    package_bin="$(get_column "$package" 1)"
+                    package_path="$(get_column "$package" 2)"
+                    package_version="$(get_column "$package" 3)"
+
+                    start_group "Installing $package_bin $package_version"
+
+                    go install "$package_path/cmd/$package_bin@$package_semver"
+
+                    end_group
+                done < <(echo "${{ steps.goenv.outputs.PACKAGES }}" )
 
             - name: Action - Check YAML formatting
               run: yamlfmt -lint .
