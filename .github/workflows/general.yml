@@ -211,7 +211,7 @@ jobs:
                     hash="$(echo "$hash" | cut -c "-$hash_len")"
 
                     cumulative_hash="$cumulative_hash$hash"
-                    exact_packages="$(printf '%s\n%s' "$exact_packages" "$package_bin:$package_path:$package_semver")"
+                    exact_packages="$(printf '%s\n%s' "$exact_packages" "$package_bin:$package_path:$version")"
                 done < <(echo "$PACKAGES")
 
                 output "CUMULATIVE_GOMOD_SHA256=$cumulative_hash"
@@ -256,7 +256,7 @@ jobs:
 
                     start_group "Installing $package_bin $package_version"
 
-                    go install "$package_path/cmd/$package_bin@$package_semver"
+                    go install "$package_path/cmd/$package_bin@$package_version"
 
                     end_group
                 done < <(echo "${{ steps.goenv.outputs.PACKAGES }}" )
