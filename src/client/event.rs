@@ -399,7 +399,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 /// This function will return an error if the author could not be notified.
 pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(user) = event.author() else {
-        info!(async "skipping user error notification as not author is present").await?;
+        info!(async "skipping user error notification as no author is present").await?;
 
         return self::pass();
     };
