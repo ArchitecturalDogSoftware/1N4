@@ -18,6 +18,7 @@
 
 #![feature(array_try_from_fn)]
 
+use std::collections::hash_map::Keys;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::Path;
@@ -98,6 +99,12 @@ impl Localizer {
     #[must_use]
     pub fn new(settings: Settings) -> Self {
         Self { settings, languages: HashMap::new() }
+    }
+
+    /// Returns the default locale of this [`Localizer`].
+    #[must_use]
+    pub const fn default_locale(&self) -> Locale {
+        self.settings.default_locale
     }
 
     /// Returns the loaded locales of this [`Localizer`].
@@ -199,6 +206,16 @@ impl Localizer {
         self.load_locales(locales).await
     }
 
+    /// Returns an iterator over the keys within a specified locale's category.
+    #[must_use]
+    pub fn keys<'tx: 'fc, 'fc>(
+        &'tx self,
+        locale: &Locale,
+        category: &'fc str,
+    ) -> Option<Keys<'tx, Arc<str>, Arc<str>>> {
+        self.languages.get(locale).and_then(|l| l.keys(category))
+    }
+
     /// Returns the translated text for the given key.
     ///
     /// # Errors
@@ -230,6 +247,12 @@ pub struct Language {
 }
 
 impl Language {
+    /// Returns an iterator over the keys within a specified category.
+    #[must_use]
+    pub fn keys<'tx: 'fc, 'fc>(&'tx self, category: &'fc str) -> Option<Keys<'tx, Arc<str>, Arc<str>>> {
+        self.categories.get(category).map(|k| k.keys())
+    }
+
     /// Returns the text for a key within the given category as written within this language file.
     ///
     /// # Errors

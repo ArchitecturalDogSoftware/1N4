@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ina_threading::statics::Static;
 use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
 use tokio::sync::RwLock;
@@ -42,6 +44,8 @@ pub enum Request {
     Load(Option<Box<[Locale]>>),
     /// Translates the given categorized key.
     Get(Option<Locale>, Box<str>, Box<str>),
+    /// Returns a list of valid keys in the specified category.
+    Keys(Option<Locale>, Box<str>),
 }
 
 /// A response sent from the localization thread.
@@ -59,6 +63,8 @@ pub enum Response {
     Load(usize),
     /// Returns translated text.
     Text(Text),
+    /// Returns a list of keys.
+    Keys(Box<[Arc<str>]>),
 }
 
 /// Starts the localization thread.
@@ -176,6 +182,12 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
                 Err(error) => Response::Error(Box::new(error)),
             }
         }
+        Request::Keys(locale, category) => {
+            let state = state.read().await;
+            let locale = locale.unwrap_or_else(|| state.default_locale());
+
+            Response::Keys(state.keys(&locale, &category).map_or_else(Box::default, |v| v.cloned().collect()))
+        }
     }
 }
 
@@ -271,6 +283,17 @@ invoke! {
         Request::Get(locale, category.as_ref().into(), key.as_ref().into())
     } -> Text {
         Response::Text(text) => Ok(text),
+    };
+
+    /// Returns the locale's stored keys in the given category.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the message could not be sent.
+    keys, blocking_keys (locale: Option<Locale>, category: impl Send + AsRef<str>) {
+        Request::Keys(locale, category.as_ref().into())
+    } -> Box<[Arc<str>]> {
+        Response::Keys(keys) => Ok(keys),
     };
 }
 
