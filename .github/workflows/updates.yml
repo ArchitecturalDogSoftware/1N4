@@ -27,19 +27,25 @@ jobs:
     updates:
         runs-on: ubuntu-24.04
         env:
+            # Spec: `semver`
             GO_VERSION: '1'
+            # Spec: `binary:path:vSemVer`
             GO_PACKAGES: |
                 yamlfmt:github.com/google/yamlfmt:v0.14
                 actionlint:github.com/rhysd/actionlint:v1
+            # Spec: `package:SemVer`
             PYTHON_PACKAGES: |
                 mdformat:0.7
+            # Spec: `namespace/repository:tag:SemVer(:search filter)?`
             DOCKER_CONTAINERS: |
-                mvdan/shfmt:v3-alpine
-                tamasfe/taplo:0.9.3
+                mvdan/shfmt:v3-alpine:v3:-alpine
+                tamasfe/taplo:0.9.3:0.9
+            # Spec: `namespace/repository@semver`
             ACTIONS: |
                 actions/cache@v4
                 actions/checkout@v4
                 actions/setup-go@v5
+            # Spec: `product-version`
             RUNNERS: |
                 ubuntu-24.04
         steps:
@@ -119,15 +125,16 @@ jobs:
                 declare_function get_column << 'EOF'
                 line="$1"
                 column="$2"
+                delimiter="${3:-:}"
 
-                echo "$line" | awk -F ':' "{ print \$$column }"
+                echo "$line" | awk -F "$delimiter" "{ print \$$column }"
                 EOF
 
                 declare_function get_go_api_base << 'EOF'
                 package_path="$1"
 
                 go env GOPROXY | tr ',|' '\n' | while read -r proxy; do
-                    if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ]; then
+                    if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ] || [ -z "$proxy" ]; then
                         continue
                     fi
 
@@ -185,7 +192,7 @@ jobs:
 
                 # Ensures there's a `v` at the start
                 latest_display="v${latest#v}"
-                semver_target_display="v${latest#v}"
+                semver_target_display="v${semver_target#v}"
 
                 case "$latest" in
                     "$semver_target"* )
@@ -214,6 +221,10 @@ jobs:
             - name: Check Go packges
               run: |
                 while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
                     package_bin="$(get_column "$package" 1)"
                     package_path="$(get_column "$package" 2)"
                     package_version="$(get_column "$package" 3)"
@@ -223,9 +234,67 @@ jobs:
                     compare_semver "$package_bin" "$latest" "$package_version"
                 done < <(trim_whitespace "$GO_PACKAGES")
             - name: Check Python packages
-              run: false
+              run: |
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    package_name="$(get_column "$package" 1)"
+                    package_version="$(get_column "$package" 2)"
+
+                    versions="$(download 'https://pypi.org/pypi/mdformat/json')"
+                    latest="$(echo "$versions" | grep -o -m 1 '"version":"[^"]*"' | sed 's/"version":"\(.*\)"/\1/')"
+
+                    compare_semver "$package_name" "$latest" "$package_version"
+                done < <(trim_whitespace "$PYTHON_PACKAGES")
             - name: Check Docker containers
-              run: false
+              run: |
+                api_base='https://hub.docker.com/v2'
+
+                # TODO: Adapt to work with Taplo.
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    # E.g., `mvdan/shfmt`.
+                    path="$(get_column "$package" 1)"
+                    # E.g., `mvdan`.
+                    namespace="$(get_column "$path" 1 '/')"
+                    # E.g., `shfmt`.
+                    repository="$(get_column "$path" 2 '/')"
+                    # E.g., `v3-alpine`.
+                    tag="$(get_column "$package" 2)"
+                    # E.g., `v3`.
+                    semver_target="$(get_column "$package" 3)"
+                    # E.g., `-alpine` (or none).
+                    search_filter="$(get_column "$package" 4)"
+
+                    url="$(
+                        echo "$api_base/namespaces/$namespace/repositories/$repository/tags \
+                            ?page_size=25 \
+                            &page=1 \
+                            &ordering=last_updated" |
+                        tr -d '[:space:]'
+                    )"
+                    if [ -n "$search_filter" ]; then
+                        url="$url&name=$search_filter"
+                    fi
+
+                    versions="$(wget -qO - "$url")"
+                    latest="$(echo "$versions" |
+                        grep -o -m 1 '"name":"[^"]*"' |
+                        sed 's/"name":"\(.*\)"/\1/' |
+                        grep -v test |
+                        sort -rV |
+                        head -n 1)"
+
+                    compare_semver "$repository" "$latest" "$semver_target"
+                done < <(trim_whitespace "$DOCKER_CONTAINERS")
+                # DOCKER_CONTAINERS:
+                # mvdan/shfmt:v3-alpine
+                # tamasfe/taplo:0.9.3
             - name: Check GitHub Actions
               run: false
             - name: Check GitHub Actions runners
