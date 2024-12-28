@@ -1,0 +1,232 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Copyright © 2024 RemasteredArch
+#
+# This file is part of 1N4.
+#
+# 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+# License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# 1N4 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
+# <https://www.gnu.org/licenses/>.
+
+name: Dependency Updates
+
+on:
+    schedule:
+        # Midnight UTC at the start of every Monday.
+        #
+        # <https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07>
+        - cron: '0 0 * * 1'
+
+jobs:
+    updates:
+        runs-on: ubuntu-24.04
+        env:
+            GO_VERSION: '1'
+            GO_PACKAGES: |
+                yamlfmt:github.com/google/yamlfmt:v0.14
+                actionlint:github.com/rhysd/actionlint:v1
+            PYTHON_PACKAGES: |
+                mdformat:0.7
+            DOCKER_CONTAINERS: |
+                mvdan/shfmt:v3-alpine
+                tamasfe/taplo:0.9.3
+            ACTIONS: |
+                actions/cache@v4
+                actions/checkout@v4
+                actions/setup-go@v5
+            RUNNERS: |
+                ubuntu-24.04
+        steps:
+            - name: Setup - Install go
+              uses: actions/setup-go@v5
+              with:
+                go-version: '1'
+                check-latest: true
+            - name: Setup - Install utilities
+              run: |
+                temp_bin_dir="$(mktemp --directory)"
+                echo "$temp_bin_dir" >> "$GITHUB_PATH"
+
+                # Persist a function declaration across steps by writing it to a temporary script.
+                #
+                # Declare the function as a string in stdin: `echo ... | declare_function ident` instead of
+                # `ident() { ... }`.
+                declare_function() {
+                    local identifier="$1"
+                    local shell="${2:-sh}"
+                    local body
+                    body="$(< /dev/stdin)"
+
+                    # Though nice, pipefail fails silently because it was only *just* added to POSIX Issue 8 (2024).
+                    printf '%s\n' \
+                        "#! /usr/bin/env $shell" \
+                        'set -eu' \
+                        'if set -o | grep -q "^pipefail "; then set -o pipefail; fi' \
+                        "$body" \
+                        > "$temp_bin_dir/$identifier"
+                }
+
+                declare_function has << 'EOF'
+                command -v "$1" > /dev/null
+                EOF
+
+                declare_function download << 'EOF'
+                url="$1"
+
+                if has curl; then
+                    curl --fail --silent --show-error --location "$url"
+                    exit 0
+                fi
+
+                if has wget; then
+                    wget -qO - "$url"
+                    exit 0
+                fi
+
+                echo "Both 'wget' and 'curl' are unavailable!" >&2
+                exit 1
+                EOF
+
+                declare_function trim_whitespace << 'EOF'
+                # E.g., `  foobar  `.
+                str="$1"
+
+                # E.g., `foobar  `.
+                trimmed="${str#"${str%%[![:space:]]*}"}"
+
+                # E.g., `foobar`.
+                trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+                echo "$trimmed"
+                EOF
+
+                declare_function start_group << 'EOF'
+                title="$1"
+
+                echo "::group::$title"
+                EOF
+
+                declare_function end_group << 'EOF'
+                echo '::endgroup::'
+                EOF
+
+                declare_function get_column << 'EOF'
+                line="$1"
+                column="$2"
+
+                echo "$line" | awk -F ':' "{ print \$$column }"
+                EOF
+
+                declare_function get_go_api_base << 'EOF'
+                package_path="$1"
+
+                go env GOPROXY | tr ',|' '\n' | while read -r proxy; do
+                    if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ]; then
+                        continue
+                    fi
+
+                    # E.g., `https://proxy.golang.org/github.com/google/yamlfmt/@v`.
+                    echo "$proxy/$package_path/@v"
+                done
+                EOF
+
+                declare_function get_go_sumdb << 'EOF'
+                # TODO: Parse for other forms than `sum.golang.org`.
+                echo "https://$(go env GOSUMDB)"
+                EOF
+
+                # Returns the SHA256 hash of the package's `go.mod` file.
+                declare_function get_go_package_hash << 'EOF'
+                package_path="$1"
+                package_version="$2"
+                go_sumdb="${3:-$(get_go_sumdb)}"
+
+                download "$go_sumdb/lookup/$package_path@$package_version" |
+                    grep "^$package_path $package_version/go.mod h1:" |
+                    sed 's/^.* h1:\(.*\)$/\1/'
+                EOF
+
+                declare_function get_go_package_versions << 'EOF'
+                package_path="$1"
+
+                api_base="$(get_go_api_base "$package_path")"
+
+                # E.g.,
+                #
+                # ```text
+                # v0.2.0
+                # v0.1.0
+                # v0.3.0
+                # v0.1.1
+                # ```
+                download "$api_base/list" | sort -rV
+                EOF
+
+                declare_function resolve_go_semver << 'EOF'
+                package_path="$1"
+                # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
+                package_semver="$2"
+
+                # E.g., `v0.1.1` for some input `v0.1`.
+                get_go_package_versions "$package_path" | grep "^$package_semver.*" | head -n 1
+                EOF
+
+                declare_function compare_semver << 'EOF'
+                name="$1"
+                latest="$2"
+                # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
+                semver_target="$3"
+
+                # Ensures there's a `v` at the start
+                latest_display="v${latest#v}"
+                semver_target_display="v${latest#v}"
+
+                case "$latest" in
+                    "$semver_target"* )
+                        echo "$name is up to date! ($latest_display in $semver_target_display)"
+                        ;;
+
+                    * )
+                        echo "New $name version available! ($latest_display not in $semver_target_display)" >&2
+                        exit 1
+                        ;;
+                esac
+                EOF
+
+                chmod u+x "$temp_bin_dir/"*
+            - name: Check Go
+              run: |
+                # E.g., `1.23.4`
+                latest_go="$(
+                    download 'https://go.dev/dl/?mode=json' |
+                        grep '^ *"version": ' |
+                        head -n 1 |
+                        sed 's/^ *"version": "go\(.*\)",$/\1/'
+                )"
+
+                compare_semver 'Go' "$latest_go" "$GO_VERSION"
+            - name: Check Go packges
+              run: |
+                while read -r package; do
+                    package_bin="$(get_column "$package" 1)"
+                    package_path="$(get_column "$package" 2)"
+                    package_version="$(get_column "$package" 3)"
+
+                    latest="$(get_go_package_versions "$package_path" | head -n 1)"
+
+                    compare_semver "$package_bin" "$latest" "$package_version"
+                done < <(trim_whitespace "$GO_PACKAGES")
+            - name: Check Python packages
+              run: false
+            - name: Check Docker containers
+              run: false
+            - name: Check GitHub Actions
+              run: false
+            - name: Check GitHub Actions runners
+              run: false
