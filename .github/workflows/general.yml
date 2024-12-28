@@ -119,7 +119,7 @@ jobs:
                     local api_base
                     api_base=''
                     while read -r proxy; do
-                        if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ]; then
+                        if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ] || [ -z "$proxy" ]; then
                             continue
                         fi
 
@@ -197,6 +197,10 @@ jobs:
                 exact_packages=''
                 cumulative_hash=''
                 while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
                     package_bin="$(get_column "$package" 1)"
                     package_path="$(get_column "$package" 2)"
                     package_semver="$(get_column "$package" 3)"
@@ -250,6 +254,10 @@ jobs:
                 }
 
                 while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
                     package_bin="$(get_column "$package" 1)"
                     package_path="$(get_column "$package" 2)"
                     package_version="$(get_column "$package" 3)"
