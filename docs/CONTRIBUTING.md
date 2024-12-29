@@ -135,6 +135,10 @@ See [this issue](https://github.com/ArchitecturalDogSoftware/1N4/issues/3) for a
   but this is not a strict requirement.
   At a minimum, code should work on [BusyBox](https://www.busybox.net/)
   so that workflows can run in [Alpine Linux](https://www.alpinelinux.org/) containers.
+  - Notably, the `local` keyword and [process substitution](https://en.wikipedia.org/wiki/Process_substitution)
+    are used despite not being in POSIX `sh`;
+    because they are present in BusyBox `sh`
+    and are easy to remove if true POSIX compliance is necessary.
 - Shell scripts are linted by [ShellCheck](https://github.com/koalaman/shellcheck)
   and formatted by [shfmt](https://github.com/mvdan/sh).
 - YAML files are formatted by [yamlfmt](https://github.com/google/yamlfmt).
