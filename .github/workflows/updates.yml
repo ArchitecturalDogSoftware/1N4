@@ -274,8 +274,6 @@ jobs:
                     namespace="$(get_column "$path" 1 '/')"
                     # E.g., `shfmt`.
                     repository="$(get_column "$path" 2 '/')"
-                    # E.g., `v3-alpine`.
-                    tag="$(get_column "$package" 2)"
                     # E.g., `v3`.
                     semver_target="$(get_column "$package" 3)"
                     # E.g., `-alpine` (or none).
