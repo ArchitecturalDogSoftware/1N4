@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 # <https://www.gnu.org/licenses/>.
 
-name: Dependency Updates
+name: Dependency Update Checks
 
 on:
     schedule:
@@ -318,7 +318,7 @@ jobs:
                     # E.g., `v4`.
                     semver_target="$(get_column "$package" 2 '@')"
 
-                    tags="$(download "https://api.github.com/repos/$namespace/$repository/tags")"
+                    tags="$(download "$GITHUB_API_URL/repos/$namespace/$repository/tags")"
                     latest="$(
                         echo "$tags" |
                             grep '^ *"name": \?".*",\?$' |
