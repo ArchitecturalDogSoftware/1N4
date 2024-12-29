@@ -39,15 +39,19 @@ jobs:
             # Spec: `namespace/repository:tag:SemVer(:search filter)?`
             DOCKER_CONTAINERS: |
                 mvdan/shfmt:v3-alpine:v3:-alpine
-                tamasfe/taplo:0.9.3:0.9
+                tamasfe/taplo:0.9.3:0.9.3
             # Spec: `namespace/repository@semver`
             ACTIONS: |
                 actions/cache@v4
                 actions/checkout@v4
                 actions/setup-go@v5
-            # Spec: `product-version`
+            # Spec: `product-version:short-name-version:subdir`
+            #
+            # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
+            # subdirectories of <https://github.com/actions/runner-images/tree/main/images>, and short-name is the
+            # short-name-version without any version information.
             RUNNERS: |
-                ubuntu-24.04
+                ubuntu-24.04:Ubuntu2404:Ubuntu
         steps:
             - name: Setup - Install go
               uses: actions/setup-go@v5
@@ -189,10 +193,16 @@ jobs:
                 latest="$2"
                 # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
                 semver_target="$3"
+                no_v="${4:-'--v'}"
 
-                # Ensures there's a `v` at the start
-                latest_display="v${latest#v}"
-                semver_target_display="v${semver_target#v}"
+                if [ "$no_v" = '--no-v' ]; then
+                    latest_display="$latest"
+                    semver_target_display="$semver_target"
+                else
+                    # Ensures there's a `v` at the start
+                    latest_display="v${latest#v}"
+                    semver_target_display="v${semver_target#v}"
+                fi
 
                 case "$latest" in
                     "$semver_target"* )
@@ -283,19 +293,75 @@ jobs:
                     fi
 
                     versions="$(wget -qO - "$url")"
-                    latest="$(echo "$versions" |
-                        grep -o -m 1 '"name":"[^"]*"' |
-                        sed 's/"name":"\(.*\)"/\1/' |
-                        grep -v test |
-                        sort -rV |
-                        head -n 1)"
+                    latest="$(
+                        echo "$versions" |
+                            grep -o -m 1 '"name":"[^"]*"' |
+                            sed 's/"name":"\(.*\)"/\1/' |
+                            grep -v '^[^0-9]\+$' |
+                            sort -rV |
+                            head -n 1
+                    )"
 
                     compare_semver "$repository" "$latest" "$semver_target"
                 done < <(trim_whitespace "$DOCKER_CONTAINERS")
-                # DOCKER_CONTAINERS:
-                # mvdan/shfmt:v3-alpine
-                # tamasfe/taplo:0.9.3
             - name: Check GitHub Actions
-              run: false
+              run: |
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    # E.g., `actions/checkout`.
+                    path="$(get_column "$package" 1 '@')"
+                    # E.g., `actions`.
+                    namespace="$(get_column "$path" 1 '/')"
+                    # E.g., `checkout`.
+                    repository="$(get_column "$path" 2 '/')"
+                    # E.g., `v4`.
+                    semver_target="$(get_column "$package" 2 '@')"
+
+                    tags="$(download "https://api.github.com/repos/$namespace/$repository/tags")"
+                    latest="$(
+                        echo "$tags" |
+                            grep '^ *"name": \?".*",\?$' |
+                            sed 's/ *"name": \?"\(.*\)",\?$/\1/' |
+                            sort -rV |
+                            head -n 1
+                    )"
+
+                    compare_semver "$path" "$latest" "$semver_target"
+                done < <(trim_whitespace "$ACTIONS")
             - name: Check GitHub Actions runners
-              run: false
+              run: |
+                git clone --depth 1 'https://github.com/actions/runner-images'
+
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    # E.g., `ubuntu-24.04`.
+                    runner="$(get_column "$package" 1)"
+                    # E.g., `Ubuntu2404`.
+                    short_name_version="$(get_column "$package" 2)"
+                    # E.g., `Ubuntu`.
+                    short_name="$(get_column "$package" 3)"
+
+                    latest="$(
+                        find 'runner-images/images' -maxdepth 2 -type f -name '*.md' -exec basename {} \; |
+                            grep "^$short_name" |
+                            sed 's/\(.*\)-Readme.md/\1/' |
+                            sort -rV |
+                            head -n 1
+                    )"
+
+                    compare_semver "$runner" "$latest" "$short_name_version" --no-v
+                done < <(trim_whitespace "$RUNNERS")
+
+                # Spec: `product-version:short-name-version:short-name`
+                #
+                # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
+                # subdirectories of <https://github.com/actions/runner-images/tree/main/images>, and product is
+                # `short_name` without any version info.
+                # RUNNERS: |
+                #     ubuntu-24.04:Ubuntu2404:Ubuntu
