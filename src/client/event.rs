@@ -37,7 +37,7 @@ use crate::command::registry::registry;
 use crate::command::resolver::find_focused_option;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::traits::extension::InteractionExt;
-use crate::utility::types::id::CustomId;
+use crate::utility::types::custom_id::CustomId;
 use crate::utility::{category, color};
 
 /// A result returned by an event handler.
@@ -241,11 +241,11 @@ pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let data_id = data.custom_id.parse::<CustomId>()?;
     let registry = registry().await;
 
-    let Some(command) = registry.command(data_id.name()) else {
-        bail!("missing command entry for '{}'", data_id.name());
+    let Some(command) = registry.command(data_id.command()) else {
+        bail!("missing command entry for '{}'", data_id.command());
     };
     let Some(ref callable) = command.callbacks.component else {
-        bail!("missing component callback for '{}'", data_id.name());
+        bail!("missing component callback for '{}'", data_id.command());
     };
 
     callable.on_component(command, Context::new(api, event, data), data_id).await
@@ -264,11 +264,11 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let data_id = data.custom_id.parse::<CustomId>()?;
     let registry = registry().await;
 
-    let Some(command) = registry.command(data_id.name()) else {
-        bail!("missing command entry for '{}'", data_id.name());
+    let Some(command) = registry.command(data_id.command()) else {
+        bail!("missing command entry for '{}'", data_id.command());
     };
     let Some(ref callback) = command.callbacks.modal else {
-        bail!("missing component callback for '{}'", data_id.name());
+        bail!("missing component callback for '{}'", data_id.command());
     };
 
     callback.on_modal(command, Context::new(api, event, data), data_id).await

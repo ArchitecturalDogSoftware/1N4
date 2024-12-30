@@ -26,7 +26,7 @@ use self::context::Context;
 use self::registry::CommandEntry;
 use crate::client::event::EventResult;
 use crate::define_command_modules;
-use crate::utility::types::id::CustomId;
+use crate::utility::types::custom_id::CustomId;
 
 /// Provides an interaction context API.
 pub mod context;
@@ -232,9 +232,9 @@ macro_rules! define_components {
         async fn on_component<'ap: 'ev, 'ev>(
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
-            custom_id: $crate::utility::types::id::CustomId,
+            custom_id: $crate::utility::types::custom_id::CustomId,
         ) -> $crate::client::event::EventResult {
-            match custom_id.kind() {
+            match &**custom_id.variant() {
                 $(self::component::$name::NAME => self::component::$name::callback(entry, context, custom_id).await,)*
                 _ => ::anyhow::bail!("unknown or missing component"),
             }
@@ -272,9 +272,9 @@ macro_rules! define_modals {
         async fn on_modal<'ap: 'ev, 'ev>(
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
-            custom_id: $crate::utility::types::id::CustomId,
+            custom_id: $crate::utility::types::custom_id::CustomId,
         ) -> $crate::client::event::EventResult {
-            match custom_id.kind() {
+            match &**custom_id.variant() {
                 $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id).await,)*
                 _ => ::anyhow::bail!("unknown or missing modal"),
             }

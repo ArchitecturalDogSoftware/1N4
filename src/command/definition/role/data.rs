@@ -27,7 +27,6 @@ use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
 use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
-use crate::utility::types::id::CustomId;
 
 /// A role selector entry.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,10 +47,10 @@ impl Selector {
     /// This function will return an error if the button could not be created.
     pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Button> {
         let style = if kind == super::component::remove::NAME { ButtonStyle::Danger } else { ButtonStyle::Secondary };
-        let custom_id = CustomId::<Box<str>>::new(entry.name, kind)?;
+        let custom_id = entry.id(kind)?.with_str(self.id.to_string())?;
 
         Ok(ButtonBuilder::new(style)
-            .custom_id(custom_id.with(self.id.to_string())?)?
+            .custom_id(custom_id)?
             .disabled(disabled)
             .emoji(self.icon.as_emoji()?)?
             .label(self.name.as_ref())?
