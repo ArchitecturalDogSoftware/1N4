@@ -111,6 +111,7 @@ ping-start = "Calculating..."
 ping-finish = "Operation successful!"
 
 poll-create-title = "Create a new poll"
+poll-invalid-url = "Invalid URL"
 
 role-load-failed = "Failed to load list of role selectors."
 role-load-missing = "You have not added any role selectors."

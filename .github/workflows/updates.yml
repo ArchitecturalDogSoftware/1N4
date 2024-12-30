@@ -1,0 +1,365 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Copyright © 2024 RemasteredArch
+#
+# This file is part of 1N4.
+#
+# 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+# License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# 1N4 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
+# <https://www.gnu.org/licenses/>.
+
+name: Dependency Update Checks
+
+on:
+    schedule:
+        # Midnight UTC at the start of every Monday.
+        #
+        # <https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07>
+        - cron: '0 0 * * 1'
+
+jobs:
+    updates:
+        runs-on: ubuntu-24.04
+        env:
+            # Spec: `semver`
+            GO_VERSION: '1'
+            # Spec: `binary:path:vSemVer`
+            GO_PACKAGES: |
+                yamlfmt:github.com/google/yamlfmt:v0.14
+                actionlint:github.com/rhysd/actionlint:v1
+            # Spec: `package:SemVer`
+            PYTHON_PACKAGES: |
+                mdformat:0.7
+            # Spec: `namespace/repository:tag:SemVer(:search filter)?`
+            DOCKER_CONTAINERS: |
+                mvdan/shfmt:v3-alpine:v3:-alpine
+                tamasfe/taplo:0.9.3:0.9.3
+            # Spec: `namespace/repository@semver`
+            ACTIONS: |
+                actions/cache@v4
+                actions/checkout@v4
+                actions/setup-go@v5
+            # Spec: `product-version:short-name-version:subdir`
+            #
+            # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
+            # subdirectories of <https://github.com/actions/runner-images/tree/main/images>, and short-name is the
+            # short-name-version without any version information.
+            RUNNERS: |
+                ubuntu-24.04:Ubuntu2404:Ubuntu
+        steps:
+            - name: Setup - Install go
+              uses: actions/setup-go@v5
+              with:
+                go-version: '1'
+                check-latest: true
+            - name: Setup - Install utilities
+              run: |
+                temp_bin_dir="$(mktemp --directory)"
+                echo "$temp_bin_dir" >> "$GITHUB_PATH"
+
+                # Persist a function declaration across steps by writing it to a temporary script.
+                #
+                # Declare the function as a string in stdin: `echo ... | declare_function ident` instead of
+                # `ident() { ... }`.
+                declare_function() {
+                    local identifier="$1"
+                    local shell="${2:-sh}"
+                    local body
+                    body="$(< /dev/stdin)"
+
+                    # Though nice, pipefail fails silently because it was only *just* added to POSIX Issue 8 (2024).
+                    printf '%s\n' \
+                        "#! /usr/bin/env $shell" \
+                        'set -eu' \
+                        'if set -o | grep -q "^pipefail "; then set -o pipefail; fi' \
+                        "$body" \
+                        > "$temp_bin_dir/$identifier"
+                }
+
+                declare_function has << 'EOF'
+                command -v "$1" > /dev/null
+                EOF
+
+                declare_function download << 'EOF'
+                url="$1"
+
+                if has curl; then
+                    curl --fail --silent --show-error --location "$url"
+                    exit 0
+                fi
+
+                if has wget; then
+                    wget -qO - "$url"
+                    exit 0
+                fi
+
+                echo "Both 'wget' and 'curl' are unavailable!" >&2
+                exit 1
+                EOF
+
+                declare_function trim_whitespace << 'EOF'
+                # E.g., `  foobar  `.
+                str="$1"
+
+                # E.g., `foobar  `.
+                trimmed="${str#"${str%%[![:space:]]*}"}"
+
+                # E.g., `foobar`.
+                trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+                echo "$trimmed"
+                EOF
+
+                declare_function start_group << 'EOF'
+                title="$1"
+
+                echo "::group::$title"
+                EOF
+
+                declare_function end_group << 'EOF'
+                echo '::endgroup::'
+                EOF
+
+                declare_function get_column << 'EOF'
+                line="$1"
+                column="$2"
+                delimiter="${3:-:}"
+
+                echo "$line" | awk -F "$delimiter" "{ print \$$column }"
+                EOF
+
+                declare_function get_go_api_base << 'EOF'
+                package_path="$1"
+
+                go env GOPROXY | tr ',|' '\n' | while read -r proxy; do
+                    if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ] || [ -z "$proxy" ]; then
+                        continue
+                    fi
+
+                    # E.g., `https://proxy.golang.org/github.com/google/yamlfmt/@v`.
+                    echo "$proxy/$package_path/@v"
+                done
+                EOF
+
+                declare_function get_go_sumdb << 'EOF'
+                # TODO: Parse for other forms than `sum.golang.org`.
+                echo "https://$(go env GOSUMDB)"
+                EOF
+
+                # Returns the SHA256 hash of the package's `go.mod` file.
+                declare_function get_go_package_hash << 'EOF'
+                package_path="$1"
+                package_version="$2"
+                go_sumdb="${3:-$(get_go_sumdb)}"
+
+                download "$go_sumdb/lookup/$package_path@$package_version" |
+                    grep "^$package_path $package_version/go.mod h1:" |
+                    sed 's/^.* h1:\(.*\)$/\1/'
+                EOF
+
+                declare_function get_go_package_versions << 'EOF'
+                package_path="$1"
+
+                api_base="$(get_go_api_base "$package_path")"
+
+                # E.g.,
+                #
+                # ```text
+                # v0.2.0
+                # v0.1.0
+                # v0.3.0
+                # v0.1.1
+                # ```
+                download "$api_base/list" | sort -rV
+                EOF
+
+                declare_function resolve_go_semver << 'EOF'
+                package_path="$1"
+                # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
+                package_semver="$2"
+
+                # E.g., `v0.1.1` for some input `v0.1`.
+                get_go_package_versions "$package_path" | grep "^$package_semver.*" | head -n 1
+                EOF
+
+                declare_function compare_semver << 'EOF'
+                name="$1"
+                latest="$2"
+                # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
+                semver_target="$3"
+                no_v="${4:-'--v'}"
+
+                if [ "$no_v" = '--no-v' ]; then
+                    latest_display="$latest"
+                    semver_target_display="$semver_target"
+                else
+                    # Ensures there's a `v` at the start
+                    latest_display="v${latest#v}"
+                    semver_target_display="v${semver_target#v}"
+                fi
+
+                case "$latest" in
+                    "$semver_target"* )
+                        echo "$name is up to date! ($latest_display in $semver_target_display)"
+                        ;;
+
+                    * )
+                        echo "New $name version available! ($latest_display not in $semver_target_display)" >&2
+                        exit 1
+                        ;;
+                esac
+                EOF
+
+                chmod u+x "$temp_bin_dir/"*
+            - name: Check Go
+              run: |
+                # E.g., `1.23.4`
+                latest_go="$(
+                    download 'https://go.dev/dl/?mode=json' |
+                        grep '^ *"version": ' |
+                        head -n 1 |
+                        sed 's/^ *"version": "go\(.*\)",$/\1/'
+                )"
+
+                compare_semver 'Go' "$latest_go" "$GO_VERSION"
+            - name: Check Go packges
+              run: |
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    package_bin="$(get_column "$package" 1)"
+                    package_path="$(get_column "$package" 2)"
+                    package_version="$(get_column "$package" 3)"
+
+                    latest="$(get_go_package_versions "$package_path" | head -n 1)"
+
+                    compare_semver "$package_bin" "$latest" "$package_version"
+                done < <(trim_whitespace "$GO_PACKAGES")
+            - name: Check Python packages
+              run: |
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    package_name="$(get_column "$package" 1)"
+                    package_version="$(get_column "$package" 2)"
+
+                    versions="$(download 'https://pypi.org/pypi/mdformat/json')"
+                    latest="$(echo "$versions" | grep -o -m 1 '"version":"[^"]*"' | sed 's/"version":"\(.*\)"/\1/')"
+
+                    compare_semver "$package_name" "$latest" "$package_version"
+                done < <(trim_whitespace "$PYTHON_PACKAGES")
+            - name: Check Docker containers
+              run: |
+                api_base='https://hub.docker.com/v2'
+
+                # TODO: Adapt to work with Taplo.
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    # E.g., `mvdan/shfmt`.
+                    path="$(get_column "$package" 1)"
+                    # E.g., `mvdan`.
+                    namespace="$(get_column "$path" 1 '/')"
+                    # E.g., `shfmt`.
+                    repository="$(get_column "$path" 2 '/')"
+                    # E.g., `v3`.
+                    semver_target="$(get_column "$package" 3)"
+                    # E.g., `-alpine` (or none).
+                    search_filter="$(get_column "$package" 4)"
+
+                    url="$(
+                        echo "$api_base/namespaces/$namespace/repositories/$repository/tags \
+                            ?page_size=25 \
+                            &page=1 \
+                            &ordering=last_updated" |
+                        tr -d '[:space:]'
+                    )"
+                    if [ -n "$search_filter" ]; then
+                        url="$url&name=$search_filter"
+                    fi
+
+                    versions="$(wget -qO - "$url")"
+                    latest="$(
+                        echo "$versions" |
+                            grep -o -m 1 '"name":"[^"]*"' |
+                            sed 's/"name":"\(.*\)"/\1/' |
+                            grep -v '^[^0-9]\+$' |
+                            sort -rV |
+                            head -n 1
+                    )"
+
+                    compare_semver "$repository" "$latest" "$semver_target"
+                done < <(trim_whitespace "$DOCKER_CONTAINERS")
+            - name: Check GitHub Actions
+              run: |
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    # E.g., `actions/checkout`.
+                    path="$(get_column "$package" 1 '@')"
+                    # E.g., `actions`.
+                    namespace="$(get_column "$path" 1 '/')"
+                    # E.g., `checkout`.
+                    repository="$(get_column "$path" 2 '/')"
+                    # E.g., `v4`.
+                    semver_target="$(get_column "$package" 2 '@')"
+
+                    tags="$(download "$GITHUB_API_URL/repos/$namespace/$repository/tags")"
+                    latest="$(
+                        echo "$tags" |
+                            grep '^ *"name": \?".*",\?$' |
+                            sed 's/ *"name": \?"\(.*\)",\?$/\1/' |
+                            sort -rV |
+                            head -n 1
+                    )"
+
+                    compare_semver "$path" "$latest" "$semver_target"
+                done < <(trim_whitespace "$ACTIONS")
+            - name: Check GitHub Actions runners
+              run: |
+                git clone --depth 1 'https://github.com/actions/runner-images'
+
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    # E.g., `ubuntu-24.04`.
+                    runner="$(get_column "$package" 1)"
+                    # E.g., `Ubuntu2404`.
+                    short_name_version="$(get_column "$package" 2)"
+                    # E.g., `Ubuntu`.
+                    short_name="$(get_column "$package" 3)"
+
+                    latest="$(
+                        find 'runner-images/images' -maxdepth 2 -type f -name '*.md' -exec basename {} \; |
+                            grep "^$short_name" |
+                            sed 's/\(.*\)-Readme.md/\1/' |
+                            sort -rV |
+                            head -n 1
+                    )"
+
+                    compare_semver "$runner" "$latest" "$short_name_version" --no-v
+                done < <(trim_whitespace "$RUNNERS")
+
+                # Spec: `product-version:short-name-version:short-name`
+                #
+                # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
+                # subdirectories of <https://github.com/actions/runner-images/tree/main/images>, and product is
+                # `short_name` without any version info.
+                # RUNNERS: |
+                #     ubuntu-24.04:Ubuntu2404:Ubuntu

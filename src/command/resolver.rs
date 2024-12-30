@@ -230,7 +230,11 @@ impl<'ev> ModalFieldResolver<'ev> {
     pub fn get(&self, name: impl AsRef<str>) -> Result<Option<&str>, Error> {
         let name = name.as_ref();
 
-        self.fields.get(name).copied().ok_or_else(|| Error::MissingField(name.into()))
+        self.fields
+            .get(name)
+            .copied()
+            .map(|v| v.filter(|v| !v.is_empty()))
+            .ok_or_else(|| Error::MissingField(name.into()))
     }
 }
 

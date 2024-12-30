@@ -73,8 +73,8 @@ pub mod types {
     pub mod builder;
     /// Provides a definition for colors.
     pub mod color;
-    /// A type that defines custom identifiers.
-    pub mod id;
+    /// A type that implements data-carrying custom identifiers.
+    pub mod custom_id;
     /// A type that defines modal data.
     pub mod modal;
 }

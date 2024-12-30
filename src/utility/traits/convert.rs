@@ -604,7 +604,7 @@ impl AsLocale for PartialMember {
     type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
-        self.user.as_ref().ok_or(ina_localizing::Error::MissingLocale)?.as_locale().map_err(Into::into)
+        self.user.as_ref().ok_or(ina_localizing::Error::MissingLocale)?.as_locale()
     }
 }
 

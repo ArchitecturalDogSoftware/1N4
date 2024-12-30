@@ -35,33 +35,67 @@ pub enum Strictness {
     },
 }
 
-/// Returns whether `find` is roughly contained within `base`.
-pub fn fuzzy_contains(strictness: Strictness, base: impl AsRef<str>, find: impl AsRef<str>) -> bool {
-    match strictness {
-        Strictness::Loose { ignore_casing } => {
-            let mut base = base.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
-            let mut find = find.as_ref().replace(|c: char| !(c.is_alphanumeric() || c.is_whitespace()), "");
+impl Strictness {
+    /// Returns `true` if the strictness is [`Loose`].
+    ///
+    /// [`Loose`]: Strictness::Loose
+    #[must_use]
+    pub const fn is_loose(&self) -> bool {
+        matches!(self, Self::Loose { .. })
+    }
 
-            if ignore_casing {
-                base = base.to_lowercase();
-                find = find.to_lowercase();
+    /// Returns `true` if the strictness is [`Firm`].
+    ///
+    /// [`Firm`]: Strictness::Firm
+    #[must_use]
+    pub const fn is_firm(&self) -> bool {
+        matches!(self, Self::Firm { .. })
+    }
+
+    /// Returns `true` if the strictness is [`Strict`].
+    ///
+    /// [`Strict`]: Strictness::Strict
+    #[must_use]
+    pub const fn is_strict(&self) -> bool {
+        matches!(self, Self::Strict { .. })
+    }
+
+    /// Returns whether this strictness level should ignore character casing.
+    #[must_use]
+    pub const fn ignore_casing(self) -> bool {
+        match self {
+            Self::Loose { ignore_casing } | Self::Firm { ignore_casing } | Self::Strict { ignore_casing } => {
+                ignore_casing
             }
-
-            find.trim().split(char::is_whitespace).all(|s| base.contains(s))
-        }
-        Strictness::Firm { ignore_casing } => {
-            let base = base.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
-            let find = find.as_ref().replace(|c: char| !c.is_alphanumeric(), "");
-
-            if ignore_casing { base.to_lowercase().contains(&find.to_lowercase()) } else { base.contains(&find) }
-        }
-        Strictness::Strict { ignore_casing } => {
-            let base = base.as_ref();
-            let find = find.as_ref();
-
-            if ignore_casing { base.to_lowercase().contains(&find.to_lowercase()) } else { base.contains(find) }
         }
     }
+}
+
+/// Returns whether the given pattern is contained within the provided string.
+///
+/// The strictness of the search is controlled by the [`Strictness`] argument.
+pub fn fuzzy_contains(strictness: Strictness, string: impl AsRef<str>, pattern: impl AsRef<str>) -> bool {
+    let mut string = string.as_ref().to_owned();
+    let mut pattern = pattern.as_ref().to_owned();
+
+    if strictness.ignore_casing() {
+        string = string.to_lowercase();
+        pattern = pattern.to_lowercase();
+    }
+
+    if strictness.is_loose() {
+        string.retain(char::is_alphanumeric);
+        pattern.retain(|c| c.is_alphanumeric() || c.is_whitespace());
+
+        return pattern.trim().split(char::is_whitespace).all(|s| string.contains(s));
+    }
+
+    if strictness.is_firm() {
+        string.retain(char::is_alphanumeric);
+        pattern.retain(char::is_alphanumeric);
+    }
+
+    string.contains(&pattern)
 }
 
 #[cfg(test)]
