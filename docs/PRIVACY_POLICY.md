@@ -1,5 +1,9 @@
 # Privacy Policy
 
+*This document is an early draft.
+This should not be considered binding.
+Please reach out with any questions.*
+
 This document describes what data 1N4 collects and
 how data from her primary instance is handled.
 Questions regarding 1N4 and her privacy policy should be directed to <https://github.com/ArchitecturalDogSoftware/1N4/issues>.
