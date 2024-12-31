@@ -86,3 +86,5 @@ See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License along with 1N4 (located within [LICENSE](./LICENSE)).
 If not, see <https://www.gnu.org/licenses/>.
+
+Powered by transgender spiders 🕷️ 🕸️ 🏳️‍⚧️.
