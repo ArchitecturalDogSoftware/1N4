@@ -22,7 +22,7 @@ or you can install and run her directly through Git and Cargo.
 git clone https://github.com/ArchitecturalDogSoftware/1N4.git
 cd 1N4
 
-# Build in release mode
+# Build in release mode.
 cargo build --release
 
 # Relocate the binary and clean up build artifacts.
@@ -55,6 +55,25 @@ If you ever need help, feel free to contact me here or on Discord, and I will do
 
 Please see 1N4's [security reporting guidelines](./docs/SECURITY.md).
 
+## Governance
+
+1N4 is primarily authored by Jaxydog,
+but as an ArchitecturalDog Software project,
+RemasteredArch is a maintainer as well.
+Jaxydog is also the operator of 1N4's primary instance.
+You can get in touch with us by
+[opening an issue](https://github.com/ArchitecturalDogSoftware/1N4/issues) (our preference)
+or sending us an email at <ArchitecturalDogSoftware@gmail.com>.
+
+1N4 does not currently have any formal community governance.
+However, we are still open to suggestions ---
+[contributions](./docs/CONTRIBUTING.md) are welcome,
+whether that is code, documentation, ideas, or anything else that makes a project shine!
+
+## Privacy Policy
+
+Please see 1N4's [privacy policy](./docs/PRIVACY_POLICY.md).
+
 ## License
 
 1N4 is free software: you can redistribute it and/or modify it
@@ -67,3 +86,5 @@ See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License along with 1N4 (located within [LICENSE](./LICENSE)).
 If not, see <https://www.gnu.org/licenses/>.
+
+Powered by transgender spiders 🕷️ 🕸️ 🏳️‍⚧️.
