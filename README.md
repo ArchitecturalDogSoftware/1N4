@@ -22,7 +22,7 @@ or you can install and run her directly through Git and Cargo.
 git clone https://github.com/ArchitecturalDogSoftware/1N4.git
 cd 1N4
 
-# Build in release mode
+# Build in release mode.
 cargo build --release
 
 # Relocate the binary and clean up build artifacts.
