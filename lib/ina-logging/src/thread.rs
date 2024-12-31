@@ -16,10 +16,10 @@
 
 use std::fmt::Display;
 
-use ina_threading::join::Join;
-use ina_threading::statics::JoinStatic;
+use ina_threading::SenderHandle;
+use ina_threading::joining::Joining;
+use ina_threading::statics::StaticJoining;
 use ina_threading::threads::consumer::Consumer;
-use ina_threading::ConsumingThread;
 use tokio::sync::mpsc::Receiver;
 
 use crate::endpoint::Endpoint;
@@ -31,7 +31,7 @@ use crate::{Logger, Result};
 static THREAD: LoggingThread = LoggingThread::new();
 
 /// The logging thread's type.
-pub type LoggingThread = JoinStatic<Consumer<Request, Result<()>>, Result<()>>;
+pub type LoggingThread = StaticJoining<Consumer<Request, Result<()>>>;
 
 /// A request send to the logging thread.
 #[derive(Debug)]
@@ -58,16 +58,14 @@ pub enum Request {
 ///
 /// This function will return an error if the thread could not be initialized.
 pub async fn start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.async_api().has().await, "the thread has already been initialized");
-
-    let capacity = settings.queue_capacity.get();
-    let handle = Consumer::spawn_with_runtime("logging", |r| self::run(settings, r), capacity)?;
-    let handle = Join::with_handle_handler(handle, |handle| {
+    let capacity = settings.queue_capacity;
+    let handle = Consumer::spawn_with_runtime("logging", capacity, |r| self::run(settings, r))?;
+    let handle = Joining::new(handle).inspect_handle(|handle| {
         #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
         handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
     });
 
-    THREAD.async_api().set(handle).await;
+    THREAD.async_api().initialize(handle).await;
 
     Ok(())
 }
@@ -84,16 +82,14 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread could not be initialized.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.sync_api().has(), "the thread has already been initialized");
-
-    let capacity = settings.queue_capacity.get();
-    let handle = Consumer::spawn_with_runtime("logging", |r| self::run(settings, r), capacity)?;
-    let handle = Join::with_handle_handler(handle, |handle| {
+    let capacity = settings.queue_capacity;
+    let handle = Consumer::spawn_with_runtime("logging", capacity, |r| self::run(settings, r))?;
+    let handle = Joining::new(handle).inspect_handle(|handle| {
         #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
         handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
     });
 
-    THREAD.sync_api().set(handle);
+    THREAD.sync_api().initialize(handle);
 
     Ok(())
 }
@@ -230,15 +226,27 @@ pub fn blocking_setup() -> Result<()> {
     Ok(())
 }
 
+/// Returns whether the thread has been started.
+pub async fn is_started() -> bool {
+    THREAD.async_api().is_initialized().await
+}
+
+/// Returns whether the thread has been started.
+///
+/// # Panics
+///
+/// Panics if this is called in an asynchronous context.
+pub fn blocking_is_started() -> bool {
+    THREAD.sync_api().is_initialized()
+}
+
 /// Closes the logging thread.
 ///
 /// # Panics
 ///
 /// Panics if the logging thread is not initialized.
 pub async fn close() {
-    assert!(THREAD.async_api().has().await, "the thread is not initialized");
-
-    THREAD.async_api().drop().await;
+    THREAD.async_api().close().await;
 }
 
 /// Closes the logging thread.
@@ -249,9 +257,7 @@ pub async fn close() {
 ///
 /// Panics if the logging thread is not initialized or if this is called in an asynchronous context.
 pub fn blocking_close() {
-    assert!(THREAD.sync_api().has(), "the thread is not initialized");
-
-    THREAD.sync_api().drop();
+    THREAD.sync_api().close();
 }
 
 /// Runs the thread process.
@@ -269,7 +275,7 @@ async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> 
             request = receiver.recv() => match request {
                 Some(Request::Entry(entry)) => logger.push_entry(entry).await?,
                 Some(Request::Flush) => logger.flush().await?,
-                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint).await?,
+                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint)?,
                 Some(Request::Setup) => logger.setup().await?,
                 None | Some(Request::Close) => return logger.close().await,
             },
@@ -281,10 +287,16 @@ async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> 
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::debug;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// debug!(async "This is an asynchronous debug log!").await?;
 ///
 /// debug!("This is a synchronous debug log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! debug {
@@ -318,10 +330,16 @@ macro_rules! debug {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::info;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// info!(async "This is an asynchronous information log!").await?;
 ///
 /// info!("This is a synchronous information log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! info {
@@ -337,10 +355,16 @@ macro_rules! info {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::warn;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// warn!(async "This is an asynchronous warning log!").await?;
 ///
 /// warn!("This is a synchronous warning log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! warn {
@@ -356,10 +380,16 @@ macro_rules! warn {
 ///
 /// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use ina_logging::error;
+/// #
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), ina_logging::Error> {
 /// error!(async "This is an asynchronous error log!").await?;
 ///
 /// error!("This is a synchronous error log!")?;
+/// # Ok(())
+/// # }
 /// ```
 #[macro_export]
 macro_rules! error {

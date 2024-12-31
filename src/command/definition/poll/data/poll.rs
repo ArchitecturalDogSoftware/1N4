@@ -14,18 +14,30 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroU64;
+use std::num::NonZeroU16;
 
+use anyhow::{Result, bail};
+use ina_localizing::locale::Locale;
+use ina_localizing::{AsTranslation, localize};
 use ina_macro::{AsTranslation, Stored};
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
-use twilight_model::id::marker::{GuildMarker, UserMarker};
+use time::{Duration, OffsetDateTime};
+use tokio_stream::{Stream, StreamExt};
+use twilight_model::channel::message::component::ButtonStyle;
+use twilight_model::channel::message::{Component, Embed, EmojiReactionType};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, UserMarker};
+use twilight_model::user::User;
+use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedBuilder, EmbedFieldBuilder, ImageSource};
+use twilight_validate::embed::FIELD_VALUE_LENGTH;
 
 use super::input::PollInput;
 use super::response::PollResponse;
-use crate::utility::category;
+use crate::command::registry::CommandEntry;
+use crate::utility::traits::convert::AsEmoji;
+use crate::utility::types::builder::ButtonBuilder;
+use crate::utility::{category, color};
 
 /// A poll's type.
 #[non_exhaustive]
@@ -35,20 +47,19 @@ use crate::utility::category;
 #[localizer_category(category::UI)]
 pub enum PollType {
     /// A multiple-choice poll.
-    #[localizer_key("multiple-choice")]
+    #[localizer_key("poll-multiple-choice")]
     MultipleChoice,
     /// An open-response poll.
-    #[localizer_key("open-response")]
+    #[localizer_key("poll-open-response")]
     OpenResponse,
     /// A multiple-choice poll with an open-ended option.
-    #[localizer_key("hybrid")]
+    #[localizer_key("poll-hybrid")]
     Hybrid,
     /// A raffle poll.
-    #[localizer_key("raffle")]
+    #[localizer_key("poll-raffle")]
     Raffle,
 }
 
-#[expect(dead_code, reason = "polls are currently a work-in-progress")]
 impl PollType {
     /// Returns the emoji that represents this poll type.
     pub const fn emoji(self) -> char {
@@ -61,58 +72,208 @@ impl PollType {
     }
 }
 
-/// Builds a poll.
+/// A poll.
 #[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Stored)]
+#[expect(clippy::unsafe_derive_deserialize, reason = "false positive from async stream macro expansion")]
+#[derive(Clone, Debug, Serialize, Deserialize, Stored)]
 #[data_format(kind = Compress<Messagepack>, from = Compress::new_fast(Messagepack))]
-#[data_path(fmt = "poll/builder/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
-pub struct PollBuilder {
+#[data_path(fmt = "poll/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
+pub struct Poll {
     /// The identifier of the poll author.
     pub user_id: Id<UserMarker>,
     /// The identifier of the poll guild.
     pub guild_id: Id<GuildMarker>,
 
-    /// The poll's type.
-    pub kind: PollType,
     /// The poll's title.
     pub title: Box<str>,
-    /// The poll's description.
-    pub description: Option<Box<str>>,
+    /// The poll's optional description.
+    pub about: Option<Box<str>>,
+    /// The poll's optional image URL.
+    pub image: Option<Box<str>>,
 
-    /// The poll's submission period duration.
-    pub duration: NonZeroU64,
-
-    /// The poll's inputs.
-    pub inputs: Vec<PollInput>,
+    /// The poll's type.
+    pub kind: PollType,
+    /// The poll's duration in minutes.
+    pub minutes: NonZeroU16,
+    /// The poll's state.
+    pub state: PollState,
 }
 
-/// Tracks an active poll's state.
+impl Poll {
+    /// Builds the poll, creating an embed and message components that represent its current state.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the poll could not be built.
+    pub async fn build(
+        &self,
+        entry: &CommandEntry,
+        locale: Option<Locale>,
+        user: &User,
+        page: Option<usize>,
+    ) -> Result<(Embed, Box<[Component]>)> {
+        Ok((self.build_embed(locale, user).await?, self.build_components(entry, locale, page).await?))
+    }
+
+    /// Builds the poll's embed, which represents its current state.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the poll's embed could not be built.
+    async fn build_embed(&self, locale: Option<Locale>, user: &User) -> Result<Embed> {
+        match &self.state {
+            PollState::Builder { .. } => self.build_embed_for_builder(locale, user).await,
+            PollState::Running { .. } => todo!(),
+            PollState::Archive { .. } => todo!(),
+        }
+    }
+
+    /// Builds the poll's builder embed.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the poll's embed could not be built.
+    async fn build_embed_for_builder(&self, locale: Option<Locale>, user: &User) -> Result<Embed> {
+        let PollState::Builder { inputs } = &self.state else {
+            bail!("expected poll state to be variant `PollState::Builder`");
+        };
+
+        let header = localize!(async(try in locale) category::UI, "poll-builder-header").await?;
+        let mut embed = EmbedBuilder::new().author(EmbedAuthorBuilder::new(header)).title(&(*self.title));
+
+        if let Some(about) = self.about.as_deref() {
+            embed = embed.description(about);
+        }
+
+        if let Some(image) = self.image.as_deref() {
+            embed = embed.image(ImageSource::url(image)?);
+        }
+
+        if let Some(color) = user.accent_color {
+            embed = embed.color(color);
+        } else {
+            embed = embed.color(color::BRANDING_B.rgb());
+        }
+
+        let type_field = EmbedFieldBuilder::new(
+            localize!(async(try in locale) category::UI, "poll-builder-type").await?,
+            format!("{} {}", self.kind.emoji(), self.kind.as_translation(locale).await?),
+        )
+        .inline();
+
+        let duration_field = EmbedFieldBuilder::new(
+            localize!(async(try in locale) category::UI, "poll-builder-duration").await?,
+            (Duration::MINUTE * self.minutes.get()).to_string(),
+        )
+        .inline();
+
+        let mut inputs_text = if self.kind == PollType::Raffle {
+            format!("{}", inputs.len())
+        } else {
+            inputs.iter().filter_map(PollInput::label).collect::<Box<[_]>>().join(", ")
+        };
+
+        // The field value length assumes UTF-16, a two-byte-per-code-point system.
+        // Since we're comparing directly against a byte count, this is fine.
+        if inputs_text.len() > FIELD_VALUE_LENGTH * 2 {
+            const ELLIPSIS: &str = "...";
+
+            inputs_text.truncate((FIELD_VALUE_LENGTH * 2) - ELLIPSIS.len());
+            inputs_text += ELLIPSIS;
+        }
+
+        let inputs_field = EmbedFieldBuilder::new(
+            localize!(async(try in locale) category::UI, "poll-builder-inputs").await?,
+            inputs_text,
+        );
+
+        embed = embed.field(type_field).field(duration_field).field(inputs_field);
+
+        Ok(embed.validate()?.build())
+    }
+
+    /// Builds the poll's components, which represent its current state.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the poll's components could not be built.
+    async fn build_components(
+        &self,
+        entry: &CommandEntry,
+        locale: Option<Locale>,
+        _page: Option<usize>,
+    ) -> Result<Box<[Component]>> {
+        let mut components: Box<dyn Stream<Item = Result<Component>> + Send + Unpin> = match &self.state {
+            PollState::Builder { .. } => Box::from(self.build_components_for_builder(entry, locale)),
+            PollState::Running { .. } => todo!(),
+            PollState::Archive { .. } => todo!(),
+        };
+
+        let mut collection = Vec::with_capacity(components.size_hint().0);
+
+        while let Some(component) = components.try_next().await? {
+            collection.push(component);
+        }
+
+        Ok(collection.into_boxed_slice())
+    }
+
+    fn build_components_for_builder<'pl>(
+        &'pl self,
+        entry: &'pl CommandEntry,
+        locale: Option<Locale>,
+    ) -> impl Stream<Item = Result<Component>> + Unpin + Send + 'pl {
+        #[inline]
+        async fn button(
+            this: &Poll,
+            name: &'static str,
+            style: ButtonStyle,
+            emoji: impl Into<EmojiReactionType> + Send,
+            disabled: bool,
+            entry: &CommandEntry,
+            locale: Option<Locale>,
+        ) -> Result<Component> {
+            let key = format!("{}-builder-{name}", entry.name);
+            let label = localize!(async(try in locale) category::UI_BUTTON, key).await?;
+            let id = entry.id(name)?.with_str(this.guild_id.to_string())?.with_str(this.user_id.to_string())?;
+
+            Ok(ButtonBuilder::new(style).label(label)?.emoji(emoji)?.custom_id(id)?.disabled(disabled).build().into())
+        }
+
+        Box::pin(async_stream::try_stream! {
+            yield button(self, "add-input", ButtonStyle::Primary, '➕'.as_emoji()?, false, entry, locale).await?;
+            yield button(self, "remove-input", ButtonStyle::Primary, '➖'.as_emoji()?, false, entry, locale).await?;
+        })
+    }
+}
+
+/// A poll's current state.
 #[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Stored)]
-#[data_format(kind = Compress<Messagepack>, from = Compress::new_default(Messagepack))]
-#[data_path(fmt = "poll/state/{}/{}", args = [Id<GuildMarker>, Id<UserMarker>], from = [guild_id, user_id])]
-pub struct PollState {
-    /// The identifier of the poll author.
-    pub user_id: Id<UserMarker>,
-    /// The identifier of the poll guild.
-    pub guild_id: Id<GuildMarker>,
-
-    /// The poll's type.
-    pub kind: PollType,
-    /// The poll's title.
-    pub title: Box<str>,
-    /// The poll's description.
-    pub description: Option<Box<str>>,
-
-    /// The poll's submission period duration.
-    pub duration: NonZeroU64,
-    /// The poll's starting time.
-    pub start_time: OffsetDateTime,
-    /// The poll's expected ending time.
-    pub ending_time: OffsetDateTime,
-
-    /// The poll's inputs.
-    pub inputs: Box<[PollInput]>,
-    /// The poll's responses.
-    pub responses: Vec<PollResponse>,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum PollState {
+    /// The poll is currently being built.
+    Builder {
+        /// The poll's inputs.
+        inputs: Vec<PollInput>,
+    },
+    /// The poll is actively running.
+    Running {
+        /// The poll's creation date.
+        created: OffsetDateTime,
+        /// The poll's inputs.
+        inputs: Box<[PollInput]>,
+        /// The poll's responses.
+        responses: Vec<PollResponse>,
+    },
+    /// The poll has been archived.
+    Archive {
+        /// The poll's creation date.
+        created: OffsetDateTime,
+        /// The poll's archive date.
+        archived: OffsetDateTime,
+        /// The poll's inputs.
+        inputs: Box<[PollInput]>,
+        /// The poll's responses.
+        responses: Box<[PollResponse]>,
+    },
 }

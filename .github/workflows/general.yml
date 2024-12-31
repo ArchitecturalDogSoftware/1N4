@@ -1,0 +1,289 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Copyright © 2024 RemasteredArch
+#
+# This file is part of 1N4.
+#
+# 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+# License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# 1N4 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
+# <https://www.gnu.org/licenses/>.
+
+name: General Lints
+
+on: [push, pull_request]
+
+jobs:
+    toml:
+        runs-on: ubuntu-24.04
+        # Doesn't have a SemVer tag for v0.9.*, we will have to update patch-by-patch.
+        container: tamasfe/taplo:0.9.3
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Action - Check TOML formatting
+              run: taplo format --check
+            - name: Action - Lint TOML files
+              run: taplo lint --default-schema-catalogs
+
+    shell:
+        runs-on: ubuntu-24.04
+        container: mvdan/shfmt:v3-alpine
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup - Install ShellCheck
+              run: apk add shellcheck
+
+            - name: Action - Lint shell scripts with shellcheck
+              run: shfmt --find . | tr '\n' '\0' | xargs -0 shellcheck
+            - name: Action - Check shell script formatting
+              run: shfmt --diff .
+
+    yaml:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - name: Setup - Install go
+              uses: actions/setup-go@v5
+              with:
+                go-version: '1'
+                check-latest: true
+            - name: Setup - Resolve package info
+              id: goenv
+              env:
+                PACKAGES: |
+                    yamlfmt:github.com/google/yamlfmt:v0.14
+                    actionlint:github.com/rhysd/actionlint:v1
+                HASH_LEN_TARGET: '64'
+                MIN_HASH_LEN: '16'
+              run: |
+                output() {
+                    local key_or_pair="$1"
+
+                    # Avoids `set -u` errors.
+                    local value="${2:-}"
+
+                    local delimeter="${3:-EOF}"
+
+                    local output
+                    output="$(
+                        if [ -z "$value" ]; then
+                            # Single line output, `key_or_pair` is a key/value pair.
+                            echo "$key_or_pair"
+                        else
+                            # Multiline output, `key_or_pair` is just a key.
+                            echo "$key_or_pair<<$delimeter"
+                            echo "$value"
+                            echo "$delimeter"
+                        fi
+                    )"
+
+                    echo "$output" >&2
+                    echo "$output" >> "$GITHUB_OUTPUT"
+                }
+
+                resolve_package() {
+                    local package_bin
+                    package_bin="$1"
+
+                    local package_path
+                    package_path="$2"
+
+                    # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
+                    local package_semver
+                    package_semver="$3"
+
+                    download() {
+                        local url
+                        url="$1"
+
+                        if [ "$(type curl 2> /dev/null)" ]; then
+                            curl --fail --silent --show-error --location "$url"
+                            return
+                        fi
+
+                        if [ "$(type wget 2> /dev/null)" ]; then
+                            wget -qO - "$url"
+                            return
+                        fi
+
+                        echo "Both 'wget' and 'curl' are unavailable!" >&2
+                        return 1
+                    }
+
+                    local api_base
+                    api_base=''
+                    while read -r proxy; do
+                        if [ "$proxy" = 'direct' ] || [ "$proxy" = 'off' ] || [ -z "$proxy" ]; then
+                            continue
+                        fi
+
+                        # E.g., `https://proxy.golang.org/github.com/google/yamlfmt/@v`.
+                        api_base="$proxy/$package_path/@v"
+                        break
+                    done < <(go env GOPROXY | tr ',|' '\n')
+
+                    # E.g.,
+                    #
+                    # ```text
+                    # v0.2.0
+                    # v0.1.0
+                    # v0.3.0
+                    # v0.1.1
+                    # ```
+                    local versions
+                    versions="$(download "$api_base/list")"
+
+                    # E.g., `v0.1.1` for some `PACKAGE_SEMVER='v0.1'`.
+                    local version
+                    version="$(echo "$versions" | grep "^$package_semver.*" | sort -rV | head -n 1)"
+
+                    # TODO: Parse for other forms than `sum.golang.org`.
+                    local gosumdb
+                    gosumdb="https://$(go env GOSUMDB)"
+
+                    local hash
+                    hash="$(
+                        download "$gosumdb/lookup/$package_path@$version" |
+                            grep "^$package_path $version/go.mod h1:" |
+                            sed 's/^.* h1:\(.*\)$/\1/'
+                    )"
+
+                    # E.g., `YAMLFMT`.
+                    local package_bin_upper
+                    package_bin_upper="$(echo "$package_bin" | tr '[:lower:]' '[:upper:]')"
+
+                    output "${package_bin_upper}_GOMOD_SHA256=$hash"
+                    output "${package_bin_upper}_VERSION=$version"
+
+                    printf '%s\n%s\n' "$version" "$hash"
+                }
+
+                get_column() {
+                    local line
+                    line="$1"
+
+                    local column
+                    column="$2"
+
+                    echo "$line" | awk -F ':' "{ print \$$column }"
+                }
+
+                trim_whitespace() {
+                    # E.g., `  foobar  `.
+                    local input="$1"
+
+                    # E.g., `foobar  `.
+                    local trimmed
+                    trimmed="${input#"${input%%[![:space:]]*}"}"
+
+                    # E.g., `foobar`.
+                    trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+
+                    echo "$trimmed"
+                }
+
+                PACKAGES="$(trim_whitespace "$PACKAGES")"
+
+                package_count="$(echo "$PACKAGES" | wc -l)"
+                hash_len="$(( HASH_LEN_TARGET / package_count ))"
+                hash_len="$(( hash_len > MIN_HASH_LEN ? hash_len : MIN_HASH_LEN ))"
+
+                exact_packages=''
+                cumulative_hash=''
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    package_bin="$(get_column "$package" 1)"
+                    package_path="$(get_column "$package" 2)"
+                    package_semver="$(get_column "$package" 3)"
+
+                    {
+                        read -r version
+                        read -r hash
+                    } < <(resolve_package "$package_bin" "$package_path" "$package_semver")
+
+                    # Previously I used `expr substr "$hash" 1 "$hash_len"`, but that is not POSIX. `cut` operates per
+                    # line, but I am certain that there will only ever be one line, so it is equivalent.
+                    hash="$(echo "$hash" | cut -c "-$hash_len")"
+
+                    cumulative_hash="$cumulative_hash$hash"
+                    exact_packages="$(printf '%s\n%s' "$exact_packages" "$package_bin:$package_path:$version")"
+                done < <(echo "$PACKAGES")
+
+                output "CUMULATIVE_GOMOD_SHA256=$cumulative_hash"
+                output "PACKAGES" "$exact_packages"
+
+                for var in GOCACHE GOMODCACHE GOVERSION; do
+                    output "$var=$(go env $var)"
+                done
+            - name: Setup - Go caches
+              uses: actions/cache@v4
+              with:
+                # This is longer than 120 characters, but `yamlfmt` will not let me format it nicer :(
+                key: "${{ github.job }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.goenv.outputs.GOVERSION }}-${{ steps.goenv.outputs.CUMULATIVE_GOMOD_SHA256 }}"
+                path: |
+                    ${{ steps.goenv.outputs.GOCACHE }}
+                    ${{ steps.goenv.outputs.GOMODCACHE }}
+            - name: Setup - Install packages
+              run: |
+                start_group() {
+                    local title="$1"
+                    echo "::group::$title"
+                }
+
+                end_group() {
+                    echo '::endgroup::'
+                }
+
+                get_column() {
+                    local line
+                    line="$1"
+
+                    local column
+                    column="$2"
+
+                    echo "$line" | awk -F ':' "{ print \$$column }"
+                }
+
+                while read -r package; do
+                    if [ -z "$package" ]; then
+                        continue
+                    fi
+
+                    package_bin="$(get_column "$package" 1)"
+                    package_path="$(get_column "$package" 2)"
+                    package_version="$(get_column "$package" 3)"
+
+                    start_group "Installing $package_bin $package_version"
+
+                    go install "$package_path/cmd/$package_bin@$package_version"
+
+                    end_group
+                done < <(echo "${{ steps.goenv.outputs.PACKAGES }}" )
+
+            - name: Action - Check YAML formatting
+              run: yamlfmt -lint .
+            - name: Action - Lint GitHub Actions workflows
+              # actionlint cannot recurse on its own without `.git/`, which `actions/checkout` does not provide.
+              # Accordingly, we do that ourselves.
+              #
+              # It is necessary to use `find` instead of just `actionlint .github/workflows/*` because GitHub is
+              # considering allowing subdirectories:
+              #
+              # <https://github.com/orgs/community/discussions/4174>
+              run: find .github/workflows/ \( -name '*.yml' -o -name '*.yaml' \) -print0 | xargs -0 actionlint
+
+    markdown:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - name: Action - Install and check files with mdformat
+              run: pipx run mdformat~=0.7 --check .

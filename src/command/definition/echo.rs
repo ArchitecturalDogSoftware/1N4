@@ -17,6 +17,7 @@
 use anyhow::bail;
 use ina_localizing::localize;
 use twilight_model::application::command::CommandType;
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::Permissions;
 
@@ -28,7 +29,7 @@ use crate::utility::category;
 use crate::utility::traits::convert::AsLocale;
 
 crate::define_entry!("echo", CommandType::ChatInput, struct {
-    allow_dms: true,
+    contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
     permissions: Permissions::ADMINISTRATOR,
 }, struct {
     command: on_command,

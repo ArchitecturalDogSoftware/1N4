@@ -19,13 +19,14 @@ use twilight_model::application::command::{Command, CommandOptionChoice, Command
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
 use twilight_model::application::interaction::modal::ModalInteractionData;
-use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::GuildMarker;
 
 use self::context::Context;
 use self::registry::CommandEntry;
 use crate::client::event::EventResult;
-use crate::utility::types::id::CustomId;
+use crate::define_command_modules;
+use crate::utility::types::custom_id::CustomId;
 
 /// Provides an interaction context API.
 pub mod context;
@@ -34,20 +35,22 @@ pub mod registry;
 /// Provides helpers for resolving command options.
 pub mod resolver;
 
-/// Provides all defined commands.
-pub mod definition {
-    /// The echo command.
-    pub mod echo;
-    /// The help command.
-    pub mod help;
-    /// The localizer command.
-    pub mod localizer;
-    /// The ping command.
-    pub mod ping;
-    /// The poll command.
-    pub mod poll;
-    /// The role command.
-    pub mod role;
+define_command_modules! {
+    /// Provides all defined commands.
+    pub mod definition {
+        /// The echo command.
+        pub mod echo;
+        /// The help command.
+        pub mod help;
+        /// The localizer command.
+        pub mod localizer;
+        /// The ping command.
+        pub mod ping;
+        /// The poll command.
+        pub mod poll;
+        /// The role command.
+        pub mod role;
+    }
 }
 
 /// A type that can be invoked to construct a command.
@@ -152,8 +155,6 @@ macro_rules! define_commands {
         })*
     ) => {
         /// Defines the command's command callbacks.
-        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
-        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         mod command {
             $(pub mod $name {
                 pub(in super::super) use super::super::$callback as callback;
@@ -214,8 +215,6 @@ macro_rules! define_commands {
 macro_rules! define_components {
     ($($name:ident => $call:ident;)*) => {
         /// Defines the command's component callbacks.
-        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
-        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         mod component {$(
             pub mod $name {
                 pub(in super::super) use super::super::$call as callback;
@@ -233,9 +232,9 @@ macro_rules! define_components {
         async fn on_component<'ap: 'ev, 'ev>(
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
-            custom_id: $crate::utility::types::id::CustomId,
+            custom_id: $crate::utility::types::custom_id::CustomId,
         ) -> $crate::client::event::EventResult {
-            match custom_id.kind() {
+            match &**custom_id.variant() {
                 $(self::component::$name::NAME => self::component::$name::callback(entry, context, custom_id).await,)*
                 _ => ::anyhow::bail!("unknown or missing component"),
             }
@@ -256,8 +255,6 @@ macro_rules! define_components {
 macro_rules! define_modals {
     ($($name:ident => $call:ident;)*) => {
         /// Defines the command's modal callbacks.
-        #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
-        #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         mod modal {$(
             pub mod $name {
                 pub(in super::super) use super::super::$call as callback;
@@ -275,9 +272,9 @@ macro_rules! define_modals {
         async fn on_modal<'ap: 'ev, 'ev>(
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
-            custom_id: $crate::utility::types::id::CustomId,
+            custom_id: $crate::utility::types::custom_id::CustomId,
         ) -> $crate::client::event::EventResult {
-            match custom_id.kind() {
+            match &**custom_id.variant() {
                 $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id).await,)*
                 _ => ::anyhow::bail!("unknown or missing modal"),
             }

@@ -19,10 +19,12 @@ use data::{Selector, SelectorList};
 use ina_localizing::localize;
 use ina_storage::stored::Stored;
 use twilight_model::application::command::CommandType;
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
-use twilight_model::id::marker::RoleMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::RoleMarker;
+use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
@@ -30,13 +32,13 @@ use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
 use crate::utility::traits::convert::{AsEmoji, AsLocale};
-use crate::utility::types::id::CustomId;
+use crate::utility::types::custom_id::CustomId;
 
 /// The command's data.
 mod data;
 
 crate::define_entry!("role", CommandType::ChatInput, struct {
-    allow_dms: false,
+    contexts: [InteractionContextType::Guild],
 }, struct {
     command: on_command,
     component: on_component,
@@ -123,7 +125,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
         return crate::client::event::pass();
     }
-    if selectors.inner.len() >= 25 {
+    if selectors.inner.len() >= COMPONENT_COUNT * ACTION_ROW_COMPONENT_COUNT {
         let title = localize!(async(try in locale) category::UI, "role-selector-limit").await?;
 
         context.failure(title, None::<&str>).await?;
@@ -315,10 +317,9 @@ async fn on_select_component<'ap: 'ev, 'ev>(
     let Some(user_id) = context.interaction.author_id() else {
         bail!("this command must be used by a user");
     };
-    let Some(role_id) = custom_id.data().first() else {
+    let Some(role_id) = custom_id.get::<Id<RoleMarker>>(0).transpose()? else {
         bail!("missing role identifier data");
     };
-    let role_id: Id<RoleMarker> = role_id.parse()?;
 
     context.defer(Visibility::Ephemeral).await?;
 
@@ -365,10 +366,9 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     let Some(user_id) = context.interaction.author_id() else {
         bail!("this component must be used by a user");
     };
-    let Some(role_id) = custom_id.data().first() else {
+    let Some(role_id) = custom_id.get::<Id<RoleMarker>>(0).transpose()? else {
         bail!("missing role identifier data");
     };
-    let role_id: Id<RoleMarker> = role_id.parse()?;
 
     context.defer(Visibility::Ephemeral).await?;
 

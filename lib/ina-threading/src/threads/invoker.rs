@@ -15,438 +15,687 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::collections::BTreeMap;
-use std::future::Future;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tokio::runtime::Builder;
-use tokio::sync::mpsc::error::TryRecvError;
+use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::RwLock;
 
 use super::exchanger::Exchanger;
-use crate::{ConsumingThread, Error, HandleHolder, ProducingThread, Result};
+use crate::{Handle, ReceiverHandle, Result, SenderHandle};
 
-/// A value with a nonce for tracking within an invoker.
-pub type Nonce<T> = (Option<usize>, T);
-/// A stateful invoker's state argument.
-pub type State<T> = Arc<RwLock<T>>;
-/// A result returned from a stateful invoker.
-pub type StatefulResult<I, T, S> = Result<I, Nonce<(State<T>, S)>>;
+/// The thread type that is wrapped by an [`Invoker<S, R>`].
+pub(crate) type InvokerInner<S, R> = Exchanger<Tracked<S>, Tracked<R>, Result<(), CallError<S, R>>>;
 
-/// A thread that consumes and produces values like a function.
-#[derive(Debug)]
-pub struct Invoker<S, R>
+/// An error that may be returned when calling invoker threads.
+#[derive(Debug, thiserror::Error)]
+pub enum CallError<S, R> {
+    /// Returned if a value cannot be sent into an invoker thread.
+    #[error("unable to send into invoker thread: {0}")]
+    SendInto(SendError<Tracked<S>>),
+    /// Returned if a value cannot be returned from an invoker thread.
+    #[error("unable to receive from invoker thread: {0}")]
+    SendFrom(SendError<Tracked<R>>),
+    /// Returned if the thread's receiving channel was closed.
+    #[error("the thread's receiving channel was closed")]
+    Closed,
+}
+
+/// A value with an associated nonce for response tracking.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Tracked<T> {
+    /// The numeric nonce.
+    pub nonce: Option<usize>,
+    /// The inner value.
+    pub value: T,
+}
+
+/// A value that is tracked as an invoker's state.
+#[derive(Clone, Debug, Default)]
+pub struct Stateful<T, S>
 where
-    S: Send + 'static,
-    R: Send + 'static,
+    T: ?Sized,
 {
+    /// The state.
+    pub state: Arc<T>,
+    /// The value.
+    pub value: S,
+}
+
+/// A thread that consumes and returns values like a function.
+#[derive(Debug)]
+pub struct Invoker<S, R> {
     /// The inner exchanger thread.
-    inner: Exchanger<Nonce<S>, Nonce<R>, ()>,
-    /// A map of missed results.
-    produced: RwLock<BTreeMap<usize, R>>,
-    /// A sequence counter for each input.
-    sequence: RwLock<usize>,
+    exchanger: InvokerInner<S, R>,
+    /// A map that contains completed results.
+    completed: BTreeMap<usize, R>,
+    /// A sequence counter that tracks results.
+    sequence: AtomicUsize,
 }
 
 impl<S, R> Invoker<S, R>
 where
     S: Send + 'static,
-    R: Send + Sync + 'static,
+    R: Send + 'static,
 {
-    /// Spawns a new thread with the given name and task.
+    /// Spawns a new [`Invoker<S, R>`] with the given name and task.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |n| {
+    ///     assert_eq!(n, 123);
+    ///     456
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(123).expect("the channel should not be closed");
+    ///
+    /// assert_eq!(response, 456);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self, Nonce<S>>
+    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: Fn(S) -> R + Send + 'static,
     {
-        let call = move |sender: Sender<Nonce<R>>, mut receiver: Receiver<Nonce<S>>| {
-            loop {
-                let Some((sequence, input)) = receiver.blocking_recv() else {
-                    break;
-                };
+        let f = move |sender: Sender<Tracked<R>>, mut receiver: Receiver<Tracked<S>>| loop {
+            let Some(received) = receiver.blocking_recv() else { return Ok(()) };
+            let response = Tracked { nonce: received.nonce, value: f(received.value) };
 
-                let response = call(input);
-
-                if sequence.is_some() && sender.blocking_send((sequence, response)).is_err() {
-                    break;
-                }
+            if received.nonce.is_some() {
+                sender.blocking_send(response).map_err(CallError::SendFrom)?;
             }
         };
 
         Ok(Self {
-            inner: Exchanger::spawn(name, call, size)?,
-            produced: RwLock::default(),
-            sequence: RwLock::default(),
+            exchanger: Exchanger::spawn(name, capacity, f)?,
+            completed: BTreeMap::new(),
+            sequence: AtomicUsize::new(0),
         })
     }
 
-    /// Spawns a new thread with the given name and asynchronous task.
+    /// Spawns a new [`Invoker<S, R>`] with the given name and asynchronous task.
+    ///
+    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn_with_runtime("worker", capacity, |n| async move {
+    ///     assert_eq!(n, 123);
+    ///
+    ///     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    ///
+    ///     456
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(123).expect("the channel should not be closed");
+    ///
+    /// assert_eq!(response, 456);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[expect(clippy::missing_panics_doc, reason = "false-positive; the thread will just exit immediately, not panic")]
-    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self, Nonce<S>>
+    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: Fn(S) -> O + Send + 'static,
         O: Future<Output = R> + Send,
     {
-        let call = move |sender: Sender<Nonce<R>>, mut receiver: Receiver<Nonce<S>>| {
-            #[expect(clippy::expect_used, reason = "if the runtime fails to spawn, we can't execute any code")]
-            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
+        let f = move |sender: Sender<Tracked<R>>, mut receiver: Receiver<Tracked<S>>| async move {
+            loop {
+                let Some(received) = receiver.recv().await else { return Ok(()) };
+                let response = Tracked { nonce: received.nonce, value: f(received.value).await };
 
-            runtime.block_on(async move {
-                loop {
-                    let Some((sequence, input)) = receiver.recv().await else { break };
-                    let response = call(input).await;
-
-                    if sequence.is_some() && sender.send((sequence, response)).await.is_err() {
-                        break;
-                    }
+                if received.nonce.is_some() {
+                    sender.send(response).await.map_err(CallError::SendFrom)?;
                 }
-            });
+            }
         };
 
         Ok(Self {
-            inner: Exchanger::spawn(name, call, size)?,
-            produced: RwLock::default(),
-            sequence: RwLock::default(),
+            exchanger: Exchanger::spawn_with_runtime(name, capacity, f)?,
+            completed: BTreeMap::new(),
+            sequence: AtomicUsize::new(0),
         })
     }
 
-    /// Invokes the thread, returning the response of the method when available.
+    /// Invokes the thread, returning the response of the inner function when available.
     ///
-    /// # Errors
+    /// # Examples
     ///
-    /// This function will return an error if the thread is disconnected.
-    pub async fn invoke(&mut self, input: S) -> Result<R, Nonce<S>> {
-        let sequence = *self.sequence.read().await;
-
-        *self.sequence.write().await = sequence.wrapping_add(1);
-
-        self.as_sender().send((Some(sequence), input)).await?;
-
-        let mut interval = tokio::time::interval(Duration::from_millis(5));
-
-        loop {
-            interval.tick().await;
-
-            let mut produced = self.produced.write().await;
-
-            if let Some(result) = produced.remove(&sequence) {
-                return Ok(result);
-            }
-
-            drop(produced);
-
-            match self.as_receiver_mut().try_recv() {
-                Ok((Some(seq), result)) if seq == sequence => return Ok(result),
-                Ok((Some(seq), result)) => self.produced.write().await.insert(seq, result),
-                Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
-                Err(TryRecvError::Empty) => continue,
-                Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
-            };
-        }
-    }
-
-    /// Invokes the thread, returning the response of the method when available.
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| a + b)?;
     ///
-    /// This blocks the current thread.
+    /// let response = thread.call((2, 2)).await.expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
-    /// Panics if this is called in an asynchronous context.
+    /// Panics if [`usize::MAX`] tasks have their responses queued, causing a response to be overwritten.
     ///
     /// # Errors
     ///
-    /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke(&mut self, input: S) -> Result<R, Nonce<S>> {
-        const DURATION: Duration = Duration::from_millis(5);
+    /// This function will return an error if either of the thread's sender or receiver channels are closed.
+    pub async fn call(&mut self, value: S) -> Result<R, CallError<S, R>> {
+        let nonce = self.sequence.fetch_add(1, Ordering::AcqRel);
+        let value = Tracked { nonce: Some(nonce), value };
 
-        let sequence = *self.sequence.blocking_read();
-
-        *self.sequence.blocking_write() = sequence.wrapping_add(1);
-
-        self.as_sender().blocking_send((Some(sequence), input))?;
-
-        let mut interval = Instant::now();
+        self.as_sender().send(value).await.map_err(CallError::SendInto)?;
 
         loop {
-            let now = Instant::now();
-
-            if now < interval {
-                let difference = interval - now;
-
-                std::thread::sleep(difference);
+            if let Some(completed) = self.completed.remove(&nonce) {
+                return Ok(completed);
             }
 
-            interval = now + DURATION;
-
-            let mut produced = self.produced.blocking_write();
-
-            if let Some(result) = produced.remove(&sequence) {
-                return Ok(result);
+            match self.as_receiver_mut().recv().await {
+                // If the value was returned by the task triggered above, return it.
+                Some(Tracked { nonce: Some(completed_nonce), value }) if completed_nonce == nonce => return Ok(value),
+                // If the value was returned by another task, store it so that it can still be consumed.
+                Some(Tracked { nonce: Some(completed_nonce), value }) => {
+                    // A panic here would require that enough tasks ([`usize::MAX`] to be exact) are triggered to cause
+                    // a task to receive the same sequence ID as another pending task.
+                    assert!(self.completed.insert(completed_nonce, value).is_none());
+                }
+                Some(Tracked { nonce: None, value: _ }) => unreachable!("values with no nonce should not be returned"),
+                None => return Err(CallError::Closed),
             }
-
-            drop(produced);
-
-            match self.as_receiver_mut().try_recv() {
-                Ok((Some(seq), result)) if seq == sequence => return Ok(result),
-                Ok((Some(seq), result)) => self.produced.blocking_write().insert(seq, result),
-                Ok((None, _)) => unreachable!("requests with no sequence number should not be returned"),
-                Err(TryRecvError::Empty) => continue,
-                Err(TryRecvError::Disconnected) => return Err(Error::Disconnected),
-            };
         }
     }
 
-    /// Invokes the thread, ignoring the response of the method.
+    /// Invokes the thread, blocking the current thread until the response of the inner function is available.
     ///
-    /// # Errors
+    /// # Examples
     ///
-    /// This function will return an error if the thread is disconnected.
-    pub async fn invoke_and_forget(&mut self, input: S) -> Result<(), Nonce<S>> {
-        self.as_sender().send((None, input)).await.map_err(Into::into)
-    }
-
-    /// Invokes the thread, ignoring the response of the method.
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| a + b)?;
     ///
-    /// This blocks the current thread.
+    /// let response = thread.blocking_call((2, 2)).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
-    /// Panics if this is called in an asynchronous context.
+    /// Panics if [`usize::MAX`] tasks have their responses queued, causing a response to be overwritten, or if this is
+    /// called from within an asynchronous runtime.
     ///
     /// # Errors
     ///
-    /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke_and_forget(&mut self, input: S) -> Result<(), Nonce<S>> {
-        self.as_sender().blocking_send((None, input)).map_err(Into::into)
+    /// This function will return an error if either of the thread's sender or receiver channels are closed.
+    pub fn blocking_call(&mut self, value: S) -> Result<R, CallError<S, R>> {
+        let nonce = self.sequence.fetch_add(1, Ordering::AcqRel);
+        let value = Tracked { nonce: Some(nonce), value };
+
+        self.as_sender().blocking_send(value).map_err(CallError::SendInto)?;
+
+        loop {
+            if let Some(completed) = self.completed.remove(&nonce) {
+                return Ok(completed);
+            }
+
+            match self.as_receiver_mut().blocking_recv() {
+                // If the value was returned by the task triggered above, return it.
+                Some(Tracked { nonce: Some(completed_nonce), value }) if completed_nonce == nonce => return Ok(value),
+                // If the value was returned by another task, store it so that it can still be consumed.
+                Some(Tracked { nonce: Some(completed_nonce), value }) => {
+                    // A panic here would require that enough tasks ([`usize::MAX`] to be exact) are triggered to cause
+                    // a task to receive the same sequence ID as another pending task.
+                    assert!(self.completed.insert(completed_nonce, value).is_none());
+                }
+                Some(Tracked { nonce: None, value: _ }) => unreachable!("values with no nonce should not be returned"),
+                None => return Err(CallError::Closed),
+            }
+        }
+    }
+
+    /// Invokes the thread, executing the method but ignoring the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| {
+    ///     println!("{a} + {b} = {}", a + b);
+    /// })?;
+    ///
+    /// thread.call_and_forget((2, 2)).await.expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's receiving channel is closed.
+    pub async fn call_and_forget(&mut self, value: S) -> Result<(), CallError<S, R>> {
+        self.as_sender().send(Tracked { nonce: None, value }).await.map_err(CallError::SendInto)
+    }
+
+    /// Invokes the thread, executing the method but ignoring the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::Invoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| {
+    ///     println!("{a} + {b} = {}", a + b);
+    /// })?;
+    ///
+    /// thread.blocking_call_and_forget((2, 2)).expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called from within an asynchronous runtime.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's receiving channel is closed.
+    pub fn blocking_call_and_forget(&mut self, value: S) -> Result<(), CallError<S, R>> {
+        self.as_sender().blocking_send(Tracked { nonce: None, value }).map_err(CallError::SendInto)
     }
 }
 
-impl<S, R> HandleHolder<()> for Invoker<S, R>
+impl<S, R> Handle for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_handle(&self) -> &JoinHandle<()> {
-        self.inner.as_handle()
+    type Output = Result<(), CallError<S, R>>;
+
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
+        self.exchanger.as_join_handle()
     }
 
-    fn as_handle_mut(&mut self) -> &mut JoinHandle<()> {
-        self.inner.as_handle_mut()
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
+        self.exchanger.as_join_handle_mut()
     }
 
-    fn into_handle(self) -> JoinHandle<()> {
-        self.inner.into_handle()
+    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output> {
+        self.exchanger.into_join_handle()
     }
 }
 
-impl<S, R> ConsumingThread<Nonce<S>> for Invoker<S, R>
+impl<S, R> SenderHandle<Tracked<S>> for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_sender(&self) -> &Sender<Nonce<S>> {
-        self.inner.as_sender()
+    fn as_sender(&self) -> &tokio::sync::mpsc::Sender<Tracked<S>> {
+        self.exchanger.as_sender()
     }
 
-    fn as_sender_mut(&mut self) -> &mut Sender<Nonce<S>> {
-        self.inner.as_sender_mut()
+    fn as_sender_mut(&mut self) -> &mut tokio::sync::mpsc::Sender<Tracked<S>> {
+        self.exchanger.as_sender_mut()
     }
 
-    fn into_sender(self) -> Sender<Nonce<S>> {
-        self.inner.into_sender()
-    }
-
-    fn clone_sender(&self) -> Sender<Nonce<S>> {
-        self.inner.clone_sender()
+    fn into_sender(self) -> tokio::sync::mpsc::Sender<Tracked<S>> {
+        self.exchanger.into_sender()
     }
 }
 
-impl<S, R> ProducingThread<Nonce<R>> for Invoker<S, R>
+impl<S, R> ReceiverHandle<Tracked<R>> for Invoker<S, R>
 where
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_receiver(&self) -> &Receiver<Nonce<R>> {
-        self.inner.as_receiver()
+    fn as_receiver(&self) -> &tokio::sync::mpsc::Receiver<Tracked<R>> {
+        self.exchanger.as_receiver()
     }
 
-    fn as_receiver_mut(&mut self) -> &mut Receiver<Nonce<R>> {
-        self.inner.as_receiver_mut()
+    fn as_receiver_mut(&mut self) -> &mut tokio::sync::mpsc::Receiver<Tracked<R>> {
+        self.exchanger.as_receiver_mut()
     }
 
-    fn into_receiver(self) -> Receiver<Nonce<R>> {
-        self.inner.into_receiver()
+    fn into_receiver(self) -> tokio::sync::mpsc::Receiver<Tracked<R>> {
+        self.exchanger.into_receiver()
     }
 }
 
-/// A thread that consumes and produces values like a function.
+/// A thread that consumes and returns values like a function.
+///
+/// This is a variant of a typical [`Invoker<S, R>`] that has a "state" value that is shared with
+/// all invocations.
 #[derive(Debug)]
 pub struct StatefulInvoker<T, S, R>
 where
-    T: Send + Sync + 'static,
-    S: Send + 'static,
-    R: Send + 'static,
+    T: ?Sized,
 {
     /// The inner invoker thread.
-    inner: Invoker<(State<T>, S), R>,
-    /// The constant state.
-    state: State<T>,
+    invoker: Invoker<Stateful<T, S>, R>,
+    /// The thread's canonical state.
+    state: Arc<T>,
 }
 
 impl<T, S, R> StatefulInvoker<T, S, R>
 where
-    T: Send + Sync + 'static,
+    T: ?Sized + Send + Sync + 'static,
     S: Send + 'static,
-    R: Send + Sync + 'static,
+    R: Send + 'static,
 {
-    /// Spawns a new thread with the given name and task.
+    /// Spawns a new [`StatefulInvoker<T, S, R>`] with the given name and task.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     // `args` carries both the value and the thread's state.
+    ///     args.value + *args.state
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(2).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, state: T, call: F, size: usize) -> StatefulResult<Self, T, S>
+    pub fn spawn<N, F, U>(name: N, capacity: NonZeroUsize, state: U, f: F) -> Result<Self>
     where
         N: AsRef<str>,
-        F: Fn(State<T>, S) -> R + Send + 'static,
+        F: Fn(Stateful<T, S>) -> R + Send + 'static,
+        U: Into<Arc<T>>,
     {
-        let state = Arc::new(RwLock::new(state));
-
-        Ok(Self { inner: Invoker::spawn(name, move |(s, i)| call(s, i), size)?, state })
+        Ok(Self { invoker: Invoker::spawn(name, capacity, f)?, state: state.into() })
     }
 
-    /// Spawns a new thread with the given name and asynchronous task.
+    /// Spawns a new [`StatefulInvoker<T, S, R>`] with the given name and asynchronous task.
+    ///
+    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread =
+    ///     StatefulInvoker::spawn_with_runtime("worker", capacity, 2, |args| async move {
+    ///         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    ///
+    ///         args.value + *args.state
+    ///     })?;
+    ///
+    /// let response = thread.blocking_call(2).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn_with_runtime<N, F, O>(name: N, state: T, call: F, size: usize) -> StatefulResult<Self, T, S>
+    pub fn spawn_with_runtime<N, F, O, U>(name: N, capacity: NonZeroUsize, state: U, f: F) -> Result<Self>
     where
         N: AsRef<str>,
-        F: Fn(State<T>, S) -> O + Send + 'static,
+        F: Fn(Stateful<T, S>) -> O + Send + 'static,
         O: Future<Output = R> + Send,
+        U: Into<Arc<T>>,
     {
-        let state = Arc::new(RwLock::new(state));
-
-        Ok(Self { inner: Invoker::spawn_with_runtime(name, move |(s, i)| call(s, i), size)?, state })
+        Ok(Self { invoker: Invoker::spawn_with_runtime(name, capacity, f)?, state: state.into() })
     }
 
-    /// Invokes the thread, returning the response of the method when available.
+    /// Invokes the thread, returning the response of the inner function when available.
     ///
-    /// # Errors
+    /// # Examples
     ///
-    /// This function will return an error if the thread is disconnected.
-    pub async fn invoke(&mut self, input: S) -> StatefulResult<R, T, S> {
-        self.inner.invoke((Arc::clone(&self.state), input)).await
-    }
-
-    /// Invokes the thread, returning the response of the method when available.
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     // `args` carries both the value and the thread's state.
+    ///     args.value + *args.state
+    /// })?;
     ///
-    /// This blocks the current thread.
+    /// let response = thread.call(2).await.expect("the channel should not be closed");
     ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke(&mut self, input: S) -> StatefulResult<R, T, S> {
-        self.inner.blocking_invoke((Arc::clone(&self.state), input))
-    }
-
-    /// Invokes the thread, ignoring the response of the method.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread is disconnected.
-    pub async fn invoke_and_forget(&mut self, input: S) -> StatefulResult<(), T, S> {
-        self.inner.invoke_and_forget((Arc::clone(&self.state), input)).await
-    }
-
-    /// Invokes the thread, ignoring the response of the method.
-    ///
-    /// This blocks the current thread.
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Panics
     ///
-    /// Panics if this is called in an asynchronous context.
+    /// Panics if [`usize::MAX`] tasks have their responses queued, causing a response to be overwritten.
     ///
     /// # Errors
     ///
-    /// This function will return an error if the thread is disconnected.
-    pub fn blocking_invoke_and_forget(&mut self, input: S) -> StatefulResult<(), T, S> {
-        self.inner.blocking_invoke_and_forget((Arc::clone(&self.state), input))
+    /// This function will return an error if either of the thread's sender or receiver channels are closed.
+    pub async fn call(&mut self, value: S) -> Result<R, CallError<Stateful<T, S>, R>> {
+        self.invoker.call(Stateful { state: Arc::clone(&self.state), value }).await
+    }
+
+    /// Invokes the thread, blocking the current thread until the response of the inner function is available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     // `args` carries both the value and the thread's state.
+    ///     args.value + *args.state
+    /// })?;
+    ///
+    /// let response = thread.blocking_call(2).expect("the channel should not be closed");
+    ///
+    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
+    /// assert_eq!(response, 4);
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if [`usize::MAX`] tasks have their responses queued, causing a response to be overwritten, or if this is
+    /// called from within an asynchronous runtime.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if either of the thread's sender or receiver channels are closed.
+    pub fn blocking_call(&mut self, value: S) -> Result<R, CallError<Stateful<T, S>, R>> {
+        self.invoker.blocking_call(Stateful { state: Arc::clone(&self.state), value })
+    }
+
+    /// Invokes the thread, executing the method but ignoring the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # #[tokio::main]
+    /// # async fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     println!("{} + {} = {}", args.value, args.state, args.value + *args.state);
+    /// })?;
+    ///
+    /// thread.call_and_forget(2).await.expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's receiving channel is closed.
+    pub async fn call_and_forget(&mut self, value: S) -> Result<(), CallError<Stateful<T, S>, R>> {
+        self.invoker.call_and_forget(Stateful { state: Arc::clone(&self.state), value }).await
+    }
+
+    /// Invokes the thread, executing the method but ignoring the return value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::Handle;
+    /// # use ina_threading::threads::invoker::StatefulInvoker;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
+    ///     println!("{} + {} = {}", args.value, args.state, args.value + *args.state);
+    /// })?;
+    ///
+    /// thread.blocking_call_and_forget(2).expect("the channel should not be closed");
+    ///
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called from within an asynchronous runtime.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's receiving channel is closed.
+    pub fn blocking_call_and_forget(&mut self, value: S) -> Result<(), CallError<Stateful<T, S>, R>> {
+        self.invoker.blocking_call_and_forget(Stateful { state: Arc::clone(&self.state), value })
     }
 }
 
-impl<T, S, R> HandleHolder<()> for StatefulInvoker<T, S, R>
+impl<T, S, R> Handle for StatefulInvoker<T, S, R>
 where
-    T: Send + Sync + 'static,
+    T: ?Sized + Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_handle(&self) -> &JoinHandle<()> {
-        self.inner.as_handle()
+    type Output = Result<(), CallError<Stateful<T, S>, R>>;
+
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
+        self.invoker.as_join_handle()
     }
 
-    fn as_handle_mut(&mut self) -> &mut JoinHandle<()> {
-        self.inner.as_handle_mut()
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
+        self.invoker.as_join_handle_mut()
     }
 
-    fn into_handle(self) -> JoinHandle<()> {
-        self.inner.into_handle()
+    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output> {
+        self.invoker.into_join_handle()
     }
 }
 
-impl<T, S, R> ConsumingThread<Nonce<(State<T>, S)>> for StatefulInvoker<T, S, R>
+impl<T, S, R> SenderHandle<Tracked<Stateful<T, S>>> for StatefulInvoker<T, S, R>
 where
-    T: Send + Sync + 'static,
+    T: ?Sized + Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_sender(&self) -> &Sender<Nonce<(State<T>, S)>> {
-        self.inner.as_sender()
+    fn as_sender(&self) -> &Sender<Tracked<Stateful<T, S>>> {
+        self.invoker.as_sender()
     }
 
-    fn as_sender_mut(&mut self) -> &mut Sender<Nonce<(State<T>, S)>> {
-        self.inner.as_sender_mut()
+    fn as_sender_mut(&mut self) -> &mut Sender<Tracked<Stateful<T, S>>> {
+        self.invoker.as_sender_mut()
     }
 
-    fn into_sender(self) -> Sender<Nonce<(State<T>, S)>> {
-        self.inner.into_sender()
-    }
-
-    fn clone_sender(&self) -> Sender<Nonce<(State<T>, S)>> {
-        self.inner.clone_sender()
+    fn into_sender(self) -> Sender<Tracked<Stateful<T, S>>> {
+        self.invoker.into_sender()
     }
 }
 
-impl<T, S, R> ProducingThread<Nonce<R>> for StatefulInvoker<T, S, R>
+impl<T, S, R> ReceiverHandle<Tracked<R>> for StatefulInvoker<T, S, R>
 where
-    T: Send + Sync + 'static,
+    T: ?Sized + Send + Sync + 'static,
     S: Send + 'static,
     R: Send + 'static,
 {
-    fn as_receiver(&self) -> &Receiver<Nonce<R>> {
-        self.inner.as_receiver()
+    fn as_receiver(&self) -> &Receiver<Tracked<R>> {
+        self.invoker.as_receiver()
     }
 
-    fn as_receiver_mut(&mut self) -> &mut Receiver<Nonce<R>> {
-        self.inner.as_receiver_mut()
+    fn as_receiver_mut(&mut self) -> &mut Receiver<Tracked<R>> {
+        self.invoker.as_receiver_mut()
     }
 
-    fn into_receiver(self) -> Receiver<Nonce<R>> {
-        self.inner.into_receiver()
+    fn into_receiver(self) -> Receiver<Tracked<R>> {
+        self.invoker.into_receiver()
     }
 }

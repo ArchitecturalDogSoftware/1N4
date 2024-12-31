@@ -19,12 +19,13 @@ use std::fmt::Write;
 use anyhow::Result;
 use ina_localizing::locale::Locale;
 use ina_localizing::localize;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::{PartialMember, Permissions, Role};
-use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
 use twilight_util::permission_calculator::PermissionCalculator;
 
@@ -35,7 +36,7 @@ use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::{category, color};
 
 crate::define_entry!("help", CommandType::ChatInput, struct {
-    allow_dms: true,
+    contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
 }, struct {
     command: on_command,
 }, struct {});
@@ -75,7 +76,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
     let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
     let footer = EmbedFooterBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).build();
-    let color = if thread_rng().gen_bool(0.5) { color::BRANDING_A } else { color::BRANDING_B };
+    let color = if thread_rng().gen_bool(0.5) { color::BRANDING_A } else { color::BRANDING_B }.rgb();
     let author = if let Some(user) = context.api.cache.current_user() {
         user.as_embed_author()?
     } else {
@@ -131,7 +132,7 @@ async fn write_command<F>(locale: Option<Locale>, command: Command, f: &mut F) -
 where
     F: Write + Send,
 {
-    let Command { name, kind, id, dm_permission, nsfw, options, .. } = command;
+    let Command { name, kind, id, contexts, nsfw, options, .. } = command;
 
     let Some(id) = id else {
         return Ok(());
@@ -157,7 +158,7 @@ where
     if has_subcommands {
         flags.push(localize!(async(try in locale) category::UI, "help-tag-subcommands").await?);
     }
-    if dm_permission.unwrap_or(false) {
+    if contexts.is_some_and(|v| v.iter().any(|v| *v == InteractionContextType::BotDm)) {
         flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?);
     }
     if nsfw.unwrap_or(false) {

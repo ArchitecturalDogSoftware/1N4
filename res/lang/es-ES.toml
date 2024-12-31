@@ -7,6 +7,8 @@ localizer-name = "traductor"
 localizer-description = "Proporciona acceso al traductor del bot."
 ping-name = "ping"
 ping-description = "Calcula el tiempo de respuesta aproximado del bot."
+poll-name = "encuesta"
+poll-description = "Crear y administrar encuestas."
 role-name = "rol"
 role-description = "Crear y administrar selectores de roles."
 
@@ -28,6 +30,15 @@ localizer-category-description = "La categoría de traducción."
 localizer-key-name = "clave"
 localizer-key-description = "La clave de traducción."
 
+poll-create-name = "crear"
+poll-create-description = "Crear una encuesta nueva."
+poll-type-name = "tipo"
+poll-type-description = "El tipo de la encuesta."
+poll-duration-name = "minutos"
+poll-duration-description = "La duración de la encuesta en minutos."
+poll-close-name = "cerrar"
+poll-close-description = "Cierre la encuesta activa antes de tiempo, o descarte la encuesta actual."
+
 role-create-name = "crear"
 role-create-description = "Crear un nuevo selector de roles."
 role-role-name = "rol"
@@ -47,6 +58,11 @@ echo-format-binary = "Binario (0-1)"
 echo-format-octal = "Octal (0-7)"
 echo-format-decimal = "Decimal (0-9)"
 echo-format-hexadecimal = "Hexadecimal (0-F)"
+
+poll-type-multiple-choice = "Opcíon múltiple"
+poll-type-open-response = "Repuesta abierta"
+poll-type-hybrid = "Opcíon múltiple y repuesta abierta"
+poll-type-raffle = "Sorteo"
 
 [ui]
 error-inform-title = "Se ha producio un error."
@@ -72,7 +88,7 @@ help-header = """\
 ¡Gracias por usar 1N4! Estoy feliz de ser de servicio.
 A continuación se muestra una lista de todos los comandos que están disponsibles para usted.
 
-Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/Jaxydog/1N4/issues).\
+Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/ArchitecturalDogSoftware/1N4/issues).\
 """
 help-footer = """\
 Propiedad de Arden Inc., versión %V+neon.
@@ -94,6 +110,9 @@ localizer-unknown = "Configuración regional desconocida"
 ping-start = "Calculando..."
 ping-finish = "Operación exitosa!"
 
+poll-create-title = "Crear una encuesta nueva"
+poll-invalid-url = "URL no válida"
+
 role-load-failed = "No se pudo cargar a lista de selectores de roles."
 role-load-missing = "No ha agregado ningún selector de roles."
 
@@ -109,3 +128,8 @@ role-remove-emptied = "Se han eliminado todos los selectores de roles."
 role-remove-missing = "El rol seleccionado ya se ha eliminado."
 
 role-finished = "Finalizados los selectores de roles."
+
+[ui-input]
+poll-create-title = "Titulo"
+poll-create-image = "URL de la imagen"
+poll-create-description = "Texto del cuerpo"

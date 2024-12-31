@@ -16,14 +16,15 @@
 
 //! Provides logging solutions for 1N4.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use endpoint::Endpoint;
 use settings::Settings;
 use thread::Request;
-use tokio::sync::mpsc::error::SendError;
 use tokio::sync::RwLock;
+use tokio::sync::mpsc::error::SendError;
 use tokio::task::{JoinError, JoinSet};
 
 use crate::entry::Entry;
@@ -65,9 +66,9 @@ pub enum Error {
     /// A request failed to send.
     #[error("a request failed to send")]
     Send(#[from] SendError<Request>),
-    /// A threading error.
+    /// The thread failed to spawn.
     #[error(transparent)]
-    Thread(#[from] ina_threading::Error<Request>),
+    ThreadSpawn(#[from] ina_threading::Error),
 }
 
 /// A logger with buffered output.
@@ -75,9 +76,9 @@ pub struct Logger {
     /// The logger's settings.
     settings: Settings,
     /// The logger's endpoints.
-    endpoints: Vec<Arc<RwLock<Box<dyn Endpoint>>>>,
+    endpoints: HashMap<&'static str, Arc<RwLock<Box<dyn Endpoint>>>>,
     /// The logger's entry queue.
-    queue: Vec<Entry<'static>>,
+    queue: Vec<Arc<Entry<'static>>>,
     /// Whether the logger has been initialized.
     initialized: bool,
 }
@@ -88,7 +89,7 @@ impl Logger {
     pub fn new(settings: Settings) -> Self {
         let queue = Vec::with_capacity(settings.queue_capacity.get());
 
-        Self { settings, endpoints: vec![], queue, initialized: false }
+        Self { settings, endpoints: HashMap::new(), queue, initialized: false }
     }
 
     /// Returns whether this [`Logger`] is enabled.
@@ -149,7 +150,7 @@ impl Logger {
             return Err(Error::AlreadyInitialized);
         }
 
-        for endpoint in &self.endpoints {
+        for endpoint in self.endpoints.values() {
             endpoint.write().await.setup(&self.settings).await?;
         }
 
@@ -163,18 +164,16 @@ impl Logger {
     /// # Errors
     ///
     /// This function will return an error if the endpoint was already added.
-    pub async fn push_endpoint(&mut self, endpoint: Box<dyn Endpoint>) -> Result<()> {
+    pub fn push_endpoint(&mut self, endpoint: Box<dyn Endpoint>) -> Result<()> {
         if self.initialized {
             return Err(Error::AlreadyInitialized);
         }
 
-        for contained in &self.endpoints {
-            if contained.read().await.name() == endpoint.name() {
-                return Err(Error::DuplicateEndpoint(endpoint.name()));
-            }
+        if self.endpoints.contains_key(endpoint.name()) {
+            return Err(Error::DuplicateEndpoint(endpoint.name()));
         }
 
-        self.endpoints.push(Arc::new(RwLock::new(endpoint)));
+        self.endpoints.insert(endpoint.name(), Arc::new(RwLock::new(endpoint)));
 
         Ok(())
     }
@@ -189,7 +188,7 @@ impl Logger {
             return Err(Error::NotInitialized);
         }
         if self.is_enabled() {
-            self.queue.push(entry);
+            self.queue.push(Arc::new(entry));
         }
 
         if self.is_full() { self.flush().await } else { Ok(()) }
@@ -210,19 +209,29 @@ impl Logger {
             return Ok(());
         }
 
-        for entry in self.queue.drain(..) {
-            let entry = Arc::new(entry);
-            let mut tasks = JoinSet::new();
+        let mut tasks = JoinSet::<Result<(), Error>>::new();
 
-            for endpoint in self.endpoints.iter().map(Arc::clone) {
-                let entry = Arc::clone(&entry);
+        #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
+        for endpoint in self.endpoints.values().cloned() {
+            let iterator: Box<[_]> = self.queue.iter().cloned().collect();
 
-                tasks.spawn(async move { endpoint.write().await.write(entry).await });
-            }
+            tasks.spawn(async move {
+                let mut endpoint = endpoint.write().await;
 
-            while let Some(result) = tasks.join_next().await {
-                result??;
-            }
+                for entry in iterator {
+                    endpoint.write(entry).await?;
+                }
+
+                drop(endpoint);
+
+                Ok(())
+            });
+        }
+
+        self.queue.clear();
+
+        while let Some(result) = tasks.join_next().await {
+            result??;
         }
 
         Ok(())
@@ -240,7 +249,7 @@ impl Logger {
 
         self.flush().await?;
 
-        for endpoint in self.endpoints {
+        for endpoint in self.endpoints.into_values() {
             endpoint.write().await.close().await?;
         }
 

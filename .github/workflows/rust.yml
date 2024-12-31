@@ -1,41 +1,88 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Copyright © 2024 Jaxydog
+# Copyright © 2024 RemasteredArch
+#
+# This file is part of 1N4.
+#
+# 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+# License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# 1N4 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
+# <https://www.gnu.org/licenses/>.
+
 name: Rust
 
 on:
-  push:
-    branches: []
-  pull_request:
-    branches: []
+    push:
+        paths:
+            - '**.rs'
+            - '**.toml'
+            - '**.lock'
+    pull_request:
+        paths:
+            - '**.rs'
+            - '**.toml'
+            - '**.lock'
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    build:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/cache@v4
+              with:
+                path: |
+                    ~/.cargo/bin/
+                    ~/.cargo/registry/index/
+                    ~/.cargo/registry/cache/
+                    ~/.cargo/git/db/
+                    target/
+                key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            - name: Setup - Install Rustup
+              run: |
+                has() {
+                  [ "$(type "$1" 2> /dev/null)" ]
+                }
 
-    - name: Setup - Install Nightly
-      run: rustup toolchain install nightly
-    - name: Setup - Install Clippy
-      run: rustup component add clippy --toolchain nightly
-    - name: Setup - install RustFmt
-      run: rustup component add rustfmt --toolchain nightly
+                download() {
+                    if has curl; then
+                        curl --proto '=https' --tlsv1.2 --silent --show-error --fail "$1"
+                    elif has wget; then
+                        wget -O - "$1"
+                    else
+                        echo 'Wget and cURL are both unavailable!' >&2
+                        exit 1
+                    fi
+                }
 
-    - name: Action - Run build
-      run: cargo build --verbose
-    - name: Action - Run tests
-      run: cargo test --verbose
-    - name: Action - Run Clippy
-      run: cargo clippy --verbose
-    - name: Action - Run RustFmt
-      run: cargo fmt --all -- --check
+                if has rustup; then
+                    exit 0;
+                fi
+
+                download 'https://sh.rustup.rs' | sh -s -- --verbose -y --default-toolchain none
+
+                cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+                echo "${cargo_home%/}/bin" >> "$GITHUB_PATH"
+            - name: Setup - Install Nightly
+              run: rustup toolchain install nightly
+            - name: Setup - Install Clippy
+              run: rustup component add clippy --toolchain nightly
+            - name: Setup - install RustFmt
+              run: rustup component add rustfmt --toolchain nightly
+
+            - name: Action - Run build
+              run: cargo build --verbose
+            - name: Action - Run tests
+              run: cargo test --all --verbose
+            - name: Action - Run Clippy
+              run: cargo clippy --verbose
+            - name: Action - Run RustFmt
+              run: cargo fmt --all -- --check

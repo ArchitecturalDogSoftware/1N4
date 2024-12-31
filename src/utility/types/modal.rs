@@ -15,8 +15,9 @@
 // <https://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
-use twilight_model::channel::message::component::{ActionRow, TextInput};
 use twilight_model::channel::message::Component;
+use twilight_model::channel::message::component::{ActionRow, TextInput};
+use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
 
 /// The maximum amount of permitted inputs within a single modal.
 pub const MAX_INPUTS: usize = 5;
@@ -66,7 +67,7 @@ impl ModalData {
     ) -> Result<Self, Error> {
         let custom_id: Box<str> = custom_id.as_ref().into();
 
-        if custom_id.chars().count() > super::id::MAX_LENGTH {
+        if custom_id.chars().count() > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::InvalidCustomId(custom_id));
         }
 
@@ -98,7 +99,7 @@ impl ModalDataBuilder {
     pub fn new(custom_id: impl AsRef<str>, title: impl AsRef<str>) -> Result<Self, Error> {
         let custom_id = custom_id.as_ref().to_string();
 
-        if custom_id.chars().count() > super::id::MAX_LENGTH {
+        if custom_id.chars().count() > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::InvalidCustomId(custom_id.into_boxed_str()));
         }
 

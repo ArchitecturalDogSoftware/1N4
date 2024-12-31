@@ -18,14 +18,15 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::LazyLock;
 
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use ina_logging::info;
 use tokio::sync::RwLock;
 use twilight_model::application::command::Command;
-use twilight_model::id::marker::GuildMarker;
 use twilight_model::id::Id;
+use twilight_model::id::marker::GuildMarker;
 
 use super::{AutocompleteCallable, CommandCallable, CommandFactory, ComponentCallable, ModalCallable};
+use crate::utility::types::custom_id::CustomId;
 
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
@@ -86,7 +87,7 @@ impl CommandRegistry {
     /// # Errors
     ///
     /// This function will return an error if a command fails to build.
-    pub async fn collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
+    pub async fn build_and_collect<T>(&self, guild_id: Option<Id<GuildMarker>>) -> Result<T>
     where
         T: FromIterator<Command>,
     {
@@ -123,6 +124,17 @@ pub struct CommandEntry {
     pub callbacks: CommandEntryCallbacks,
 }
 
+impl CommandEntry {
+    /// Creates a new [`CustomId`] using this command entry's name as the base name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the identifier could not be created.
+    pub fn id(&self, kind: &str) -> Result<CustomId, crate::utility::types::custom_id::Error> {
+        CustomId::new(self.name, kind)
+    }
+}
+
 /// The callback functions of a [`CommandEntry`].
 #[non_exhaustive]
 #[derive(Default)]
@@ -142,9 +154,27 @@ pub async fn registry() -> impl Deref<Target = CommandRegistry> {
     REGISTRY.read().await
 }
 
+/// Returns a reference to the command registry.
+///
+/// # Panics
+///
+/// Panics if used from within an asynchronous context.
+pub fn blocking_registry() -> impl Deref<Target = CommandRegistry> {
+    REGISTRY.blocking_read()
+}
+
 /// Returns a mutable reference to the command registry.
 pub async fn registry_mut() -> impl DerefMut<Target = CommandRegistry> {
     REGISTRY.write().await
+}
+
+/// Returns a mutable reference to the command registry.
+///
+/// # Panics
+///
+/// Panics if used from within an asynchronous context.
+pub fn blocking_registry_mut() -> impl DerefMut<Target = CommandRegistry> {
+    REGISTRY.blocking_write()
 }
 
 /// Initializes the command registry.
@@ -155,15 +185,52 @@ pub async fn registry_mut() -> impl DerefMut<Target = CommandRegistry> {
 pub async fn initialize() -> Result<()> {
     let mut registry = self::registry_mut().await;
 
-    registry.register(super::definition::echo::entry())?;
-    registry.register(super::definition::help::entry())?;
-    registry.register(super::definition::localizer::entry())?;
-    registry.register(super::definition::ping::entry())?;
-    registry.register(super::definition::role::entry())?;
+    super::definition::register(&mut registry)?;
 
     drop(registry);
 
     info!(async "initialized command registry").await.map_err(Into::into)
+}
+
+/// Creates a module that contains command definitions.
+///
+/// # Examples
+///
+/// ```
+/// define_command_modules! {
+///     /// Defines commands.
+///     pub mod definition {
+///         /// The help command.
+///         pub mod help;
+///         /// The ping command.
+///         pub mod ping;
+///     }
+/// }
+/// ```
+#[macro_export]
+macro_rules! define_command_modules {
+    (
+        $(#[$base_attribute:meta])*
+        $base_visibility:vis mod $base_module:ident {$(
+            $(#[$command_attribute:meta])*
+            $command_visibility:vis mod $command_module:ident;
+        )*}
+    ) => {
+        $(#[$base_attribute])* $base_visibility mod $base_module {
+            $($(#[$command_attribute])* $command_visibility mod $command_module;)*
+
+            /// Registers all commands within this module.
+            ///
+            /// # Errors
+            ///
+            /// This function will return an error if command registration fails.
+            pub(in $crate::command) fn register(registry: &mut $crate::command::registry::CommandRegistry) -> ::anyhow::Result<()> {
+                $(registry.register(self::$command_module::entry())?;)*
+
+                Ok(())
+            }
+        }
+    };
 }
 
 /// Creates a command.
@@ -173,7 +240,7 @@ pub async fn initialize() -> Result<()> {
 /// ```
 /// define_entry!("scream", CommandType::ChatInput, struct {
 ///     dev_only: false,
-///     allow_dms: true,
+///     contexts: [InteractionContextType::BotDm],
 ///     is_nsfw: false,
 ///     permissions: Permissions::USE_SLASH_COMMANDS,
 /// }, struct {
@@ -197,7 +264,7 @@ macro_rules! define_entry {
     (
         $name:literal, $type:expr, struct {
             $(dev_only: $dev_only:literal,)?
-            $(allow_dms: $allow_dms:literal,)?
+            $(contexts: $contexts:expr,)?
             $(is_nsfw: $is_nsfw:literal,)?
             $(permissions: $permissions:expr,)?
         },struct {
@@ -228,7 +295,7 @@ macro_rules! define_entry {
                 let localized_name = ::ina_localizing::localize!(async $crate::utility::category::COMMAND, &(*localizer_description_key)).await?;
                 let mut builder = ::twilight_util::builder::command::CommandBuilder::new(entry.name, localized_name, $type);
 
-                $(builder = builder.dm_permission($allow_dms);)?
+                $(builder = builder.contexts($contexts);)?
                 $(builder = builder.nsfw($is_nsfw);)?
                 $(builder = builder.default_member_permissions($permissions);)?
 
@@ -278,7 +345,7 @@ macro_rules! define_entry {
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
-                    custom_id: $crate::utility::types::id::CustomId,
+                    custom_id: $crate::utility::types::custom_id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
                     $component_callback(entry, context, custom_id).await
@@ -293,7 +360,7 @@ macro_rules! define_entry {
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
-                    custom_id: $crate::utility::types::id::CustomId,
+                    custom_id: $crate::utility::types::custom_id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
                     $modal_callback(entry, context, custom_id).await

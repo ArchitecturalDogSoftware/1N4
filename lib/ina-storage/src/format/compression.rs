@@ -19,8 +19,8 @@ use std::fmt::Debug;
 use std::io::Read;
 use std::sync::Arc;
 
-use flate2::read::{GzDecoder, GzEncoder};
 use flate2::Compression;
+use flate2::read::{GzDecoder, GzEncoder};
 use serde::{Deserialize, Serialize};
 
 use super::{DataDecode, DataEncode, DataFormat};

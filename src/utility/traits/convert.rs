@@ -15,14 +15,10 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::convert::Infallible;
-use std::future::Future;
-use std::ops::Deref;
 use std::str::FromStr;
 
 use anyhow::{bail, ensure};
 use ina_localizing::locale::Locale;
-use ina_localizing::localize;
-use ina_localizing::text::Text;
 use twilight_cache_inmemory::model::{CachedEmoji, CachedGuild, CachedMember, CachedMessage, CachedSticker};
 use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::embed::EmbedAuthor;
@@ -32,11 +28,11 @@ use twilight_model::channel::{Attachment, Channel, Message};
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Emoji, Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
+use twilight_model::id::Id;
 use twilight_model::id::marker::{
     AttachmentMarker, ChannelMarker, EmojiMarker, GuildMarker, InteractionMarker, MessageMarker, StickerMarker,
     UserMarker,
 };
-use twilight_model::id::Id;
 use twilight_model::user::{CurrentUser, CurrentUserGuild, User};
 use twilight_util::builder::embed::{EmbedAuthorBuilder, ImageSource};
 
@@ -266,7 +262,9 @@ impl AsEmoji for str {
 
         let Some(id) = sections.next() else { bail!("missing emoji identifier") };
 
-        ensure!(sections.next().is_none(), "expected closing angle bracket");
+        let remaining = sections.collect::<Box<[_]>>();
+
+        ensure!(remaining.is_empty(), "unexpected section(s) in emoji string: {remaining:?}");
 
         Ok(EmojiReactionType::Custom { animated, id: id.parse()?, name: Some(name.to_string()) })
     }
@@ -397,11 +395,11 @@ impl AsImageSource for EmojiReactionType {
 
                 format!("{DISCORD_CDN_URL}/emojis/{id}.{extension}")
             }
-            Self::Unicode { ref name } => {
+            Self::Unicode { name } => {
                 // Each file is encoded as hex numbers separated by hyphens. Some examples:
                 // - `.../1f3f3-fe0f-200d-26a7-fe0f.png` for the transgender flag.
-                // - `.../1f577-fe0f-fe0f` for the spider emoji.
-                // - `.../1f578-fe0f-fe0f-fe0f` for the cobweb emoji.
+                // - `.../1f577-fe0f-fe0f.png` for the spider emoji.
+                // - `.../1f578-fe0f-fe0f-fe0f.png` for the cobweb emoji.
                 // See also: spiders 🕷️🕸️.
                 let id = name.chars().map(|c| format!("{:x}", c as u32));
 
@@ -606,7 +604,7 @@ impl AsLocale for PartialMember {
     type Error = ina_localizing::Error;
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
-        self.user.as_ref().ok_or(ina_localizing::Error::MissingLocale)?.as_locale().map_err(Into::into)
+        self.user.as_ref().ok_or(ina_localizing::Error::MissingLocale)?.as_locale()
     }
 }
 
@@ -623,55 +621,5 @@ impl AsLocale for User {
 
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         self.locale.as_deref().ok_or(ina_localizing::Error::MissingLocale)?.parse().map_err(Into::into)
-    }
-}
-
-/// Converts the implementing type into an owned translation.
-pub trait AsTranslation<I = ina_localizing::text::TextInner>
-where
-    I: Deref<Target = str> + for<'s> From<&'s str>,
-{
-    /// The error that may be returned when converting.
-    type Error: From<ina_localizing::Error>;
-
-    /// Returns this value's localizer category.
-    fn localizer_category(&self) -> impl Into<Box<str>>;
-
-    /// Returns this value's localizer key.
-    fn localizer_key(&self) -> impl Into<Box<str>>;
-
-    /// Fallibly localizes this value.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value could not be localized.
-    fn as_translation(&self, locale: Option<Locale>) -> impl Future<Output = Result<Text<I>, Self::Error>> + Send
-    where
-        Self: Sync,
-    {
-        async move {
-            let category = self.localizer_category().into();
-            let key = self.localizer_key().into();
-
-            Ok(localize!(async(try in locale) category, key).await?.cast_inner())
-        }
-    }
-
-    /// Fallibly localizes this value.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called from within an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value could not be localized.
-    fn blocking_as_translation(&self, locale: Option<Locale>) -> Result<Text<I>, Self::Error> {
-        let category = self.localizer_category().into();
-        let key = self.localizer_key().into();
-
-        Ok(localize!((try in locale) category, key)?.cast_inner())
     }
 }

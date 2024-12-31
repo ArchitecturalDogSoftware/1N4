@@ -14,25 +14,19 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::future::Future;
-use std::thread::JoinHandle;
+use std::num::NonZeroUsize;
 
-use tokio::runtime::Builder;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{HandleHolder, ProducingThread, Result, Thread};
+use crate::{Handle, ReceiverHandle, Result, Thread};
 
-/// A thread that consumes values.
+/// A thread that accepts values through a receiver channel.
 #[derive(Debug)]
-pub struct Producer<R, T>
-where
-    R: Send + 'static,
-    T: Send + 'static,
-{
-    /// The receiving channel.
-    receiver: Receiver<R>,
+pub struct Producer<R, T> {
     /// The inner thread.
     thread: Thread<T>,
+    /// The inner receiver channel.
+    receiver: Receiver<R>,
 }
 
 impl<R, T> Producer<R, T>
@@ -40,64 +34,100 @@ where
     R: Send + 'static,
     T: Send + 'static,
 {
-    /// Spawns a new thread with the given name and task.
+    /// Spawns a new [`Producer<R, T>`] with the given name and task.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::{Handle, ReceiverHandle};
+    /// # use ina_threading::threads::producer::Producer;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Producer::spawn("worker", capacity, |s| {
+    ///     std::thread::sleep(std::time::Duration::from_secs(1));
+    ///
+    ///     s.blocking_send(123).expect("the channel should not be closed");
+    /// })?;
+    ///
+    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(123));
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, call: F, size: usize) -> Result<Self>
+    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce(Sender<R>) -> T + Send + 'static,
     {
-        let (sender, receiver) = tokio::sync::mpsc::channel(size);
-        let thread = Thread::spawn(name, || call(sender))?;
+        let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
 
-        Ok(Self { receiver, thread })
+        Ok(Self { thread: Thread::spawn(name, || f(sender))?, receiver })
     }
 
-    /// Spawns a new thread with the given name and asynchronous task.
+    /// Spawns a new [`Producer<R, T>`] with the given name and asynchronous task.
+    ///
+    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZeroUsize;
+    /// # use ina_threading::{Handle, ReceiverHandle};
+    /// # use ina_threading::threads::producer::Producer;
+    /// # fn main() -> ina_threading::Result<()> {
+    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let mut thread = Producer::spawn_with_runtime("worker", capacity, |s| async move {
+    ///     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    ///
+    ///     s.send(123).await.expect("the channel should not be closed");
+    /// })?;
+    ///
+    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(123));
+    /// assert!(thread.into_join_handle().join().is_ok());
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    #[expect(clippy::missing_panics_doc, reason = "false-positive; the thread will just exit immediately, not panic")]
-    pub fn spawn_with_runtime<N, F, O>(name: N, call: F, size: usize) -> Result<Self>
+    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce(Sender<R>) -> O + Send + 'static,
-        O: Future<Output = T> + Send,
+        O: Future<Output = T>,
     {
-        let call = |receiver: Sender<R>| {
-            #[expect(clippy::expect_used, reason = "if the runtime fails to spawn, we can't execute any code")]
-            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
+        let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
 
-            runtime.block_on(async move { call(receiver).await })
-        };
-
-        Self::spawn(name, call, size)
+        Ok(Self { thread: Thread::spawn_with_runtime(name, || f(sender))?, receiver })
     }
 }
 
-impl<R, T> HandleHolder<T> for Producer<R, T>
+impl<R, T> Handle for Producer<R, T>
 where
-    R: Send + 'static,
     T: Send + 'static,
 {
-    fn as_handle(&self) -> &JoinHandle<T> {
-        self.thread.as_handle()
+    type Output = T;
+
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
+        self.thread.as_join_handle()
     }
 
-    fn as_handle_mut(&mut self) -> &mut JoinHandle<T> {
-        self.thread.as_handle_mut()
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
+        self.thread.as_join_handle_mut()
     }
 
-    fn into_handle(self) -> JoinHandle<T> {
-        self.thread.into_handle()
+    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output> {
+        self.thread.into_join_handle()
     }
 }
 
-impl<R, T> ProducingThread<R> for Producer<R, T>
+impl<R, T> ReceiverHandle<R> for Producer<R, T>
 where
     R: Send + 'static,
     T: Send + 'static,

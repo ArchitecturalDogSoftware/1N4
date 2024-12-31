@@ -36,7 +36,7 @@ Applicable file types include (but are not limited to)
 Rust source files (`.rs`) and script files (`.sh`, `.bat`).
 
 There is a copyright header template available to you
-within the [`LICENSE_TEMPLATE`](./LICENSE_TEMPLATE.md) file in the [`docs/`](.) directory.
+within the [`LICENSE_TEMPLATE`](./LICENSE_TEMPLATE.md) file in the [`docs/`](./) directory.
 
 ## Programming Conventions
 
@@ -46,11 +46,17 @@ This exists to ensure that added code is high quality, consistent, performant, a
 If you feel that these rules are incomplete or should be modified, feel free to make a pull request,
 and if there is any confusion, feel free to ask me directly or view pre-existing files within the repository.
 
+Many of these conventions are enforced by linters and formatters,
+all of which are present in GitHub Actions workflows.
+Accordingly, all the lints and tests can be run without installation and configuration
+using [`act`](https://nektosact.com/).
+
 ### Data
 
 - All configuration data files should be in the TOML format (`.toml`).
-- Always indent using four spaces, not tabs.
-- Lines should never exceed 120 characters.
+- TOML files are by linted and formatted by [Taplo](https://taplo.tamasfe.dev/).
+  - Always indent using four spaces, not tabs.
+  - Lines should never exceed 120 characters.
 - Arrays and objects may be single-line if they do not exceed the character limit.
 - Single-line objects and arrays should contain spaces as padding.
 - Stored command data should be in the most sensible format.
@@ -117,4 +123,27 @@ such as checklists, tables, and strikethrough text,
 are not available.
 These choices were made for the sake of
 wide compatibility, maintainability, and plain-text readability.
-See [this issue](https://github.com/Jaxydog/1N4/issues/3) for a look at the decision making process.
+See [this issue](https://github.com/ArchitecturalDogSoftware/1N4/issues/3) for a look at the decision making process.
+
+### Scripts
+
+- Standalone scripts are written in Bash and located in the [`scripts/`](../scripts/) directory.
+  - These are written for use on Ubuntu 24.04 and similarly equipped systems because that is what we use.
+    If you would like more portable shell scripts,
+    please file an issue and we can port them to the same standards as GitHub Actions workflows.
+- Shell scripting inside of GitHub Actions workflows should prefer [POSIX `sh`](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html),
+  but this is not a strict requirement.
+  At a minimum, code should work on [BusyBox](https://www.busybox.net/)
+  so that workflows can run in [Alpine Linux](https://www.alpinelinux.org/) containers.
+  - Notably, the `local` keyword and [process substitution](https://en.wikipedia.org/wiki/Process_substitution)
+    are used despite not being in POSIX `sh`;
+    because they are present in BusyBox `sh`
+    and are easy to remove if true POSIX compliance is necessary.
+- Shell scripts are linted by [ShellCheck](https://github.com/koalaman/shellcheck)
+  and formatted by [shfmt](https://github.com/mvdan/sh).
+- YAML files are formatted by [yamlfmt](https://github.com/google/yamlfmt).
+- GitHub Actions workflows are linted by [actionlint](https://github.com/rhysd/actionlint),
+  which also includes ShellCheck.
+- Scripts should also limit themselves to lines 120 characters long.
+  This is not enforced by formatters due to technical limitations,
+  but should be followed by the programmer.

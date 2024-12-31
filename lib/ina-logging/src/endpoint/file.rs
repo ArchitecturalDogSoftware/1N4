@@ -16,16 +16,16 @@
 
 use std::sync::Arc;
 
+use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
-use time::OffsetDateTime;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 use super::Endpoint;
+use crate::Result;
 use crate::entry::Entry;
 use crate::settings::Settings;
-use crate::Result;
 
 /// The time formatter used to create log file names.
 const FILE_NAME_FORMAT: &[FormatItem<'static>] = format_description!(

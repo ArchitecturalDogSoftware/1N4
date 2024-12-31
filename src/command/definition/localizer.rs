@@ -23,19 +23,20 @@ use ina_logging::{info, warn};
 use twilight_model::application::command::{
     CommandOptionChoice, CommandOptionChoiceValue, CommandOptionType, CommandType,
 };
+use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
-use twilight_util::builder::embed::EmbedBuilder;
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
-use crate::utility::search::{fuzzy_contains, Strictness};
+use crate::utility::category;
+use crate::utility::search::{Strictness, fuzzy_contains};
 use crate::utility::traits::convert::AsLocale;
-use crate::utility::{category, color};
 
 crate::define_entry!("localizer", CommandType::ChatInput, struct {
     dev_only: true,
+    contexts: [InteractionContextType::Guild],
 }, struct {
     command: on_command,
     autocomplete: on_autocomplete,
@@ -97,9 +98,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
     let list = list.iter().map(|l| format!("`{l}`"));
     let locales = format!("{locales}:\n> {}", list.collect::<Box<[_]>>().join(", "));
 
-    let embed = EmbedBuilder::new().title(title).color(color::SUCCESS).description(locales);
-
-    context.embed(embed.build(), Visibility::Ephemeral).await?;
+    context.success(title, Some(locales)).await?;
 
     crate::client::event::pass()
 }
@@ -139,7 +138,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
         localize!(async(try in locale) category, key).await?
     };
 
-    context.text(translated, Visibility::Ephemeral).await?;
+    context.text(format!("`{category}::{key}`\n\n{translated}"), Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
@@ -151,7 +150,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
 /// This function will return an error if the auto-completion could not be executed.
 async fn on_autocomplete<'ap: 'ev, 'ev>(
     _: &CommandEntry,
-    _: Context<'ap, 'ev, &'ev CommandData>,
+    context: Context<'ap, 'ev, &'ev CommandData>,
     option: &'ev str,
     current: &'ev str,
     _: CommandOptionType,
@@ -159,7 +158,15 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
     match option {
         "locale" => self::on_locale_autocomplete(current).await,
         "category" => Ok(self::on_category_autocomplete(current)),
-        "key" => Ok(self::on_key_autocomplete(current)),
+        "key" => {
+            let resolver = CommandOptionResolver::new(context.data);
+            let resolver = resolver.subcommand("localize")?;
+
+            let locale = resolver.string("locale").ok().and_then(|v| v.parse().ok());
+            let category = resolver.string("category").ok().map(Box::from);
+
+            self::on_key_autocomplete(locale, category, current).await
+        }
         option => {
             warn!(async "unknown option '{option}'").await?;
 
@@ -176,7 +183,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
 async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoice]>> {
     let mut locales = ina_localizing::thread::list().await?.to_vec();
 
-    locales.retain(|l| fuzzy_contains(Strictness::Firm(true), l.to_string(), current));
+    locales.retain(|l| fuzzy_contains(Strictness::Firm { ignore_casing: true }, l.to_string(), current));
 
     let choices = locales.iter().map(|locale| CommandOptionChoice {
         name: locale.to_string(),
@@ -196,12 +203,12 @@ fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
     let mut categories: HashSet<String> = category::LIST.iter().copied().map(Into::into).collect();
 
     if !current.is_empty() {
-        categories.retain(|c| fuzzy_contains(Strictness::Firm(true), c, current));
+        categories.retain(|c| fuzzy_contains(Strictness::Firm { ignore_casing: true }, c, current));
 
-        let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
-        let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
+        if categories.is_empty() {
+            let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
+            let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
 
-        if !replaced.is_empty() {
             categories.insert(replaced.to_string());
         }
     }
@@ -220,18 +227,33 @@ fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
 /// # Errors
 ///
 /// This function will return an error if the auto-completion could not be executed.
-fn on_key_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
-    if current.is_empty() {
-        return Box::new([]);
+async fn on_key_autocomplete(
+    locale: Option<Locale>,
+    category: Option<Box<str>>,
+    current: &str,
+) -> Result<Box<[CommandOptionChoice]>> {
+    let mut keys = if let Some(category) = category {
+        ina_localizing::thread::keys(locale, category).await?.into_vec()
+    } else {
+        vec![]
+    };
+
+    if !current.is_empty() {
+        keys.retain(|c| fuzzy_contains(Strictness::Firm { ignore_casing: true }, c, current));
+
+        if keys.is_empty() {
+            let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
+            let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
+
+            keys.push(replaced.to_string().into());
+        }
     }
 
-    let replaced = current.replace(|c: char| !c.is_alphanumeric(), "-");
-    let replaced = replaced.trim_matches(|c: char| !c.is_alphanumeric());
-    let output = (!replaced.is_empty()).then(|| CommandOptionChoice {
-        name: replaced.to_string(),
+    let choices = keys.into_iter().map(|key| CommandOptionChoice {
+        name: key.to_string(),
         name_localizations: None,
-        value: CommandOptionChoiceValue::String(replaced.to_string()),
+        value: CommandOptionChoiceValue::String(key.to_string()),
     });
 
-    output.into_iter().collect()
+    Ok(choices.collect())
 }

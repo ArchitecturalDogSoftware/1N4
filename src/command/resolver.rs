@@ -21,8 +21,8 @@ use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
 use twilight_model::application::interaction::modal::{ModalInteractionData, ModalInteractionDataActionRow};
-use twilight_model::id::marker::{AttachmentMarker, ChannelMarker, GenericMarker, RoleMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{AttachmentMarker, ChannelMarker, GenericMarker, RoleMarker, UserMarker};
 
 /// An error that may be returned when interacting with resolvers.
 #[non_exhaustive]
@@ -83,7 +83,7 @@ impl<'ev> CommandOptionResolver<'ev> {
         let name = name.as_ref();
 
         match self.any(name)? {
-            CommandOptionValue::SubCommand(ref options) => Ok(Self::with_options(self.data, options)),
+            CommandOptionValue::SubCommand(options) => Ok(Self::with_options(self.data, options)),
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommand, other.kind())),
         }
     }
@@ -99,7 +99,7 @@ impl<'ev> CommandOptionResolver<'ev> {
         let name = name.as_ref();
 
         match self.any(name)? {
-            CommandOptionValue::SubCommandGroup(ref options) => Ok(Self::with_options(self.data, options)),
+            CommandOptionValue::SubCommandGroup(options) => Ok(Self::with_options(self.data, options)),
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommandGroup, other.kind())),
         }
     }
@@ -113,7 +113,7 @@ macro_rules! command_option_resolver_getters {
                 let name = name.as_ref();
 
                 match self.any(name)? {
-                    CommandOptionValue::$type(ref value) => Ok(value),
+                    CommandOptionValue::$type(value) => Ok(value),
                     other => Err(Error::InvalidOption(name.into(), CommandOptionType::$type, other.kind())),
                 }
             }
@@ -230,7 +230,11 @@ impl<'ev> ModalFieldResolver<'ev> {
     pub fn get(&self, name: impl AsRef<str>) -> Result<Option<&str>, Error> {
         let name = name.as_ref();
 
-        self.fields.get(name).copied().ok_or_else(|| Error::MissingField(name.into()))
+        self.fields
+            .get(name)
+            .copied()
+            .map(|v| v.filter(|v| !v.is_empty()))
+            .ok_or_else(|| Error::MissingField(name.into()))
     }
 }
 

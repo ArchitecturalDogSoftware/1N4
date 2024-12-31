@@ -14,15 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::convert::identity;
 use std::fmt::Display;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use twilight_http::request::channel::message::UpdateMessage;
 use twilight_model::channel::Message;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker, MessageMarker};
 
 use crate::client::api::ApiRef;
 
@@ -36,9 +35,6 @@ pub struct Anchor {
     pub channel_id: Id<ChannelMarker>,
     /// The message identifier.
     pub message_id: Id<MessageMarker>,
-    /// Tracks whether the message is known to exist.
-    #[serde(skip, default)]
-    message_exists: Option<bool>,
 }
 
 impl Anchor {
@@ -49,13 +45,13 @@ impl Anchor {
         channel_id: Id<ChannelMarker>,
         message_id: Id<MessageMarker>,
     ) -> Self {
-        Self { guild_id: Some(guild_id), channel_id, message_id, message_exists: None }
+        Self { guild_id: Some(guild_id), channel_id, message_id }
     }
 
     /// Creates a new private channel [`Anchor`].
     #[must_use]
     pub const fn new_private(channel_id: Id<ChannelMarker>, message_id: Id<MessageMarker>) -> Self {
-        Self { guild_id: None, channel_id, message_id, message_exists: None }
+        Self { guild_id: None, channel_id, message_id }
     }
 
     /// Returns a display implementation for this [`Anchor`]'s link.
@@ -70,11 +66,8 @@ impl Anchor {
     /// This function will return an error if the message could not be fetched.
     pub async fn message(&mut self, api: ApiRef<'_>) -> Result<Message> {
         let Self { channel_id, message_id, .. } = self;
-        let message = api.client.message(*channel_id, *message_id).await?.model().await?;
 
-        self.message_exists = Some(true);
-
-        Ok(message)
+        Ok(api.client.message(*channel_id, *message_id).await?.model().await?)
     }
 
     /// Returns a message update future builder for the associated message.
@@ -93,7 +86,6 @@ impl Anchor {
         let Self { channel_id, message_id, .. } = self;
 
         api.client.delete_message(*channel_id, *message_id).await?;
-        self.message_exists = Some(false);
 
         Ok(())
     }
@@ -104,11 +96,9 @@ impl Anchor {
     ///
     /// This function will return an error if the message could not be deleted.
     pub async fn delete_if_present(&mut self, api: ApiRef<'_>) -> Result<()> {
-        if self.message_exists.is_some_and(identity) || self.message(api).await.is_ok() {
+        if self.message(api).await.is_ok() {
             self.delete(api).await?;
         }
-
-        self.message_exists = Some(false);
 
         Ok(())
     }
@@ -124,7 +114,7 @@ impl From<&Message> for Anchor {
     fn from(value: &Message) -> Self {
         let &Message { channel_id, guild_id, id, .. } = value;
 
-        Self { guild_id, channel_id, message_id: id, message_exists: None }
+        Self { guild_id, channel_id, message_id: id }
     }
 }
 
@@ -134,7 +124,7 @@ impl From<&Message> for Anchor {
 #[derive(Clone, Copy, Debug)]
 pub struct AnchorLinkDisplay<'ak>(&'ak Anchor);
 
-impl<'ak> Display for AnchorLinkDisplay<'ak> {
+impl Display for AnchorLinkDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         const BASE_URL: &str = "https://discord.com/channels";
 

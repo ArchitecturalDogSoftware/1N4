@@ -14,16 +14,22 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::backtrace::BacktraceStatus;
+
 use anyhow::bail;
+use directories::BaseDirs;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
+use time::{Duration, OffsetDateTime};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, Ready};
+use twilight_model::http::attachment::Attachment;
 use twilight_model::http::interaction::InteractionResponseType;
 use twilight_util::builder::embed::EmbedBuilder;
+use twilight_validate::embed::DESCRIPTION_LENGTH;
 
 use super::api::{Api, ApiRef};
 use crate::command::context::Context;
@@ -31,7 +37,7 @@ use crate::command::registry::registry;
 use crate::command::resolver::find_focused_option;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::traits::extension::InteractionExt;
-use crate::utility::types::id::CustomId;
+use crate::utility::types::custom_id::CustomId;
 use crate::utility::{category, color};
 
 /// A result returned by an event handler.
@@ -135,17 +141,23 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
 
     crate::command::registry::initialize().await?;
 
+    if api.settings.skip_command_patch {
+        info!(async "skipping command patching").await?;
+
+        return self::pass();
+    }
+
     let client = api.client.interaction(event.application.id);
 
     if let Ok(guild_id) = crate::utility::secret::development_guild_id() {
-        let list = registry().await.collect::<Box<[_]>>(Some(guild_id)).await?;
+        let list = registry().await.build_and_collect::<Box<[_]>>(Some(guild_id)).await?;
         let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
 
         info!(async "patched {} server commands", list.len()).await?;
     }
 
     if cfg!(not(debug_assertions)) {
-        let list = registry().await.collect::<Box<[_]>>(None).await?;
+        let list = registry().await.build_and_collect::<Box<[_]>>(None).await?;
         let list = client.set_global_commands(&list).await?.model().await?;
 
         info!(async "patched {} global commands", list.len()).await?;
@@ -160,7 +172,11 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
 ///
 /// This function will return an error if the event could not be handled.
 pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> EventResult {
+    const TIME_WARN_THRESHOLD: Duration = Duration::seconds(1);
+
     info!(async "shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
+
+    let start_time = OffsetDateTime::now_utc();
 
     let result: EventResult = match event.kind {
         InteractionType::ApplicationCommand => self::on_command(api.as_ref(), &event).await,
@@ -169,6 +185,14 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
         InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api.as_ref(), &event).await,
         _ => self::pass(),
     };
+
+    let elapsed_time = OffsetDateTime::now_utc() - start_time;
+
+    if elapsed_time >= TIME_WARN_THRESHOLD {
+        warn!(async "shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
+    } else {
+        debug!(async "shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
+    }
 
     // Capture errors here to prevent duplicate logging.
     if let Err(ref error) = result {
@@ -192,7 +216,7 @@ pub async fn on_command(api: ApiRef<'_>, event: &Interaction) -> EventResult {
         bail!("missing command data");
     };
 
-    let registry = &registry().await;
+    let registry = registry().await;
 
     let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
@@ -215,13 +239,13 @@ pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
-    let registry = &registry().await;
+    let registry = registry().await;
 
-    let Some(command) = registry.command(data_id.name()) else {
-        bail!("missing command entry for '{}'", data_id.name());
+    let Some(command) = registry.command(data_id.command()) else {
+        bail!("missing command entry for '{}'", data_id.command());
     };
     let Some(ref callable) = command.callbacks.component else {
-        bail!("missing component callback for '{}'", data_id.name());
+        bail!("missing component callback for '{}'", data_id.command());
     };
 
     callable.on_component(command, Context::new(api, event, data), data_id).await
@@ -238,13 +262,13 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
-    let registry = &registry().await;
+    let registry = registry().await;
 
-    let Some(command) = registry.command(data_id.name()) else {
-        bail!("missing command entry for '{}'", data_id.name());
+    let Some(command) = registry.command(data_id.command()) else {
+        bail!("missing command entry for '{}'", data_id.command());
     };
     let Some(ref callback) = command.callbacks.modal else {
-        bail!("missing component callback for '{}'", data_id.name());
+        bail!("missing component callback for '{}'", data_id.command());
     };
 
     callback.on_modal(command, Context::new(api, event, data), data_id).await
@@ -260,7 +284,7 @@ pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResul
         bail!("missing command data");
     };
 
-    let registry = &registry().await;
+    let registry = registry().await;
 
     let Some(command) = registry.command(&data.name) else {
         bail!("missing command entry for '{}'", data.name);
@@ -310,6 +334,12 @@ pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Erro
 ///
 /// This function will return an error if the channel could not be notified.
 pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
+    const PREFIX: &str = "```json\n";
+    const ELLIPSES: &str = "...";
+    const SUFFIX: &str = "\n```";
+
+    const MAX_DESCRIPTION_LENGTH: usize = DESCRIPTION_LENGTH - PREFIX.len() - SUFFIX.len();
+
     let Ok(channel_id) = crate::utility::secret::development_channel_id() else {
         warn!(async "skipping channel error notification as no channel has been configured").await?;
 
@@ -319,15 +349,45 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
     let titles = localize!(async category::UI, "error-titles").await?.to_string();
     let titles = titles.lines().collect::<Box<[_]>>();
     let index = thread_rng().gen_range(0 .. titles.len());
-    let error = format!("`{}`\n\n```json\n{error}\n```", event.display_label());
 
-    let mut embed = EmbedBuilder::new().color(color::FAILURE).title(titles[index]).description(error);
+    let header = format!("`{}`\n\n", event.display_label());
+    let mut description = error.to_string();
+
+    if description.len() > MAX_DESCRIPTION_LENGTH - header.len() {
+        description.truncate(MAX_DESCRIPTION_LENGTH - header.len() - ELLIPSES.len());
+        description += ELLIPSES;
+    }
+
+    description = format!("{header}{PREFIX}{description}{SUFFIX}");
+
+    let backtrace = (error.backtrace().status() == BacktraceStatus::Captured).then(|| {
+        let errors = error.chain().enumerate().map(|(i, v)| format!("{} {v}", "-".repeat(i + 1))).collect::<Box<[_]>>();
+        let mut lines = error.backtrace().to_string().lines().map(str::to_string).collect::<Box<[_]>>();
+
+        if let Some(home_dir) = BaseDirs::new().map(|v| v.home_dir().to_path_buf()) {
+            let home_dir = home_dir.to_string_lossy();
+
+            lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), "$HOME"));
+        }
+
+        format!("{}\n\n{}", errors.join("\n"), lines.join("\n"))
+    });
+
+    let mut embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(titles[index]).description(description);
 
     if let Some(user) = event.author() {
         embed = embed.author(user.as_embed_author()?);
     }
 
-    api.client.create_message(channel_id).embeds(&[embed.build()]).flags(MessageFlags::SUPPRESS_NOTIFICATIONS).await?;
+    let builder = api.client.create_message(channel_id).flags(MessageFlags::SUPPRESS_NOTIFICATIONS);
+    let message = builder.embeds(&[embed.validate()?.build()]).await?;
+
+    if let Some(backtrace) = backtrace {
+        let attachment = Attachment::from_bytes("backtrace.txt".into(), backtrace.into_bytes(), 1);
+        let message = message.model().await?;
+
+        api.client.create_message(channel_id).reply(message.id).attachments(&[attachment]).await?;
+    }
 
     self::pass()
 }
@@ -339,7 +399,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 /// This function will return an error if the author could not be notified.
 pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(user) = event.author() else {
-        info!(async "skipping user error notification as not author is present").await?;
+        info!(async "skipping user error notification as no author is present").await?;
 
         return self::pass();
     };
@@ -359,7 +419,7 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
     let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
     let description = localize!(async(try in locale) category::UI, "error-inform-description").await?;
     let description = format!("{description}: `{}`", event.display_label());
-    let embed = EmbedBuilder::new().color(color::FAILURE).title(title).description(description);
+    let embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(title).description(description);
 
     // Do our best to ensure that this is handled ephemerally.
     let _ = crate::create_response!(api.client, event, struct {

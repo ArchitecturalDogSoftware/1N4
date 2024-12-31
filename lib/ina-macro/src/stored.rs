@@ -18,7 +18,7 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::{bracketed, parse_macro_input, Attribute, DeriveInput, Error, Expr, Ident, LitStr, Result, Token, Type};
+use syn::{Attribute, DeriveInput, Error, Expr, Ident, LitStr, Result, Token, Type, bracketed, parse_macro_input};
 
 /// The `data_format` attribute.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

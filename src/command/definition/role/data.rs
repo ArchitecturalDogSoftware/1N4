@@ -18,15 +18,15 @@ use anyhow::Result;
 use ina_macro::Stored;
 use ina_storage::format::{Compress, Messagepack};
 use serde::{Deserialize, Serialize};
-use twilight_model::channel::message::component::{Button, ButtonStyle};
 use twilight_model::channel::message::Component;
-use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
+use twilight_model::channel::message::component::{Button, ButtonStyle};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
+use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
 use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
-use crate::utility::types::id::CustomId;
 
 /// A role selector entry.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,10 +47,10 @@ impl Selector {
     /// This function will return an error if the button could not be created.
     pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Button> {
         let style = if kind == super::component::remove::NAME { ButtonStyle::Danger } else { ButtonStyle::Secondary };
-        let custom_id = CustomId::<Box<str>>::new(entry.name, kind)?;
+        let custom_id = entry.id(kind)?.with_str(self.id.to_string())?;
 
         Ok(ButtonBuilder::new(style)
-            .custom_id(custom_id.with(self.id.to_string())?)?
+            .custom_id(custom_id)?
             .disabled(disabled)
             .emoji(self.icon.as_emoji()?)?
             .label(self.name.as_ref())?
@@ -83,12 +83,12 @@ impl SelectorList {
     ///
     /// This function will return an error if a button could not be created.
     pub fn build(&self, entry: &CommandEntry, kind: &'static str, disabled: bool) -> Result<Box<[Component]>> {
-        let action_row_count = self.inner.len().div_ceil(5).min(5);
+        let action_row_count = self.inner.len().div_ceil(COMPONENT_COUNT).min(COMPONENT_COUNT);
         let mut action_rows = Vec::<Component>::with_capacity(action_row_count);
         let mut action_row = ActionRowBuilder::new();
 
         for (index, selector) in self.inner.iter().enumerate() {
-            if index != 0 && index % 5 == 0 {
+            if index != 0 && index % ACTION_ROW_COMPONENT_COUNT == 0 {
                 action_rows.push(action_row.build().into());
 
                 action_row = ActionRowBuilder::new();

@@ -16,13 +16,15 @@
 
 //! Your resident M41D Unit, here to help with your server.
 
+use std::process::ExitCode;
+
 use anyhow::Result;
 use clap::Parser;
 use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
 use ina_logging::{error, info};
 use serde::{Deserialize, Serialize};
 
-use self::client::Instance;
+use crate::client::Instance;
 
 /// The bot's client implementation.
 pub mod client;
@@ -58,7 +60,20 @@ pub struct Arguments {
 /// # Errors
 ///
 /// This function will return an error if the program's execution fails.
-pub fn main() -> Result<()> {
+pub fn main() -> Result<ExitCode> {
+    // Safety:
+    // The requirement here is that this is called in a single-threaded context, or while no other threads are reading
+    // from the environment while this is being set.
+    //
+    // In this case, this is the very first function being called, which means that no other threads are actively
+    // accessing any environment variables.
+    #[cfg(debug_assertions)]
+    #[expect(unsafe_code, reason = "this is safe because this is the very first function being called")]
+    unsafe {
+        // We only want to capture backtraces on debug builds, as this can have a large performance impact.
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
     let arguments = Arguments::parse();
 
     ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
@@ -76,14 +91,17 @@ pub fn main() -> Result<()> {
     }
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+    let code = runtime.block_on(self::async_main(arguments))?;
 
-    runtime.block_on(self::async_main(arguments))?;
+    info!("exited asynchronous runtime")?;
+
+    drop(runtime);
 
     info!("closing logging thread")?;
 
     ina_logging::thread::blocking_close();
 
-    Ok(())
+    Ok(code)
 }
 
 /// The application's main function.
@@ -91,7 +109,7 @@ pub fn main() -> Result<()> {
 /// # Errors
 ///
 /// This function will return an error if the program's execution fails.
-pub async fn async_main(arguments: Arguments) -> Result<()> {
+pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
     info!(async "entered asynchronous runtime").await?;
 
     ina_localizing::thread::start(arguments.lang_settings).await?;
@@ -102,7 +120,7 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
 
     info!(async "loaded {loaded_locales} localization locales").await?;
 
-    ina_storage::initialize(arguments.data_settings).await;
+    ina_storage::thread::start(arguments.data_settings).await?;
 
     info!(async "initialized storage instance").await?;
 
@@ -118,11 +136,12 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
     info!(async "starting client process").await?;
 
     #[expect(clippy::redundant_pub_crate, reason = "seems to be a false-positive relating to macro expansion")]
-    tokio::select! {
-        _ = terminate => info!(async "received termination signal").await,
+    let code = tokio::select! {
+        // Exit code of 130 for ^C is standard; 128 (to mark a signal) + 2 (the code for the ^C interrupt).
+        _ = terminate => info!(async "received termination signal").await.map(|()| ExitCode::from(130)),
         result = process => match result {
-            Ok(()) => info!(async "stopping client process").await,
-            Err(error) => error!(async "unhandled error encountered: {error}").await,
+            Ok(()) => info!(async "stopping client process").await.map(|()| ExitCode::SUCCESS),
+            Err(error) => error!(async "unhandled error encountered: {error}").await.map(|()| ExitCode::FAILURE),
         },
     }?;
 
@@ -130,5 +149,5 @@ pub async fn async_main(arguments: Arguments) -> Result<()> {
 
     info!(async "closed localization thread").await?;
 
-    info!(async "exiting asynchronous runtime").await.map_err(Into::into)
+    Ok(code)
 }

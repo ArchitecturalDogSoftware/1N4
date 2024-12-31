@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::convert::identity;
 use std::fmt::Display;
 use std::num::NonZeroU16;
 
@@ -25,8 +24,8 @@ use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
-use twilight_model::id::marker::{InteractionMarker, UserMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{InteractionMarker, UserMarker};
 use twilight_model::user::{CurrentUser, CurrentUserGuild, User};
 use twilight_model::util::ImageHash;
 
@@ -65,7 +64,7 @@ pub struct InteractionLabelDisplay<'ev> {
     user_id: Option<Id<UserMarker>>,
 }
 
-impl<'ev> Display for InteractionLabelDisplay<'ev> {
+impl Display for InteractionLabelDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(user_id) = self.user_id {
             write!(f, "<{}:{}:{user_id}>", self.kind, self.id)
@@ -162,9 +161,9 @@ pub struct UserNameDisplay<'us> {
     user: &'us str,
 }
 
-impl<'us> Display for UserNameDisplay<'us> {
+impl Display for UserNameDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.nick.map_or(self.name.map_or(self.user, identity), identity))
+        write!(f, "{}", self.nick.or(self.name).unwrap_or(self.user))
     }
 }
 
@@ -178,7 +177,7 @@ pub struct UserTagDisplay<'us> {
     tag: Option<NonZeroU16>,
 }
 
-impl<'us> Display for UserTagDisplay<'us> {
+impl Display for UserTagDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(discriminator) = self.tag {
             write!(f, "{}#{discriminator:04}", self.user)

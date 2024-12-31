@@ -18,8 +18,8 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use anyhow::Result;
-use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 use twilight_model::id::Id;
+use twilight_model::id::marker::{ChannelMarker, GuildMarker};
 
 /// Returns the environment variable associated with the given key, if present.
 ///

@@ -20,8 +20,8 @@ use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::{
-    bracketed, parse_macro_input, Attribute, Data, DataEnum, DataStruct, DeriveInput, Error, Expr, Fields, Generics,
-    Ident, LitStr, Result, Token, Variant,
+    Attribute, Data, DataEnum, DataStruct, DeriveInput, Error, Expr, Fields, Generics, Ident, LitStr, Result, Token,
+    Variant, bracketed, parse_macro_input,
 };
 
 /// The `localizer_category` attribute.
@@ -95,19 +95,6 @@ impl LocalizerKeyAttribute {
 }
 
 /// Applies the procedural macro.
-///
-/// ```
-/// #[derive(AsTranslation)]
-/// #[localizer_category(crate::utility::category::UI)]
-/// pub enum DataType {
-///     #[localizer_key("boolean")]
-///     Boolean,
-///     #[localizer_key("integer")]
-///     Integer,
-///     #[localizer_key("string")]
-///     String,
-/// }
-/// ```
 pub fn procedure(input: TokenStream) -> TokenStream {
     let DeriveInput { attrs, ident, generics, data, .. } = parse_macro_input!(input as DeriveInput);
 
@@ -173,16 +160,10 @@ pub fn procedure_struct(
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics crate::utility::traits::convert::AsTranslation for #identifier #type_generics
+        impl #impl_generics ::ina_localizing::AsTranslation for #identifier #type_generics
         #where_clause
         {
-            type Error = ::ina_localization::Error<(
-                ::std::option::Option<::std::primitive::usize>,
-                (
-                    ::std::sync::Arc<::tokio::sync::RwLock<::ina_localization::Localizer>>,
-                    ::ina_localization::thread::Request,
-                ),
-            )>;
+            type Error = ::ina_localizing::Error;
 
             fn localizer_category(&self) -> impl ::std::convert::Into<::std::boxed::Box<::std::primitive::str>> {
                 #category
@@ -241,7 +222,7 @@ pub fn procedure_enum(
 
     quote! {
         #[automatically_derived]
-        impl #impl_generics crate::utility::traits::convert::AsTranslation for #identifier #type_generics
+        impl #impl_generics ::ina_localizing::AsTranslation for #identifier #type_generics
         #where_clause
         {
             type Error = ::ina_localizing::Error;

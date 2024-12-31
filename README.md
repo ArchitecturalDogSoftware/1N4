@@ -19,7 +19,7 @@ or you can install and run her directly through Git and Cargo.
 
 ```sh
 # Clone and move into the repository.
-git clone https://github.com/Jaxydog/1N4.git
+git clone https://github.com/ArchitecturalDogSoftware/1N4.git
 cd 1N4
 
 # Build in release mode

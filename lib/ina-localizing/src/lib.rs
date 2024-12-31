@@ -18,16 +18,21 @@
 
 #![feature(array_try_from_fn)]
 
-use std::collections::HashMap;
+use std::collections::hash_map::Keys;
+use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use std::path::Path;
+use std::sync::Arc;
 
-use ina_threading::threads::invoker::{Nonce, State};
+use ina_logging::warn;
+use ina_threading::threads::invoker::{CallError, Stateful};
 use serde::{Deserialize, Serialize};
-use thread::Request;
+use text::Text;
+use thread::{Request, Response};
+use tokio::sync::RwLock;
 
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
-use self::text::TextRef;
 
 /// Defines the format for locales.
 pub mod locale;
@@ -39,7 +44,7 @@ pub mod text;
 pub mod thread;
 
 /// A result alias with a defaulted error type.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// An error that may be returned when using this library.
 #[non_exhaustive]
@@ -69,9 +74,15 @@ pub enum Error {
     /// A TOML deserialization error.
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
-    /// An error from communicating with a thread.
+    /// An error from spawning the thread.
     #[error(transparent)]
-    Thread(#[from] ina_threading::Error<Nonce<(State<Localizer>, Request)>>),
+    ThreadSpawn(#[from] ina_threading::Error),
+    /// An error from calling a function on the thread.
+    #[error(transparent)]
+    ThreadCall(#[from] CallError<Stateful<RwLock<Localizer>, Request>, Response>),
+    /// An error from interacting with the logging system.
+    #[error(transparent)]
+    Logging(#[from] ina_logging::Error),
 }
 
 /// A value that stores and retrieves translated text.
@@ -90,6 +101,12 @@ impl Localizer {
         Self { settings, languages: HashMap::new() }
     }
 
+    /// Returns the default locale of this [`Localizer`].
+    #[must_use]
+    pub const fn default_locale(&self) -> Locale {
+        self.settings.default_locale
+    }
+
     /// Returns the loaded locales of this [`Localizer`].
     pub fn locales(&self) -> impl Iterator<Item = Locale> + '_ {
         self.languages.keys().copied()
@@ -103,7 +120,7 @@ impl Localizer {
 
     /// Clears the specified locales if they have been loaded, clearing all locales if given [`None`].
     pub fn clear_locales(&mut self, locales: Option<impl IntoIterator<Item = Locale>>) {
-        if let Some(locales) = locales.map(|l| l.into_iter().collect::<Box<[_]>>()) {
+        if let Some(locales) = locales.map(|l| l.into_iter().collect::<HashSet<_>>()) {
             self.languages.retain(|l, _| !locales.contains(l));
         } else {
             self.languages.clear();
@@ -181,10 +198,22 @@ impl Localizer {
 
             if let Ok(locale) = name.to_string_lossy().parse() {
                 locales.push(locale);
+            } else {
+                warn!(async "invalid locale file name: {}", path.to_string_lossy()).await?;
             }
         }
 
         self.load_locales(locales).await
+    }
+
+    /// Returns an iterator over the keys within a specified locale's category.
+    #[must_use]
+    pub fn keys<'tx: 'fc, 'fc>(
+        &'tx self,
+        locale: &Locale,
+        category: &'fc str,
+    ) -> Option<Keys<'tx, Arc<str>, Arc<str>>> {
+        self.languages.get(locale).and_then(|l| l.keys(category))
     }
 
     /// Returns the translated text for the given key.
@@ -193,12 +222,7 @@ impl Localizer {
     ///
     /// This function will return an error if the text is not found and the configured behavior specifies to return an
     /// error.
-    pub fn get<'tx: 'fc, 'fc>(
-        &'tx self,
-        locale: Locale,
-        category: &'fc str,
-        key: &'fc str,
-    ) -> Result<TextRef<'tx, 'fc>> {
+    pub fn get<'tx: 'fc, 'fc>(&'tx self, locale: Locale, category: &'fc str, key: &'fc str) -> Result<Text> {
         let Some(language) = self.languages.get(&locale) else {
             return if self.settings.default_locale == locale {
                 self.settings.miss_behavior.call(category, key)
@@ -207,7 +231,7 @@ impl Localizer {
             };
         };
 
-        language.get_recursive(category, key, self.settings.miss_behavior, &self.languages, Language::DEFAULT_MAX_DEPTH)
+        language.get_recursive(category, key, self.settings.miss_behavior, &self.languages, self.settings.search_depth)
     }
 }
 
@@ -219,28 +243,26 @@ pub struct Language {
     pub inherit: Option<Locale>,
     /// The language's defined text categories and their defined keys.
     #[serde(default, flatten, skip_serializing_if = "HashMap::is_empty")]
-    pub categories: HashMap<Box<str>, HashMap<Box<str>, Box<str>>>,
+    pub categories: HashMap<Box<str>, HashMap<Arc<str>, Arc<str>>>,
 }
 
 impl Language {
-    /// The default amount of depth at which to search for a key before giving up.
-    const DEFAULT_MAX_DEPTH: usize = 4;
+    /// Returns an iterator over the keys within a specified category.
+    #[must_use]
+    pub fn keys<'tx: 'fc, 'fc>(&'tx self, category: &'fc str) -> Option<Keys<'tx, Arc<str>, Arc<str>>> {
+        self.categories.get(category).map(|k| k.keys())
+    }
 
     /// Returns the text for a key within the given category as written within this language file.
     ///
     /// # Errors
     ///
     /// This function will return an error if the text is not present and the behavior specifies to return an error.
-    pub fn get<'tx: 'fc, 'fc>(
-        &'tx self,
-        category: &'fc str,
-        key: &'fc str,
-        behavior: MissingBehavior,
-    ) -> Result<TextRef<'tx, 'fc>> {
+    pub fn get<'tx: 'fc, 'fc>(&'tx self, category: &'fc str, key: &'fc str, behavior: MissingBehavior) -> Result<Text> {
         self.categories
             .get(category)
             .and_then(|k| k.get(key))
-            .map_or_else(|| behavior.call(category, key), |s| Ok(TextRef::Present(s)))
+            .map_or_else(|| behavior.call(category, key), |s| Ok(Text::Present(Arc::clone(s))))
     }
 
     /// Returns the text for a key within the given category as written within this or a parent language file.
@@ -255,7 +277,7 @@ impl Language {
         behavior: MissingBehavior,
         languages: &'tx HashMap<Locale, Self>,
         max_depth: usize,
-    ) -> Result<TextRef<'tx, 'fc>> {
+    ) -> Result<Text> {
         if max_depth == 0 {
             return behavior.call(category, key).map_err(|_| Error::RecursionLimit);
         }
@@ -263,7 +285,7 @@ impl Language {
         let text = self.get(category, key, behavior);
 
         // Only continue if the resolved text is missing.
-        let (Ok(TextRef::Missing(..)) | Err(Error::MissingText(..))) = text else {
+        let (Ok(Text::Missing(..)) | Err(Error::MissingText(..))) = text else {
             return text;
         };
 
@@ -277,8 +299,58 @@ impl Language {
 
         // Convert `Present` variants to `Inherit` variants.
         match parent.get_recursive(category, key, behavior, languages, max_depth - 1) {
-            Ok(TextRef::Present(value)) => Ok(TextRef::Inherit(*locale, value)),
+            Ok(Text::Present(value)) => Ok(Text::Inherit(*locale, value)),
             other => other,
         }
+    }
+}
+
+/// Converts the implementing type into an owned translation.
+pub trait AsTranslation<I = text::TextInner>
+where
+    I: Deref<Target = str> + for<'s> From<&'s str>,
+{
+    /// The error that may be returned when converting.
+    type Error: From<Error>;
+
+    /// Returns this value's localizer category.
+    fn localizer_category(&self) -> impl Into<Box<str>>;
+
+    /// Returns this value's localizer key.
+    fn localizer_key(&self) -> impl Into<Box<str>>;
+
+    /// Fallibly localizes this value.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be localized.
+    fn as_translation(&self, locale: Option<Locale>) -> impl Future<Output = Result<Text<I>, Self::Error>> + Send
+    where
+        Self: Sync,
+    {
+        async move {
+            let category = self.localizer_category().into();
+            let key = self.localizer_key().into();
+
+            Ok(localize!(async(try in locale) category, key).await?.cast_inner())
+        }
+    }
+
+    /// Fallibly localizes this value.
+    ///
+    /// This blocks the current thread.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this is called from within an asynchronous context.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be localized.
+    fn blocking_as_translation(&self, locale: Option<Locale>) -> Result<Text<I>, Self::Error> {
+        let category = self.localizer_category().into();
+        let key = self.localizer_key().into();
+
+        Ok(localize!((try in locale) category, key)?.cast_inner())
     }
 }
