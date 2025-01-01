@@ -355,11 +355,3 @@ jobs:
 
                     compare_semver "$runner" "$latest" "$short_name_version" --no-v
                 done < <(trim_whitespace "$RUNNERS")
-
-                # Spec: `product-version:short-name-version:short-name`
-                #
-                # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
-                # subdirectories of <https://github.com/actions/runner-images/tree/main/images>, and product is
-                # `short_name` without any version info.
-                # RUNNERS: |
-                #     ubuntu-24.04:Ubuntu2404:Ubuntu
