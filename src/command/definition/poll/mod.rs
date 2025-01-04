@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2024—2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -109,14 +109,14 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     };
 
     let mut modal = ModalDataBuilder::new(
-        entry.id("create")?.with_str(kind.to_string())?.with_str(duration.to_string())?.to_string(),
-        localize!(async(try in locale) category::UI, "poll-create-title").await?.to_string(),
+        entry.id("create")?.with_str(kind.to_string())?.with_str(duration.to_string())?,
+        localize!(async(try in locale) category::UI, "poll-create-title").await?,
     )?;
 
     modal.input(
         TextInputBuilder::new(
-            entry.id("title")?.to_string(),
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-title").await?.to_string(),
+            entry.id("title")?,
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-title").await?,
             TextInputStyle::Short,
         )?
         .min_length(1)?
@@ -126,8 +126,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     modal.input(
         TextInputBuilder::new(
-            entry.id("image_url")?.to_string(),
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?.to_string(),
+            entry.id("image_url")?,
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?,
             TextInputStyle::Short,
         )?
         .required(false),
@@ -135,8 +135,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     modal.input(
         TextInputBuilder::new(
-            entry.id("description")?.to_string(),
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?.to_string(),
+            entry.id("description")?,
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?,
             TextInputStyle::Paragraph,
         )?
         .max_length(u16::try_from(DESCRIPTION_LENGTH / 2)?)?

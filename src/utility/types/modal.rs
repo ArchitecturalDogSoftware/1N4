@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2024—2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -61,17 +61,17 @@ impl ModalData {
     ///
     /// This function will return an error if the data is invalid.
     pub fn new(
-        custom_id: impl AsRef<str>,
-        title: impl AsRef<str>,
+        custom_id: impl Into<String>,
+        title: impl Into<String>,
         components: impl IntoIterator<Item = Component>,
     ) -> Result<Self, Error> {
-        let custom_id: Box<str> = custom_id.as_ref().into();
+        let custom_id = <_ as Into<String>>::into(custom_id).into_boxed_str();
 
         if custom_id.chars().count() > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::InvalidCustomId(custom_id));
         }
 
-        let title = title.as_ref().into();
+        let title = <_ as Into<String>>::into(title).into_boxed_str();
         let components = components.into_iter().collect();
 
         Ok(Self { custom_id, title, components })
@@ -96,14 +96,14 @@ impl ModalDataBuilder {
     /// # Errors
     ///
     /// This function will return an error if the custom identifier or title are invalid.
-    pub fn new(custom_id: impl AsRef<str>, title: impl AsRef<str>) -> Result<Self, Error> {
-        let custom_id = custom_id.as_ref().to_string();
+    pub fn new(custom_id: impl Into<String>, title: impl Into<String>) -> Result<Self, Error> {
+        let custom_id: String = custom_id.into();
 
         if custom_id.chars().count() > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::InvalidCustomId(custom_id.into_boxed_str()));
         }
 
-        let title = title.as_ref().to_string();
+        let title: String = title.into();
 
         if title.chars().count() > MAX_TITLE_LENGTH {
             return Err(Error::InvalidTitle(title.into_boxed_str()));
