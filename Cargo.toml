@@ -50,7 +50,7 @@ ina-storage = { version = "*", path = "./lib/ina-storage" }
 serde = "1.0"
 time = "0.3"
 thiserror = "2.0"
-tokio = "1.42"
+tokio = "1.43"
 toml = "0.8"
 
 [lints]
