@@ -20,9 +20,9 @@ use twilight_model::channel::message::component::{ActionRow, TextInput};
 use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
 
 /// The maximum amount of permitted inputs within a single modal.
-pub const MAX_INPUTS: usize = 5;
+pub const MODAL_INPUT_COUNT: usize = 5;
 /// The maximum length of a modal title.
-pub const MAX_TITLE_LENGTH: usize = 45;
+pub const MODAL_TITLE_LENGTH: usize = 45;
 
 /// An error that may be returned when interacting with modals.
 #[non_exhaustive]
@@ -35,7 +35,7 @@ pub enum Error {
     #[error("an invalid title was provided: '{0}'")]
     InvalidTitle(Box<str>),
     /// Returned when attempting to add more than the allowed number of inputs.
-    #[error("a maximum of {MAX_INPUTS} inputs is permitted")]
+    #[error("a maximum of {MODAL_INPUT_COUNT} inputs is permitted")]
     MaximumInputs,
     /// Returned when no inputs are provided.
     #[error("a minimum of 1 input is required")]
@@ -105,11 +105,11 @@ impl ModalDataBuilder {
 
         let title: String = title.into();
 
-        if title.chars().count() > MAX_TITLE_LENGTH {
+        if title.chars().count() > MODAL_TITLE_LENGTH {
             return Err(Error::InvalidTitle(title.into_boxed_str()));
         }
 
-        Ok(Self { custom_id, title, components: Vec::with_capacity(5) })
+        Ok(Self { custom_id, title, components: Vec::with_capacity(MODAL_INPUT_COUNT) })
     }
 
     /// Adds the given input to the modal.
@@ -118,7 +118,7 @@ impl ModalDataBuilder {
     ///
     /// This function will return an error if the input is invalid or the maximum number has been reached.
     pub fn input(&mut self, input: impl Into<TextInput>) -> Result<(), Error> {
-        if self.components.len() >= MAX_INPUTS {
+        if self.components.len() >= MODAL_INPUT_COUNT {
             return Err(Error::MaximumInputs);
         }
 

@@ -93,7 +93,7 @@ impl From<ActionRowBuilder> for Component {
 
 impl<I: Into<Component>> FromIterator<I> for ActionRowBuilder {
     fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        Self(ActionRow { components: iter.into_iter().take(5).map(Into::into).collect() })
+        Self(ActionRow { components: iter.into_iter().take(ACTION_ROW_COMPONENT_COUNT).map(Into::into).collect() })
     }
 }
 
