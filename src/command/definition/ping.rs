@@ -47,14 +47,14 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     };
 
     let title = localize!(async(try in locale) category::UI, "ping-start").await?;
-    let embed = EmbedBuilder::new().title(title).color(color::BRANDING_B.rgb());
+    let embed = EmbedBuilder::new().title(title).color(color::BACKDROP.rgb());
 
     context.embed(embed.build(), Visibility::Ephemeral).await?;
 
     let response = context.client().response(&context.interaction.token).await?.model().await?;
     let delay = response.id.creation_date() - context.interaction.id.creation_date();
     let title = localize!(async(try in locale) category::UI, "ping-finish").await?;
-    let embed = EmbedBuilder::new().title(format!("{title} ({delay})")).color(color::BRANDING_A.rgb());
+    let embed = EmbedBuilder::new().title(format!("{title} ({delay})")).color(color::BRANDING.rgb());
 
     context.client().update_response(&context.interaction.token).embeds(Some(&[embed.build()])).await?;
 

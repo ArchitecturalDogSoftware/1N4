@@ -278,7 +278,7 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::BRANDING_A.rgb(), title, description).await
+        self.finish(color::BRANDING.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded warning message.
@@ -292,7 +292,7 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::BRANDING_B.rgb(), title, description).await
+        self.finish(color::BACKDROP.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded failure message.

@@ -19,7 +19,6 @@ use std::fmt::Write;
 use anyhow::Result;
 use ina_localizing::locale::Locale;
 use ina_localizing::localize;
-use rand::{Rng, thread_rng};
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
@@ -76,7 +75,7 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
     let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
     let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
     let footer = EmbedFooterBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).build();
-    let color = if thread_rng().gen_bool(0.5) { color::BRANDING_A } else { color::BRANDING_B }.rgb();
+    let color = color::BRANDING.rgb();
     let author = if let Some(user) = context.api.cache.current_user() {
         user.as_embed_author()?
     } else {
