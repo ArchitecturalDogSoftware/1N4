@@ -71,7 +71,7 @@ anyhow.workspace = true
 async-stream = "0.3"
 async-trait.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
-directories = "5.0"
+directories = "6.0"
 dotenvy = { version = "0.15", optional = true }
 ina-localizing.workspace = true
 ina-logging.workspace = true

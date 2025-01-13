@@ -192,9 +192,9 @@ checksum = "325918d6fe32f23b19878fe4b34794ae41fc19ddbe53b10571a4874d44ffd39b"
 
 [[package]]
 name = "cc"
-version = "1.2.8"
+version = "1.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad0cf6e91fde44c773c6ee7ec6bba798504641a8bc2eb7e37a04ffbf4dfaa55a"
+checksum = "c8293772165d9345bdaaa39b45b2109591e63fe5e6fbc23c6ff930a048aa310b"
 dependencies = [
  "shlex",
 ]
@@ -336,23 +336,23 @@ dependencies = [
 
 [[package]]
 name = "directories"
-version = "5.0.1"
+version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
+checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
 dependencies = [
  "dirs-sys",
 ]
 
 [[package]]
 name = "dirs-sys"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+checksum = "e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab"
 dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1042,13 +1042,13 @@ dependencies = [
 
 [[package]]
 name = "redox_users"
-version = "0.4.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba009ff324d1fc1b900bd1fdb31564febe58a8ccc8a6fdbb93b543d33b13ca43"
+checksum = "dd6f9d3d47bdd2ad6945c5015a226ec6155d0bcdfd8f7cd29f86b71f8de99d2b"
 dependencies = [
  "getrandom",
  "libredox",
- "thiserror 1.0.69",
+ "thiserror 2.0.11",
 ]
 
 [[package]]
@@ -1643,8 +1643,8 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "twilight-cache-inmemory"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "bitflags",
  "dashmap",
@@ -1654,8 +1654,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "bitflags",
  "fastrand",
@@ -1674,8 +1674,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway-queue"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "tokio",
  "tracing",
@@ -1683,8 +1683,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-http"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "brotli-decompressor",
  "fastrand",
@@ -1706,8 +1706,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-http-ratelimiting"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "tokio",
  "tracing",
@@ -1715,16 +1715,16 @@ dependencies = [
 
 [[package]]
 name = "twilight-mention"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "twilight-model",
 ]
 
 [[package]]
 name = "twilight-model"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "bitflags",
  "serde",
@@ -1735,8 +1735,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-util"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "twilight-model",
  "twilight-validate",
@@ -1744,8 +1744,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-validate"
-version = "0.16.0-rc.1"
-source = "git+https://github.com/twilight-rs/twilight#dce54bdcd091eeb4695830de3d049738558cff1f"
+version = "0.16.0"
+source = "git+https://github.com/twilight-rs/twilight#65c7c8de10f36af06fc24052f5a84d53721e0def"
 dependencies = [
  "twilight-model",
 ]
@@ -1828,15 +1828,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.48.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677d2418bec65e3338edb076e806bc1ec15693c5d0104683f2efe857f61056a9"
-dependencies = [
- "windows-targets 0.48.5",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
@@ -1870,21 +1861,6 @@ dependencies = [
 
 [[package]]
 name = "windows-targets"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a2fa6e2155d7247be68c096456083145c183cbbbc2764150dda45a87197940c"
-dependencies = [
- "windows_aarch64_gnullvm 0.48.5",
- "windows_aarch64_msvc 0.48.5",
- "windows_i686_gnu 0.48.5",
- "windows_i686_msvc 0.48.5",
- "windows_x86_64_gnu 0.48.5",
- "windows_x86_64_gnullvm 0.48.5",
- "windows_x86_64_msvc 0.48.5",
-]
-
-[[package]]
-name = "windows-targets"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973"
@@ -1907,12 +1883,6 @@ checksum = "597a5118570b68bc08d8d59125332c54f1ba9d9adeedeef5b99b02ba2b0698f8"
 
 [[package]]
 name = "windows_aarch64_gnullvm"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b38e32f0abccf9987a4e3079dfb67dcd799fb61361e53e2882c3cbaf0d905d8"
-
-[[package]]
-name = "windows_aarch64_gnullvm"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a4622180e7a0ec044bb555404c800bc9fd9ec262ec147edd5989ccd0c02cd3"
@@ -1925,12 +1895,6 @@ checksum = "e08e8864a60f06ef0d0ff4ba04124db8b0fb3be5776a5cd47641e942e58c4d43"
 
 [[package]]
 name = "windows_aarch64_msvc"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc35310971f3b2dbbf3f0690a219f40e2d9afcf64f9ab7cc1be722937c26b4bc"
-
-[[package]]
-name = "windows_aarch64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09ec2a7bb152e2252b53fa7803150007879548bc709c039df7627cabbd05d469"
@@ -1940,12 +1904,6 @@ name = "windows_i686_gnu"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c61d927d8da41da96a81f029489353e68739737d3beca43145c8afec9a31a84f"
-
-[[package]]
-name = "windows_i686_gnu"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75915e7def60c94dcef72200b9a8e58e5091744960da64ec734a6c6e9b3743e"
 
 [[package]]
 name = "windows_i686_gnu"
@@ -1967,12 +1925,6 @@ checksum = "44d840b6ec649f480a41c8d80f9c65108b92d89345dd94027bfe06ac444d1060"
 
 [[package]]
 name = "windows_i686_msvc"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f55c233f70c4b27f66c523580f78f1004e8b5a8b659e05a4eb49d4166cca406"
-
-[[package]]
-name = "windows_i686_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "240948bc05c5e7c6dabba28bf89d89ffce3e303022809e73deaefe4f6ec56c66"
@@ -1982,12 +1934,6 @@ name = "windows_x86_64_gnu"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8de912b8b8feb55c064867cf047dda097f92d51efad5b491dfb98f6bbb70cb36"
-
-[[package]]
-name = "windows_x86_64_gnu"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53d40abd2583d23e4718fddf1ebec84dbff8381c07cae67ff7768bbf19c6718e"
 
 [[package]]
 name = "windows_x86_64_gnu"
@@ -2003,12 +1949,6 @@ checksum = "26d41b46a36d453748aedef1486d5c7a85db22e56aff34643984ea85514e94a3"
 
 [[package]]
 name = "windows_x86_64_gnullvm"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b7b52767868a23d5bab768e390dc5f5c55825b6d30b86c844ff2dc7414044cc"
-
-[[package]]
-name = "windows_x86_64_gnullvm"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d"
@@ -2018,12 +1958,6 @@ name = "windows_x86_64_msvc"
 version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
-
-[[package]]
-name = "windows_x86_64_msvc"
-version = "0.48.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
 
 [[package]]
 name = "windows_x86_64_msvc"
