@@ -336,9 +336,9 @@ where
             // Fall back to the guild's locale.
             .or(self.interaction.guild_locale.as_deref())
             // Attempt to parse it into a valid locale value.
-            .map(|s| s.parse().map_err(Into::into))
+            .map(str::parse).transpose()?
             // Or fail and say that it's missing.
-            .ok_or(ina_localizing::Error::MissingLocale)?
+            .ok_or(ina_localizing::Error::MissingLocale)
     }
 }
 
