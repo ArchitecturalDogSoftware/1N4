@@ -31,7 +31,7 @@ jobs:
             GO_VERSION: '1'
             # Spec: `binary:path:vSemVer`
             GO_PACKAGES: |
-                yamlfmt:github.com/google/yamlfmt:v0.14
+                yamlfmt:github.com/google/yamlfmt:v0.15
                 actionlint:github.com/rhysd/actionlint:v1
             # Spec: `package:SemVer`
             PYTHON_PACKAGES: |
@@ -355,11 +355,3 @@ jobs:
 
                     compare_semver "$runner" "$latest" "$short_name_version" --no-v
                 done < <(trim_whitespace "$RUNNERS")
-
-                # Spec: `product-version:short-name-version:short-name`
-                #
-                # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
-                # subdirectories of <https://github.com/actions/runner-images/tree/main/images>, and product is
-                # `short_name` without any version info.
-                # RUNNERS: |
-                #     ubuntu-24.04:Ubuntu2404:Ubuntu
