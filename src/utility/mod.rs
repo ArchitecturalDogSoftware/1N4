@@ -45,11 +45,15 @@ pub mod color {
     pub const BRANDING_A: Color = Color::from_u32(0x2C_8F_E5);
     /// The bot's branding color (B).
     pub const BRANDING_B: Color = Color::from_u32(0xE5_82_2C);
+    /// The bot's branding color, dependent on whether this is a debug build.
+    pub const BRANDING: Color = if cfg!(debug_assertions) { BRANDING_B } else { BRANDING_A };
 
     /// The bot's backdrop color (A).
     pub const BACKDROP_A: Color = Color::from_u32(0x1C_4A_72);
     /// The bot's backdrop color (B).
     pub const BACKDROP_B: Color = Color::from_u32(0x72_44_1C);
+    /// The bot's backdrop color, dependent on whether this is a debug build.
+    pub const BACKDROP: Color = if cfg!(debug_assertions) { BACKDROP_B } else { BACKDROP_A };
 
     /// The bot's success color.
     pub const SUCCESS: Color = Color::from_u32(0x45_E0_51);
@@ -73,8 +77,8 @@ pub mod types {
     pub mod builder;
     /// Provides a definition for colors.
     pub mod color;
-    /// A type that defines custom identifiers.
-    pub mod id;
+    /// A type that implements data-carrying custom identifiers.
+    pub mod custom_id;
     /// A type that defines modal data.
     pub mod modal;
 }

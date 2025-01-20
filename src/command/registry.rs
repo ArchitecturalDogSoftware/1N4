@@ -26,6 +26,7 @@ use twilight_model::id::Id;
 use twilight_model::id::marker::GuildMarker;
 
 use super::{AutocompleteCallable, CommandCallable, CommandFactory, ComponentCallable, ModalCallable};
+use crate::utility::types::custom_id::CustomId;
 
 /// The command registry instance.
 static REGISTRY: LazyLock<RwLock<CommandRegistry>> = LazyLock::new(RwLock::default);
@@ -121,6 +122,17 @@ pub struct CommandEntry {
     pub factory: Box<dyn CommandFactory>,
     /// The command's callback functions.
     pub callbacks: CommandEntryCallbacks,
+}
+
+impl CommandEntry {
+    /// Creates a new [`CustomId`] using this command entry's name as the base name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the identifier could not be created.
+    pub fn id(&self, kind: &str) -> Result<CustomId, crate::utility::types::custom_id::Error> {
+        CustomId::new(self.name, kind)
+    }
 }
 
 /// The callback functions of a [`CommandEntry`].
@@ -333,7 +345,7 @@ macro_rules! define_entry {
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
-                    custom_id: $crate::utility::types::id::CustomId,
+                    custom_id: $crate::utility::types::custom_id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
                     $component_callback(entry, context, custom_id).await
@@ -348,7 +360,7 @@ macro_rules! define_entry {
                     &self,
                     entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
-                    custom_id: $crate::utility::types::id::CustomId,
+                    custom_id: $crate::utility::types::custom_id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
                     $modal_callback(entry, context, custom_id).await

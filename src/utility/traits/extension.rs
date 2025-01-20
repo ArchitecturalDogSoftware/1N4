@@ -20,14 +20,15 @@ use std::num::NonZeroU16;
 use time::macros::datetime;
 use time::{Duration, OffsetDateTime};
 use twilight_cache_inmemory::model::{CachedGuild, CachedMember};
-use twilight_model::application::interaction::{Interaction, InteractionType};
+use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
 use twilight_model::id::Id;
-use twilight_model::id::marker::{InteractionMarker, UserMarker};
 use twilight_model::user::{CurrentUser, CurrentUserGuild, User};
 use twilight_model::util::ImageHash;
+
+use crate::utility::types::custom_id::CustomId;
 
 /// Extends an [`Id<T>`] or other identifier-like types.
 pub trait IdExt<T> {
@@ -54,38 +55,47 @@ pub trait InteractionExt {
 
 /// Displays an interaction label.
 #[must_use = "this value does nothing unless displayed"]
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct InteractionLabelDisplay<'ev> {
-    /// The interaction identifier.
-    id: Id<InteractionMarker>,
-    /// The interaction type string.
-    kind: &'ev str,
-    /// The user identifier.
-    user_id: Option<Id<UserMarker>>,
+#[derive(Clone, Copy, Debug)]
+pub struct InteractionLabelDisplay<'itx> {
+    /// The inner interaction.
+    interaction: &'itx Interaction,
 }
 
 impl Display for InteractionLabelDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(user_id) = self.user_id {
-            write!(f, "<{}:{}:{user_id}>", self.kind, self.id)
-        } else {
-            write!(f, "<{}:{}>", self.kind, self.id)
-        }
-    }
-}
-
-impl InteractionExt for Interaction {
-    fn display_label(&self) -> InteractionLabelDisplay {
-        let kind = match self.kind {
+        write!(f, "<{}", match self.interaction.kind {
             InteractionType::Ping => "ping",
             InteractionType::ApplicationCommand => "command",
             InteractionType::MessageComponent => "component",
             InteractionType::ApplicationCommandAutocomplete => "autocomplete",
             InteractionType::ModalSubmit => "modal",
             _ => "unknown",
-        };
+        })?;
 
-        InteractionLabelDisplay { id: self.id, kind, user_id: self.author_id() }
+        if let Some(InteractionData::ApplicationCommand(data)) = &self.interaction.data {
+            write!(f, ":{}", data.name)?;
+        } else if let Some(custom_id) = match &self.interaction.data {
+            Some(InteractionData::MessageComponent(data)) => data.custom_id.parse::<CustomId>().ok(),
+            Some(InteractionData::ModalSubmit(data)) => data.custom_id.parse::<CustomId>().ok(),
+            _ => None,
+        } {
+            write!(f, ":{}:{}", custom_id.command(), custom_id.variant())?;
+        }
+
+        write!(f, ":{}", self.interaction.id)?;
+
+        if let Some(user_id) = self.interaction.author_id() {
+            write!(f, ":{user_id}")?;
+        }
+
+        f.write_str(">")
+    }
+}
+
+impl InteractionExt for Interaction {
+    #[inline]
+    fn display_label(&self) -> InteractionLabelDisplay {
+        InteractionLabelDisplay { interaction: self }
     }
 }
 

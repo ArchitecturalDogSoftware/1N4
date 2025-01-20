@@ -37,7 +37,6 @@ use super::response::PollResponse;
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
 use crate::utility::types::builder::ButtonBuilder;
-use crate::utility::types::id::CustomId;
 use crate::utility::{category, color};
 
 /// A poll's type.
@@ -236,9 +235,7 @@ impl Poll {
         ) -> Result<Component> {
             let key = format!("{}-builder-{name}", entry.name);
             let label = localize!(async(try in locale) category::UI_BUTTON, key).await?;
-            let id = CustomId::<Box<str>>::new(entry.name, name)?
-                .with(this.guild_id.to_string())?
-                .with(this.user_id.to_string())?;
+            let id = entry.id(name)?.with_str(this.guild_id.to_string())?.with_str(this.user_id.to_string())?;
 
             Ok(ButtonBuilder::new(style).label(label)?.emoji(emoji)?.custom_id(id)?.disabled(disabled).build().into())
         }

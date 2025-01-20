@@ -21,6 +21,7 @@ use directories::BaseDirs;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
 use rand::{Rng, thread_rng};
+use time::{Duration, OffsetDateTime};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 use twilight_model::channel::message::MessageFlags;
@@ -36,7 +37,7 @@ use crate::command::registry::registry;
 use crate::command::resolver::find_focused_option;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::traits::extension::InteractionExt;
-use crate::utility::types::id::CustomId;
+use crate::utility::types::custom_id::CustomId;
 use crate::utility::{category, color};
 
 /// A result returned by an event handler.
@@ -171,7 +172,11 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
 ///
 /// This function will return an error if the event could not be handled.
 pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> EventResult {
+    const TIME_WARN_THRESHOLD: Duration = Duration::seconds(1);
+
     info!(async "shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
+
+    let start_time = OffsetDateTime::now_utc();
 
     let result: EventResult = match event.kind {
         InteractionType::ApplicationCommand => self::on_command(api.as_ref(), &event).await,
@@ -180,6 +185,14 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
         InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api.as_ref(), &event).await,
         _ => self::pass(),
     };
+
+    let elapsed_time = OffsetDateTime::now_utc() - start_time;
+
+    if elapsed_time >= TIME_WARN_THRESHOLD {
+        warn!(async "shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
+    } else {
+        debug!(async "shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
+    }
 
     // Capture errors here to prevent duplicate logging.
     if let Err(ref error) = result {
@@ -228,11 +241,11 @@ pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let data_id = data.custom_id.parse::<CustomId>()?;
     let registry = registry().await;
 
-    let Some(command) = registry.command(data_id.name()) else {
-        bail!("missing command entry for '{}'", data_id.name());
+    let Some(command) = registry.command(data_id.command()) else {
+        bail!("missing command entry for '{}'", data_id.command());
     };
     let Some(ref callable) = command.callbacks.component else {
-        bail!("missing component callback for '{}'", data_id.name());
+        bail!("missing component callback for '{}'", data_id.command());
     };
 
     callable.on_component(command, Context::new(api, event, data), data_id).await
@@ -251,11 +264,11 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let data_id = data.custom_id.parse::<CustomId>()?;
     let registry = registry().await;
 
-    let Some(command) = registry.command(data_id.name()) else {
-        bail!("missing command entry for '{}'", data_id.name());
+    let Some(command) = registry.command(data_id.command()) else {
+        bail!("missing command entry for '{}'", data_id.command());
     };
     let Some(ref callback) = command.callbacks.modal else {
-        bail!("missing component callback for '{}'", data_id.name());
+        bail!("missing component callback for '{}'", data_id.command());
     };
 
     callback.on_modal(command, Context::new(api, event, data), data_id).await
@@ -386,7 +399,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 /// This function will return an error if the author could not be notified.
 pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(user) = event.author() else {
-        info!(async "skipping user error notification as not author is present").await?;
+        info!(async "skipping user error notification as no author is present").await?;
 
         return self::pass();
     };

@@ -50,7 +50,7 @@ ina-storage = { version = "*", path = "./lib/ina-storage" }
 serde = "1.0"
 time = "0.3"
 thiserror = "2.0"
-tokio = "1.42"
+tokio = "1.43"
 toml = "0.8"
 
 [lints]
@@ -71,7 +71,7 @@ anyhow.workspace = true
 async-stream = "0.3"
 async-trait.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
-directories = "5.0"
+directories = "6.0"
 dotenvy = { version = "0.15", optional = true }
 ina-localizing.workspace = true
 ina-logging.workspace = true
@@ -86,10 +86,10 @@ time = { workspace = true, features = ["local-offset", "serde"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = "0.1"
 toml = { workspace = true, features = ["preserve_order"] }
-twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight" }
-twilight-gateway = { git = "https://github.com/twilight-rs/twilight" }
-twilight-http = { git = "https://github.com/twilight-rs/twilight" }
-twilight-mention = { git = "https://github.com/twilight-rs/twilight" }
-twilight-model = { git = "https://github.com/twilight-rs/twilight" }
-twilight-util = { git = "https://github.com/twilight-rs/twilight", features = ["full"] }
-twilight-validate = { git = "https://github.com/twilight-rs/twilight" }
+twilight-cache-inmemory = "~0.16"
+twilight-gateway = "~0.16"
+twilight-http = "~0.16"
+twilight-mention = "~0.16"
+twilight-model = "~0.16"
+twilight-util = { version = "~0.16", features = ["full"] }
+twilight-validate = "~0.16"

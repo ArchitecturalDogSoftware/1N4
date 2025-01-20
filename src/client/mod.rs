@@ -110,7 +110,7 @@ macro_rules! match_join_result {
     ($result:expr, $type:literal, $exit:expr) => {
         match $result {
             // Just keep polling if instructed to pass.
-            Ok(Ok(EventOutput::Pass)) => continue,
+            Ok(Ok(EventOutput::Pass)) => {},
             // If we should exit, return early.
             Ok(Ok(EventOutput::Exit)) => return Ok($exit),
             // If the task returns an error, return it.

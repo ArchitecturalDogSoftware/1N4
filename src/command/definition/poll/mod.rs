@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2024—2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -38,7 +38,7 @@ use crate::command::resolver::{CommandOptionResolver, ModalFieldResolver};
 use crate::utility::category;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::builder::TextInputBuilder;
-use crate::utility::types::id::CustomId;
+use crate::utility::types::custom_id::CustomId;
 use crate::utility::types::modal::ModalDataBuilder;
 
 /// The command's data.
@@ -109,17 +109,14 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     };
 
     let mut modal = ModalDataBuilder::new(
-        CustomId::<Box<str>>::new(entry.name, "create")?
-            .with(kind.to_string())?
-            .with(duration.to_string())?
-            .to_string(),
-        localize!(async(try in locale) category::UI, "poll-create-title").await?.to_string(),
+        entry.id("create")?.with_str(kind.to_string())?.with_str(duration.to_string())?,
+        localize!(async(try in locale) category::UI, "poll-create-title").await?,
     )?;
 
     modal.input(
         TextInputBuilder::new(
-            CustomId::<Box<str>>::new(entry.name, "title")?.to_string(),
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-title").await?.to_string(),
+            entry.id("title")?,
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-title").await?,
             TextInputStyle::Short,
         )?
         .min_length(1)?
@@ -129,8 +126,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     modal.input(
         TextInputBuilder::new(
-            CustomId::<Box<str>>::new(entry.name, "image_url")?.to_string(),
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?.to_string(),
+            entry.id("image_url")?,
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?,
             TextInputStyle::Short,
         )?
         .required(false),
@@ -138,8 +135,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     modal.input(
         TextInputBuilder::new(
-            CustomId::<Box<str>>::new(entry.name, "description")?.to_string(),
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?.to_string(),
+            entry.id("description")?,
+            localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?,
             TextInputStyle::Paragraph,
         )?
         .max_length(u16::try_from(DESCRIPTION_LENGTH / 2)?)?
@@ -173,7 +170,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    let kind = match custom_id.data().first().map(|s| s.parse::<i64>()).transpose()? {
+    let kind = match custom_id.get::<i64>(0).transpose()? {
         Some(n) if n == PollType::MultipleChoice as i64 => PollType::MultipleChoice,
         Some(n) if n == PollType::OpenResponse as i64 => PollType::OpenResponse,
         Some(n) if n == PollType::Hybrid as i64 => PollType::Hybrid,
@@ -181,14 +178,16 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
         Some(n) => bail!("invalid poll type: {n}"),
         None => bail!("missing poll type"),
     };
-    let Some(duration) = custom_id.data().get(1).map(|s| s.parse::<NonZeroU16>()).transpose()? else {
-        bail!("missing poll duration")
+    let Some(duration) = custom_id.get::<NonZeroU16>(1).transpose()? else {
+        bail!("missing poll duration");
     };
 
     let resolver = ModalFieldResolver::new(context.data);
-    let image_url = resolver.get(CustomId::<Box<str>>::new(entry.name, "image_url")?.to_string())?;
-    let description = resolver.get(CustomId::<Box<str>>::new(entry.name, "description")?.to_string())?;
-    let Some(title) = resolver.get(CustomId::<Box<str>>::new(entry.name, "title")?.to_string())? else {
+
+    let description = resolver.get(entry.id("description")?.to_string())?;
+    let image_url = resolver.get(entry.id("image_url")?.to_string())?;
+
+    let Some(title) = resolver.get(entry.id("title")?.to_string())? else {
         bail!("failed to resolve poll title");
     };
 

@@ -79,6 +79,7 @@ where
     }
 
     /// Returns the interaction client of this [`Context<T>`].
+    #[expect(clippy::missing_const_for_fn, reason = "false positive; the arc'd api cannot be const-derefed")]
     pub fn client(&self) -> InteractionClient {
         self.api.client.interaction(self.interaction.application_id)
     }
@@ -278,7 +279,7 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::BRANDING_A.rgb(), title, description).await
+        self.finish(color::BRANDING.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded warning message.
@@ -292,7 +293,7 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::BRANDING_B.rgb(), title, description).await
+        self.finish(color::BACKDROP.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded failure message.
@@ -336,9 +337,9 @@ where
             // Fall back to the guild's locale.
             .or(self.interaction.guild_locale.as_deref())
             // Attempt to parse it into a valid locale value.
-            .map(|s| s.parse().map_err(Into::into))
+            .map(str::parse).transpose()?
             // Or fail and say that it's missing.
-            .ok_or(ina_localizing::Error::MissingLocale)?
+            .ok_or(ina_localizing::Error::MissingLocale)
     }
 }
 

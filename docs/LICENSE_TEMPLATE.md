@@ -1,7 +1,7 @@
 ```rs
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Your Name
+// Copyright © 2025 Your Name
 //
 // This file is part of 1N4.
 //
@@ -19,7 +19,7 @@
 ```sh
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Copyright © 2024 Your Name
+# Copyright © 2025 Your Name
 #
 # This file is part of 1N4.
 #

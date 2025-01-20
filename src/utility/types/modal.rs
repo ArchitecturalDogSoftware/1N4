@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2024—2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -20,9 +20,9 @@ use twilight_model::channel::message::component::{ActionRow, TextInput};
 use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
 
 /// The maximum amount of permitted inputs within a single modal.
-pub const MAX_INPUTS: usize = 5;
+pub const MODAL_INPUT_COUNT: usize = 5;
 /// The maximum length of a modal title.
-pub const MAX_TITLE_LENGTH: usize = 45;
+pub const MODAL_TITLE_LENGTH: usize = 45;
 
 /// An error that may be returned when interacting with modals.
 #[non_exhaustive]
@@ -35,7 +35,7 @@ pub enum Error {
     #[error("an invalid title was provided: '{0}'")]
     InvalidTitle(Box<str>),
     /// Returned when attempting to add more than the allowed number of inputs.
-    #[error("a maximum of {MAX_INPUTS} inputs is permitted")]
+    #[error("a maximum of {MODAL_INPUT_COUNT} inputs is permitted")]
     MaximumInputs,
     /// Returned when no inputs are provided.
     #[error("a minimum of 1 input is required")]
@@ -61,17 +61,17 @@ impl ModalData {
     ///
     /// This function will return an error if the data is invalid.
     pub fn new(
-        custom_id: impl AsRef<str>,
-        title: impl AsRef<str>,
+        custom_id: impl Into<String>,
+        title: impl Into<String>,
         components: impl IntoIterator<Item = Component>,
     ) -> Result<Self, Error> {
-        let custom_id: Box<str> = custom_id.as_ref().into();
+        let custom_id = <_ as Into<String>>::into(custom_id).into_boxed_str();
 
         if custom_id.chars().count() > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::InvalidCustomId(custom_id));
         }
 
-        let title = title.as_ref().into();
+        let title = <_ as Into<String>>::into(title).into_boxed_str();
         let components = components.into_iter().collect();
 
         Ok(Self { custom_id, title, components })
@@ -96,20 +96,20 @@ impl ModalDataBuilder {
     /// # Errors
     ///
     /// This function will return an error if the custom identifier or title are invalid.
-    pub fn new(custom_id: impl AsRef<str>, title: impl AsRef<str>) -> Result<Self, Error> {
-        let custom_id = custom_id.as_ref().to_string();
+    pub fn new(custom_id: impl Into<String>, title: impl Into<String>) -> Result<Self, Error> {
+        let custom_id: String = custom_id.into();
 
         if custom_id.chars().count() > COMPONENT_CUSTOM_ID_LENGTH {
             return Err(Error::InvalidCustomId(custom_id.into_boxed_str()));
         }
 
-        let title = title.as_ref().to_string();
+        let title: String = title.into();
 
-        if title.chars().count() > MAX_TITLE_LENGTH {
+        if title.chars().count() > MODAL_TITLE_LENGTH {
             return Err(Error::InvalidTitle(title.into_boxed_str()));
         }
 
-        Ok(Self { custom_id, title, components: Vec::with_capacity(5) })
+        Ok(Self { custom_id, title, components: Vec::with_capacity(MODAL_INPUT_COUNT) })
     }
 
     /// Adds the given input to the modal.
@@ -118,7 +118,7 @@ impl ModalDataBuilder {
     ///
     /// This function will return an error if the input is invalid or the maximum number has been reached.
     pub fn input(&mut self, input: impl Into<TextInput>) -> Result<(), Error> {
-        if self.components.len() >= MAX_INPUTS {
+        if self.components.len() >= MODAL_INPUT_COUNT {
             return Err(Error::MaximumInputs);
         }
 
