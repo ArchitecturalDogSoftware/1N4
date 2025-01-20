@@ -31,7 +31,7 @@ jobs:
             GO_VERSION: '1'
             # Spec: `binary:path:vSemVer`
             GO_PACKAGES: |
-                yamlfmt:github.com/google/yamlfmt:v0.14
+                yamlfmt:github.com/google/yamlfmt:v0.15
                 actionlint:github.com/rhysd/actionlint:v1
             # Spec: `package:SemVer`
             PYTHON_PACKAGES: |
