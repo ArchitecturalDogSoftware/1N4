@@ -133,7 +133,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
-            Self::Present(t) | Self::Inherit(_, t) => write!(f, "{}", &(**t)),
+            Self::Present(t) | Self::Inherit(_, t) => f.write_str(t),
             Self::Missing(c, k) => write!(f, "{}::{}", &(**c), &(**k)),
         }
     }
