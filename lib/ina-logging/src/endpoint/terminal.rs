@@ -66,17 +66,17 @@ impl Endpoint for TerminalEndpoint {
         let content = entry.display(Some(stream)).to_string() + "\n";
 
         if entry.level.error {
-            let Some(ref mut stdout) = self.stdout else {
-                return Err(self.invalid_state());
-            };
-
-            stdout.write_all(content.as_bytes()).await
-        } else {
             let Some(ref mut stderr) = self.stderr else {
                 return Err(self.invalid_state());
             };
 
             stderr.write_all(content.as_bytes()).await
+        } else {
+            let Some(ref mut stdout) = self.stdout else {
+                return Err(self.invalid_state());
+            };
+
+            stdout.write_all(content.as_bytes()).await
         }
         .map_err(Into::into)
     }
