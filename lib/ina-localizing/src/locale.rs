@@ -93,7 +93,7 @@ impl Locale {
     /// Returns the locale's territory code.
     #[must_use]
     pub fn territory(&self) -> Option<Box<str>> {
-        self.territory.map(|t| format!("{t}").into_boxed_str())
+        self.territory.map(|t| t.to_string().into_boxed_str())
     }
 }
 
@@ -136,7 +136,7 @@ impl From<Locale> for String {
 
 impl Display for Locale {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.language())?;
+        self.language().fmt(f)?;
 
         if let Some(territory) = self.territory {
             write!(f, "-{territory}")?;
@@ -224,7 +224,7 @@ impl Display for Territory {
         match self {
             Self::Alpha2([a, b]) => write!(f, "{a}{b}"),
             Self::Alpha3([a, b, c]) => write!(f, "{a}{b}{c}"),
-            Self::Numeric(n) => write!(f, "{n}"),
+            Self::Numeric(n) => n.fmt(f),
         }
     }
 }
