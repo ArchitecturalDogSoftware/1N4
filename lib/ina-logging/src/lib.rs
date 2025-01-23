@@ -72,6 +72,7 @@ pub enum Error {
 }
 
 /// A logger with buffered output.
+#[derive(Clone, Debug)]
 pub struct Logger {
     /// The logger's settings.
     settings: Settings,
@@ -131,7 +132,7 @@ impl Logger {
     /// Returns whether the inner queue of this [`Logger`] is empty.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.queue.is_empty()
     }
 
     /// Returns whether the inner queue of this [`Logger`] is full.
