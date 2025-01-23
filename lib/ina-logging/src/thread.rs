@@ -15,11 +15,13 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Display;
+use std::sync::Arc;
 
 use ina_threading::SenderHandle;
 use ina_threading::joining::Joining;
 use ina_threading::statics::StaticJoining;
 use ina_threading::threads::consumer::Consumer;
+use tokio::sync::RwLock;
 use tokio::sync::mpsc::Receiver;
 
 use crate::endpoint::Endpoint;
@@ -45,7 +47,7 @@ pub enum Request {
     /// Queues an entry to be output during the next flush.
     Entry(Entry<'static>),
     /// Adds an endpoint to the logger.
-    Endpoint(Box<dyn Endpoint>),
+    Endpoint(Arc<RwLock<dyn Endpoint>>),
 }
 
 /// Starts the logging thread.
@@ -104,7 +106,7 @@ pub fn blocking_start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the message could not be sent.
 pub async fn endpoint(endpoint: impl Endpoint) -> Result<()> {
-    THREAD.async_api().get().await.as_sender().send(Request::Endpoint(Box::new(endpoint))).await?;
+    THREAD.async_api().get().await.as_sender().send(Request::Endpoint(Arc::new(RwLock::new(endpoint)))).await?;
 
     Ok(())
 }
@@ -121,7 +123,7 @@ pub async fn endpoint(endpoint: impl Endpoint) -> Result<()> {
 ///
 /// This function will return an error if the message could not be sent.
 pub fn blocking_endpoint(endpoint: impl Endpoint) -> Result<()> {
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Endpoint(Box::new(endpoint)))?;
+    THREAD.sync_api().get().as_sender().blocking_send(Request::Endpoint(Arc::new(RwLock::new(endpoint))))?;
 
     Ok(())
 }
@@ -275,7 +277,7 @@ async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> 
             request = receiver.recv() => match request {
                 Some(Request::Entry(entry)) => logger.push_entry(entry).await?,
                 Some(Request::Flush) => logger.flush().await?,
-                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint)?,
+                Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint).await?,
                 Some(Request::Setup) => logger.setup().await?,
                 None | Some(Request::Close) => return logger.close().await,
             },

@@ -76,7 +76,7 @@ pub struct Logger {
     /// The logger's settings.
     settings: Settings,
     /// The logger's endpoints.
-    endpoints: HashMap<&'static str, Arc<RwLock<Box<dyn Endpoint>>>>,
+    endpoints: HashMap<&'static str, Arc<RwLock<dyn Endpoint>>>,
     /// The logger's entry queue.
     queue: Vec<Entry<'static>>,
     /// Whether the logger has been initialized.
@@ -164,16 +164,18 @@ impl Logger {
     /// # Errors
     ///
     /// This function will return an error if the endpoint was already added.
-    pub fn push_endpoint(&mut self, endpoint: Box<dyn Endpoint>) -> Result<()> {
+    pub async fn push_endpoint(&mut self, endpoint: Arc<RwLock<dyn Endpoint>>) -> Result<()> {
         if self.initialized {
             return Err(Error::AlreadyInitialized);
         }
 
-        if self.endpoints.contains_key(endpoint.name()) {
-            return Err(Error::DuplicateEndpoint(endpoint.name()));
+        let name = endpoint.read().await.name();
+
+        if self.endpoints.contains_key(name) {
+            return Err(Error::DuplicateEndpoint(name));
         }
 
-        self.endpoints.insert(endpoint.name(), Arc::new(RwLock::new(endpoint)));
+        self.endpoints.insert(name, endpoint);
 
         Ok(())
     }
