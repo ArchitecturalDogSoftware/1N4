@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use owo_colors::Stream;
 use tokio::io::{AsyncWriteExt, Stderr, Stdout};
 
@@ -68,7 +66,7 @@ impl Endpoint for TerminalEndpoint {
         Ok(())
     }
 
-    async fn write(&mut self, entry: Arc<Entry<'static>>) -> Result<()> {
+    async fn write(&mut self, entry: &Entry<'static>) -> Result<()> {
         let stream = if entry.level.error { Stream::Stderr } else { Stream::Stdout };
         let content = entry.display(Some(stream)).to_string() + "\n";
 

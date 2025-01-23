@@ -136,7 +136,7 @@ pub fn blocking_endpoint(endpoint: impl Endpoint) -> Result<()> {
 ///
 /// This function will return an error if the message could not be sent.
 pub async fn entry(level: Level<'static>, text: impl Display + Send) -> Result<()> {
-    let entry = Entry::new(level, text.to_string().into_boxed_str());
+    let entry = Entry::new(level, text.to_string().into());
 
     THREAD.async_api().get().await.as_sender().send(Request::Entry(entry)).await?;
 
@@ -155,7 +155,7 @@ pub async fn entry(level: Level<'static>, text: impl Display + Send) -> Result<(
 ///
 /// This function will return an error if the message could not be sent.
 pub fn blocking_entry(level: Level<'static>, text: impl Display) -> Result<()> {
-    let entry = Entry::new(level, text.to_string().into_boxed_str());
+    let entry = Entry::new(level, text.to_string().into());
 
     THREAD.sync_api().get().as_sender().blocking_send(Request::Entry(entry))?;
 

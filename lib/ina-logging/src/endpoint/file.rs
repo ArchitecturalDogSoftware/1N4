@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -77,7 +75,7 @@ impl Endpoint for FileEndpoint {
         Ok(())
     }
 
-    async fn write(&mut self, entry: Arc<Entry<'static>>) -> Result<()> {
+    async fn write(&mut self, entry: &Entry<'static>) -> Result<()> {
         let content = entry.display(None).to_string() + "\n";
         let Some(ref mut handle) = self.handle else {
             return Err(self.invalid_state());

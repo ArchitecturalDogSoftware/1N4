@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
 #[cfg(feature = "file")]
 pub use self::file::*;
 #[cfg(feature = "terminal")]
@@ -49,7 +47,20 @@ pub trait Endpoint: std::fmt::Debug + Send + Sync + 'static {
     /// # Errors
     ///
     /// This function will return an error if the entry could not be written.
-    async fn write(&mut self, entry: Arc<Entry<'static>>) -> Result<()>;
+    async fn write(&mut self, entry: &Entry<'static>) -> Result<()>;
+
+    /// Write all the given entries into this endpoint.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if an entry could not be written.
+    async fn write_all(&mut self, entries: &[Entry<'static>]) -> Result<()> {
+        for entry in entries {
+            self.write(entry).await?;
+        }
+
+        Ok(())
+    }
 
     /// Closes this endpoint.
     ///

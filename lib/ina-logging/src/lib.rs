@@ -78,7 +78,7 @@ pub struct Logger {
     /// The logger's endpoints.
     endpoints: HashMap<&'static str, Arc<RwLock<Box<dyn Endpoint>>>>,
     /// The logger's entry queue.
-    queue: Vec<Arc<Entry<'static>>>,
+    queue: Vec<Entry<'static>>,
     /// Whether the logger has been initialized.
     initialized: bool,
 }
@@ -188,7 +188,7 @@ impl Logger {
             return Err(Error::NotInitialized);
         }
         if self.is_enabled() {
-            self.queue.push(Arc::new(entry));
+            self.queue.push(entry);
         }
 
         if self.is_full() { self.flush().await } else { Ok(()) }
@@ -210,29 +210,16 @@ impl Logger {
         }
 
         let mut tasks = JoinSet::<Result<(), Error>>::new();
+        let entries: Arc<[_]> = self.queue.drain(..).collect();
+        let entries = std::iter::from_fn(|| Some(Arc::clone(&entries)));
 
-        #[expect(clippy::unnecessary_to_owned, reason = "false positive")]
-        for endpoint in self.endpoints.values().cloned() {
-            let iterator: Box<[_]> = self.queue.iter().cloned().collect();
+        for (endpoint, entries) in self.endpoints.values().cloned().zip(entries) {
+            let mut endpoint = endpoint.write_owned().await;
 
-            tasks.spawn(async move {
-                let mut endpoint = endpoint.write().await;
-
-                for entry in iterator {
-                    endpoint.write(entry).await?;
-                }
-
-                drop(endpoint);
-
-                Ok(())
-            });
+            tasks.spawn(async move { endpoint.write_all(&entries).await });
         }
 
-        self.queue.clear();
-
-        while let Some(result) = tasks.join_next().await {
-            result??;
-        }
+        while tasks.join_next().await.transpose()?.transpose()?.is_some() {}
 
         Ok(())
     }

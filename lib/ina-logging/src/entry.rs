@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use time::OffsetDateTime;
 
 /// A log entry's timestamp.
@@ -116,13 +118,13 @@ pub struct Entry<'lv> {
     /// The entry's level.
     pub level: Level<'lv>,
     /// The entry's content.
-    pub content: Box<str>,
+    pub content: Arc<str>,
 }
 
 impl<'lv> Entry<'lv> {
     /// Creates a new [`Entry`].
     #[must_use]
-    pub fn new(level: Level<'lv>, content: Box<str>) -> Self {
+    pub fn new(level: Level<'lv>, content: Arc<str>) -> Self {
         Self { timestamp: Timestamp::new(), level, content }
     }
 
