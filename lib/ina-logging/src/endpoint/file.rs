@@ -68,6 +68,10 @@ impl Endpoint for FileEndpoint {
     }
 
     async fn close(&mut self) -> Result<()> {
+        if let Some(handle) = self.handle.as_mut() {
+            handle.flush().await?;
+        }
+
         drop(self.handle.take());
 
         Ok(())

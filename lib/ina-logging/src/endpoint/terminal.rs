@@ -55,6 +55,13 @@ impl Endpoint for TerminalEndpoint {
     }
 
     async fn close(&mut self) -> Result<()> {
+        if let Some(stdout) = self.stdout.as_mut() {
+            stdout.flush().await?;
+        }
+        if let Some(stderr) = self.stderr.as_mut() {
+            stderr.flush().await?;
+        }
+
         drop(self.stdout.take());
         drop(self.stderr.take());
 
