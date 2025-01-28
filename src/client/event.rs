@@ -20,7 +20,7 @@ use anyhow::bail;
 use directories::BaseDirs;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
-use rand::{Rng, thread_rng};
+use rand::{Rng, rng};
 use time::{Duration, OffsetDateTime};
 use twilight_gateway::{Event, ShardId};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
@@ -348,7 +348,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 
     let titles = localize!(async category::UI, "error-titles").await?.to_string();
     let titles = titles.lines().collect::<Box<[_]>>();
-    let index = thread_rng().gen_range(0 .. titles.len());
+    let index = rng().random_range(0 .. titles.len());
 
     let header = format!("`{}`\n\n", event.display_label());
     let mut description = error.to_string();

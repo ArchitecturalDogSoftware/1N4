@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ina_logging::{debug, error, warn};
-use rand::{Rng, thread_rng};
+use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tokio_stream::{StreamExt, StreamMap};
@@ -70,7 +70,7 @@ impl StatusList {
     pub fn random(&self) -> &StatusDefinition {
         let list = if cfg!(debug_assertions) { &self.testing } else { &self.release };
 
-        &list[thread_rng().gen_range(0 .. list.len())]
+        &list[rng().random_range(0 .. list.len())]
     }
 }
 

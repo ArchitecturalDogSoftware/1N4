@@ -78,7 +78,7 @@ ina-logging.workspace = true
 ina-macro.workspace = true
 ina-threading.workspace = true
 ina-storage = { workspace = true, features = ["format-compression", "format-messagepack"] }
-rand = { version = "0.8", features = ["nightly"] }
+rand = { version = "0.9", default-features = false, features = ["nightly", "thread_rng"] }
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
