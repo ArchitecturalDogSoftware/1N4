@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::path::PathBuf;
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
@@ -32,16 +33,16 @@ pub struct Settings {
 
     /// The logger's file output directory.
     #[cfg(feature = "file")]
-    #[arg(id = "LOG_DIR", long = "log-directory", default_value = "./log/")]
+    #[arg(id = "LOG_DIR", long = "log-directory", default_value_os_t = self::default_directory())]
     #[serde(default = "default_directory")]
-    pub directory: Box<std::path::Path>,
+    pub directory: PathBuf,
 
     /// The capacity of the logger's queue. If set to '1', no buffering will occur.
-    #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity", default_value = "8")]
+    #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity", default_value_t = self::default_queue_capacity())]
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
     /// The duration in milliseconds that the logger's queue should retain entries for before flushing.
-    #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration", default_value = "5")]
+    #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration", default_value_t = self::default_queue_duration())]
     #[serde(default = "default_queue_duration")]
     pub queue_duration: NonZeroU64,
 }
@@ -62,6 +63,6 @@ const fn default_queue_duration() -> NonZeroU64 {
 
 /// Returns the default log directory.
 #[cfg(feature = "file")]
-fn default_directory() -> Box<std::path::Path> {
-    std::path::PathBuf::from("./log/").into_boxed_path()
+fn default_directory() -> PathBuf {
+    std::env::current_dir().map_or_else(|_| PathBuf::from("./log/"), |v| v.join("log"))
 }

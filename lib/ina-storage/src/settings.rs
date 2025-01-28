@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
@@ -29,17 +29,17 @@ use crate::System;
 #[group(id = "DataSettings")]
 pub struct Settings {
     /// The storage system to use to read and write data.
-    #[arg(long = "data-system", default_value = "file")]
+    #[arg(long = "data-system", default_value_t)]
     #[serde(default)]
     pub system: System,
 
     /// The directory within which to manage data files.
-    #[arg(id = "DATA_DIRECTORY", long = "data-directory", default_value = "./res/data/")]
+    #[arg(id = "DATA_DIRECTORY", long = "data-directory", default_value_os_t = self::default_directory())]
     #[serde(default = "default_directory")]
-    pub directory: Box<Path>,
+    pub directory: PathBuf,
 
     /// The storage thread's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity", default_value = "8")]
+    #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity", default_value_t = self::default_queue_capacity())]
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
 }
@@ -52,6 +52,6 @@ const fn default_queue_capacity() -> NonZeroUsize {
 }
 
 /// Returns the default data directory.
-fn default_directory() -> Box<Path> {
-    PathBuf::from("./res/data/").into_boxed_path()
+fn default_directory() -> PathBuf {
+    std::env::current_dir().map_or_else(|_| PathBuf::from("./res/data/"), |v| v.join("res/data"))
 }

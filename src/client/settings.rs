@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::num::{NonZeroU32, NonZeroU64};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::Args;
 use serde::{Deserialize, Serialize};
@@ -27,11 +27,11 @@ use serde::{Deserialize, Serialize};
 #[group(id = "BotSettings")]
 pub struct Settings {
     /// The location of the file that determines the bot's status.
-    #[arg(long = "status-file", default_value = "./res/status.toml")]
+    #[arg(long = "status-file", default_value_os_t = self::default_status_file())]
     #[serde(default = "default_status_file")]
-    pub status_file: Box<Path>,
+    pub status_file: PathBuf,
     /// The interval at which to refresh the bot's status in minutes.
-    #[arg(short = 'S', long = "status-interval", default_value = "30")]
+    #[arg(short = 'S', long = "status-interval", default_value_t = self::default_status_interval())]
     #[serde(default = "default_status_interval")]
     pub status_interval: NonZeroU64,
 
@@ -40,7 +40,7 @@ pub struct Settings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shards: Option<NonZeroU32>,
     /// The interval at which to reshard in hours.
-    #[arg(short = 'r', long = "reshard-interval", default_value = "8")]
+    #[arg(short = 'r', long = "reshard-interval", default_value_t = self::default_reshard_interval())]
     #[serde(default = "default_reshard_interval")]
     pub reshard_interval: NonZeroU64,
 
@@ -51,8 +51,8 @@ pub struct Settings {
 }
 
 /// Returns the default status file location.
-fn default_status_file() -> Box<Path> {
-    PathBuf::from("./res/status.toml").into_boxed_path()
+fn default_status_file() -> PathBuf {
+    std::env::current_dir().map_or_else(|_| PathBuf::from("./res/status.toml"), |v| v.join("res/status.toml"))
 }
 
 /// Returns the default re-sharding interval.

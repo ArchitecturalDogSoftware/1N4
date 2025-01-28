@@ -19,6 +19,7 @@
 
 #[cfg(feature = "caching")]
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -96,6 +97,14 @@ pub enum System {
     #[cfg(feature = "system-memory")]
     #[cfg_attr(not(feature = "system-file"), default)]
     Memory,
+}
+
+impl Display for System {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Some(value) = self.to_possible_value() else { unreachable!("no variants are marked as skipped") };
+
+        f.write_str(value.get_name())
+    }
 }
 
 macro_rules! system_call {

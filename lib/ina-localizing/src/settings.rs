@@ -14,9 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::fmt::Display;
 use std::num::NonZeroUsize;
 use std::ops::Deref;
-use std::path::Path;
+use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
 use serde::{Deserialize, Serialize};
@@ -32,28 +33,27 @@ use crate::{Error, Result};
 #[group(id = "LangSettings")]
 pub struct Settings {
     /// The localizer's default locale.
-    #[arg(short = 'l', long = "default-locale", default_value = "en-US")]
+    #[arg(short = 'l', long = "default-locale", default_value_t)]
     #[serde(default)]
     pub default_locale: Locale,
 
     /// The directory within which to read language files.
-    #[arg(id = "LANG_DIRECTORY", long = "lang-directory", default_value = "./res/lang/")]
+    #[arg(id = "LANG_DIRECTORY", long = "lang-directory", default_value_os_t = self::default_directory())]
     #[serde(default = "default_directory")]
-    pub directory: Box<Path>,
+    pub directory: PathBuf,
 
     /// The behavior that the localizer will exhibit when it fails to translate a key.
-    #[cfg_attr(not(debug_assertions), arg(long = "lang-miss-behavior", default_value = "return"))]
-    #[cfg_attr(debug_assertions, arg(long = "lang-miss-behavior", default_value = "error"))]
+    #[arg(long = "lang-miss-behavior", default_value_t)]
     #[serde(default)]
     pub miss_behavior: MissingBehavior,
 
     /// The localizing thread's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value = "8")]
+    #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value_t = self::default_queue_capacity())]
     #[serde(default = "default_queue_capacity")]
     pub queue_capacity: NonZeroUsize,
 
     /// The amount of depth at which to search for a translation key in language files with inherited translations.
-    #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth", default_value = "2")]
+    #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth", default_value_t = self::default_search_depth())]
     #[serde(default = "default_search_depth")]
     pub search_depth: usize,
 }
@@ -87,6 +87,14 @@ impl MissingBehavior {
     }
 }
 
+impl Display for MissingBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Some(value) = self.to_possible_value() else { unreachable!("no variants are marked as skipped") };
+
+        f.write_str(value.get_name())
+    }
+}
+
 /// Returns the default queue capacity.
 const fn default_queue_capacity() -> NonZeroUsize {
     let Some(capacity) = NonZeroUsize::new(8) else { unreachable!() };
@@ -95,8 +103,8 @@ const fn default_queue_capacity() -> NonZeroUsize {
 }
 
 /// Returns the default language file directory.
-fn default_directory() -> Box<Path> {
-    std::path::PathBuf::from("./res/lang/").into_boxed_path()
+fn default_directory() -> PathBuf {
+    std::env::current_dir().map_or_else(|_| PathBuf::from("./res/lang/"), |v| v.join("res/lang"))
 }
 
 /// Returns the default recursive search depth.
