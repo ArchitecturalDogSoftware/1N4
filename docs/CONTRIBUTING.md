@@ -54,7 +54,7 @@ using [`act`](https://nektosact.com/).
 ### Data
 
 - All configuration data files should be in the TOML format (`.toml`).
-- TOML files are by linted and formatted by [Taplo](https://taplo.tamasfe.dev/).
+- TOML files are linted and formatted by [Taplo](https://taplo.tamasfe.dev/).
   - Always indent using four spaces, not tabs.
   - Lines should never exceed 120 characters.
 - Arrays and objects may be single-line if they do not exceed the character limit.
@@ -68,6 +68,10 @@ All code should strive to follow the [Rust API Guidelines](https://rust-lang.git
 but here are some key rules:
 
 - All source files should be in the Rust file format (`.rs`).
+- Rust files are linted and formatted by [rust-analyzer](https://rust-analyzer.github.io/).
+  - For this project, it's preferred that you lint with [Clippy](https://doc.rust-lang.org/clippy/)
+    instead of the regular cargo check command.
+    This can be configured by setting the `rust-analyzer.checkOnSave.command` option to `clippy`.
 - All types, fields, and methods should be fully documented,
   even if not part of the public API.
 - Logic should be easy to follow.
@@ -79,6 +83,10 @@ but here are some key rules:
   Single-letter names are only allowed within single-line closures.
 - Code should be as safe and performant as possible.
   Avoid repeated allocations, computation, and the usage of Unsafe Rust.
+- Prefer returning results over panicking under most circumstances.
+  - Panics are considered okay if they arise due to issues present at compile-time.
+    For example, failing to read a file should never panic,
+    but calling blocking functions within an asynchronous runtime should *always* panic.
 
 #### Rust Documentation
 
