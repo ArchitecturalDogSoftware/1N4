@@ -15,7 +15,7 @@ repository.workspace = true
 
 [workspace]
 members = ["lib/ina-*"]
-resolver = "2"
+resolver = "3"
 
 package.edition = "2024"
 package.license = "AGPL-3.0-or-later"
