@@ -105,6 +105,24 @@ impl<'ev> CommandOptionResolver<'ev> {
     }
 }
 
+/// Defines getter functions for the [`CommandOptionResolver`] type.
+///
+/// # Examples
+///
+/// ```
+/// command_option_resolver_getters! {
+///    /// Returns a reference to the stored boolean associated with the given name.
+///    ///
+///    /// # Errors
+///    ///
+///    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
+///    boolean as Boolean -> &'ev bool;
+/// }
+///
+/// // generates a function with the following signature:
+/// //
+/// // fn boolean<'ev>(&'ev self, name: impl AsRef<str>) -> Result<&'ev bool, Error>;
+/// ```
 macro_rules! command_option_resolver_getters {
     ($($(#[$attribute:meta])* $name:ident as $type:ident -> $return:ty;)*) => {
         impl<'ev> CommandOptionResolver<'ev> {$(

@@ -276,6 +276,7 @@ pub trait AsId<T> {
     fn as_id(&self) -> Id<T>;
 }
 
+/// Implements the [`AsId<T>`] trait for the given type(s), using the given field or function to resolve the identifier.
 macro_rules! as_id_impl {
     ($(
         $type:ty as $marker:ty $(= $field:ident)? $(=> $call:ident)? $(=> { $($body:tt)* })?;

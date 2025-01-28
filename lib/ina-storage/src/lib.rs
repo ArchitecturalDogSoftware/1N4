@@ -107,6 +107,7 @@ impl Display for System {
     }
 }
 
+/// Calls a function provided by the [`DataSystem`] trait by matching the given [`System`] enum's variant(s).
 macro_rules! system_call {
     (match $system:expr, $($header:ident)* => $($call:tt)*) => {
         match $system {

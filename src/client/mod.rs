@@ -225,6 +225,7 @@ impl Instance {
         UpdatePresencePayload::new(vec![activity.into()], false, None, definition.status).map_err(Into::into)
     }
 
+    /// Returns a [`Duration`] representing the time delay between re-sharding the bot process.
     #[expect(clippy::cast_possible_truncation, reason = "this is fine as we round before casting")]
     #[expect(clippy::cast_sign_loss, reason = "buckets cannot be negative")]
     #[expect(clippy::cast_precision_loss, reason = "there will never be enough shards for this to matter")]

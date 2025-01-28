@@ -218,6 +218,11 @@ impl Poll {
         Ok(collection.into_boxed_slice())
     }
 
+    /// Builds the poll's components, which represent its current builder state.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the poll's components could not be built.
     fn build_components_for_builder<'pl>(
         &'pl self,
         entry: &'pl CommandEntry,

@@ -108,6 +108,7 @@ pub trait GuildExt {
     fn icon_hash(&self) -> Option<&ImageHash>;
 }
 
+/// Implements the [`GuildExt`] trait for a list of types that share common fields.
 macro_rules! guild_ext_impl {
     ($($type:ty)*) => {$(
         impl GuildExt for $type {

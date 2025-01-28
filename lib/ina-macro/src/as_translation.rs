@@ -41,6 +41,7 @@ impl LocalizerCategoryAttribute {
     }
 }
 
+/// The `localizer_key` attribute.
 pub enum LocalizerKeyAttribute {
     /// The literal key string.
     Literal(LitStr),
