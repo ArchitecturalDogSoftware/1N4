@@ -68,25 +68,32 @@ All code should strive to follow the [Rust API Guidelines](https://rust-lang.git
 but here are some key rules:
 
 - All source files should be in the Rust file format (`.rs`).
-- Rust files are linted and formatted by [rust-analyzer](https://rust-analyzer.github.io/).
+- Rust files are linted by [rust-analyzer](https://rust-analyzer.github.io/).
   - For this project, it's preferred that you lint with [Clippy](https://doc.rust-lang.org/clippy/)
     instead of the regular cargo check command.
     This can be configured by setting the `rust-analyzer.checkOnSave.command` option to `clippy`.
+  - Lints are enabled for the entire workspace to guide you towards preferred practices.
+- Rust files are formatted by [`rustfmt`](https://github.com/rust-lang/rustfmt).
+  - Formatting rules are already configured by the `rustfmt.toml` file at the crate root,
+    and should not be modified through the command-line or otherwise.
 - All types, fields, and methods should be fully documented,
   even if not part of the public API.
 - Logic should be easy to follow.
   If something is overly confusing or obscure,
   it should be explained in a comment.
-- Code should have consistent formatting.
-  Use the included `rustfmt.toml` file as your format configuration.
 - Names must be consistent and clear.
   Single-letter names are only allowed within single-line closures.
 - Code should be as safe and performant as possible.
   Avoid repeated allocations, computation, and the usage of Unsafe Rust.
+  - If unsafe *is* used,
+    it is **required** to have documentation explaining why it is safe.
 - Prefer returning results over panicking under most circumstances.
   - Panics are considered okay if they arise due to issues present at compile-time.
     For example, failing to read a file should never panic,
     but calling blocking functions within an asynchronous runtime should *always* panic.
+  - Code containing `unreachable!()` is expressly allowed,
+    however it should typically be alongside documentation
+    describing why it will not cause a panic.
 
 #### Rust Documentation
 
