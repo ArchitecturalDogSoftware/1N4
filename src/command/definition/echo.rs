@@ -49,7 +49,11 @@ crate::define_entry!("echo", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+async fn on_command<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
+) -> EventResult {
     let Some(ref channel) = context.interaction.channel else {
         bail!("this command must be used in a channel");
     };
@@ -60,7 +64,6 @@ async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, '
         Err(error) => return Err(error.into()),
     };
 
-    let resolver = CommandOptionResolver::new(context.data);
     let message = resolver.string("content")?;
     let message: Box<[_]> = match resolver.integer("format").copied().unwrap_or(0) {
         1 => message.chars().map(|c| format!("0b{:b}", u32::from(c))).collect(),

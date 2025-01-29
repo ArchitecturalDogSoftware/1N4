@@ -24,6 +24,7 @@ use twilight_util::builder::embed::EmbedBuilder;
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
+use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::traits::extension::IdExt;
 use crate::utility::{category, color};
@@ -39,7 +40,11 @@ crate::define_entry!("ping", CommandType::ChatInput, struct {
 /// # Errors
 ///
 /// This function will return an error if the command could not be executed.
-async fn on_command<'ap: 'ev, 'ev>(_: &CommandEntry, mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
+async fn on_command<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev CommandData>,
+    _: CommandOptionResolver<'ev>,
+) -> EventResult {
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
         Err(ina_localizing::Error::MissingLocale) => None,

@@ -157,6 +157,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
     entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev ModalInteractionData>,
     custom_id: CustomId,
+    resolver: ModalFieldResolver<'ev>,
 ) -> EventResult {
     let Some(guild_id) = context.interaction.guild_id else {
         bail!("this command must be used in a guild");
@@ -181,8 +182,6 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
     let Some(duration) = custom_id.get::<NonZeroU16>(1).transpose()? else {
         bail!("missing poll duration");
     };
-
-    let resolver = ModalFieldResolver::new(context.data);
 
     let description = resolver.get(entry.id("description")?.to_string())?;
     let image_url = resolver.get(entry.id("image_url")?.to_string())?;

@@ -34,7 +34,7 @@ use twilight_validate::embed::DESCRIPTION_LENGTH;
 use super::api::{Api, ApiRef};
 use crate::command::context::Context;
 use crate::command::registry::registry;
-use crate::command::resolver::find_focused_option;
+use crate::command::resolver::{CommandOptionResolver, ModalFieldResolver, find_focused_option};
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::traits::extension::InteractionExt;
 use crate::utility::types::custom_id::CustomId;
@@ -225,7 +225,9 @@ pub async fn on_command(api: ApiRef<'_>, event: &Interaction) -> EventResult {
         bail!("missing command callback for '{}'", data.name);
     };
 
-    callable.on_command(command, Context::new(api, event, data)).await
+    let resolver = CommandOptionResolver::new(data);
+
+    callable.on_command(command, Context::new(api, event, data), resolver).await
 }
 
 /// Handles a component [`Interaction`] event.
@@ -271,7 +273,9 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
         bail!("missing component callback for '{}'", data_id.command());
     };
 
-    callback.on_modal(command, Context::new(api, event, data), data_id).await
+    let resolver = ModalFieldResolver::new(data);
+
+    callback.on_modal(command, Context::new(api, event, data), data_id, resolver).await
 }
 
 /// Handles an autocomplete [`Interaction`] event.
@@ -297,7 +301,8 @@ pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResul
     };
 
     let context = Context::new(api, event, &(**data));
-    let mut choices = callback.on_autocomplete(command, context, name, text, kind).await?.to_vec();
+    let resolver = CommandOptionResolver::new(data);
+    let mut choices = callback.on_autocomplete(command, context, resolver, name, text, kind).await?.to_vec();
 
     choices.dedup_by_key(|c| c.value.clone());
     choices.sort_unstable_by_key(|c| c.name.clone());

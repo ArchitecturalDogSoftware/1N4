@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
+use resolver::{CommandOptionResolver, ModalFieldResolver};
 use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionType};
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
@@ -76,6 +77,7 @@ pub trait CommandCallable: Send + Sync {
         &self,
         entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev CommandData>,
+        resolver: CommandOptionResolver<'ev>,
     ) -> EventResult;
 }
 
@@ -108,6 +110,7 @@ pub trait ModalCallable: Send + Sync {
         entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev ModalInteractionData>,
         custom_id: CustomId,
+        resolver: ModalFieldResolver<'ev>,
     ) -> EventResult;
 }
 
@@ -123,6 +126,7 @@ pub trait AutocompleteCallable: Send + Sync {
         &self,
         entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev CommandData>,
+        resolver: CommandOptionResolver<'ev>,
         option: &'ev str,
         current: &'ev str,
         kind: CommandOptionType,
@@ -184,9 +188,8 @@ macro_rules! define_commands {
         async fn on_command<'ap: 'ev, 'ev>(
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
+            resolver: $crate::command::resolver::CommandOptionResolver<'ev>,
         ) -> $crate::client::event::EventResult {
-            let resolver = $crate::command::resolver::CommandOptionResolver::new(context.data);
-
             $(if let Ok(resolver) = resolver.subcommand(self::command::$name::NAME) {
                 return self::command::$name::callback(entry, context, resolver).await;
             })else*
@@ -273,9 +276,10 @@ macro_rules! define_modals {
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
             custom_id: $crate::utility::types::custom_id::CustomId,
+            resolver: $crate::command::resolver::ModalFieldResolver<'ev>,
         ) -> $crate::client::event::EventResult {
             match &**custom_id.variant() {
-                $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id).await,)*
+                $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id, resolver).await,)*
                 _ => ::anyhow::bail!("unknown or missing modal"),
             }
         }

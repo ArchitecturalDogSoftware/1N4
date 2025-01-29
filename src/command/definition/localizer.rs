@@ -150,7 +150,8 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
 /// This function will return an error if the auto-completion could not be executed.
 async fn on_autocomplete<'ap: 'ev, 'ev>(
     _: &CommandEntry,
-    context: Context<'ap, 'ev, &'ev CommandData>,
+    _: Context<'ap, 'ev, &'ev CommandData>,
+    resolver: CommandOptionResolver<'ev>,
     option: &'ev str,
     current: &'ev str,
     _: CommandOptionType,
@@ -159,7 +160,6 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
         "locale" => self::on_locale_autocomplete(current).await,
         "category" => Ok(self::on_category_autocomplete(current)),
         "key" => {
-            let resolver = CommandOptionResolver::new(context.data);
             let resolver = resolver.subcommand("localize")?;
 
             let locale = resolver.string("locale").ok().and_then(|v| v.parse().ok());
