@@ -70,8 +70,8 @@ but here are some key rules:
 - All source files should be in the Rust file format (`.rs`).
 - Rust files are linted by [rust-analyzer](https://rust-analyzer.github.io/).
   - For this project, it's preferred that you lint with [Clippy](https://doc.rust-lang.org/clippy/)
-    instead of the regular cargo check command.
-    This can be configured by setting the `rust-analyzer.checkOnSave.command` option to `clippy`.
+    instead of the regular `cargo check` command.
+    This can be configured by setting the `rust-analyzer.check.command` option to `clippy`.
   - Lints are enabled for the entire workspace to guide you towards preferred practices.
 - Rust files are formatted by [`rustfmt`](https://github.com/rust-lang/rustfmt).
   - Formatting rules are already configured by the `rustfmt.toml` file at the crate root,
@@ -87,13 +87,14 @@ but here are some key rules:
   Avoid repeated allocations, computation, and the usage of Unsafe Rust.
   - If unsafe *is* used,
     it is **required** to have documentation explaining why it is safe.
+    This should come in the form of a comment above the usage starting with "Safety:",
+    followed by the reason that the code will not cause undefined behavior.
 - Prefer returning results over panicking under most circumstances.
   - Panics are considered okay if they arise due to issues present at compile-time.
     For example, failing to read a file should never panic,
     but calling blocking functions within an asynchronous runtime should *always* panic.
-  - Code containing `unreachable!()` is expressly allowed,
-    however it should typically be alongside documentation
-    describing why it will not cause a panic.
+  - Code containing `unreachable!` is expressly allowed,
+    however it must be provided a string argument describing why it will not cause a panic.
 
 #### Rust Documentation
 
