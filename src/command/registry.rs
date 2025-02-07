@@ -392,7 +392,7 @@ macro_rules! define_entry {
         #[expect(clippy::allow_attributes, reason = "this is not always catching a lint")]
         #[must_use = r"command entries should be registered"]
         pub fn entry() -> $crate::command::registry::CommandEntry {
-            #[allow(unused_mut)]
+            #[allow(unused_mut, reason = "this value is not always mutated")]
             let mut entry = $crate::command::registry::CommandEntry {
                 name: $name,
                 factory: ::std::boxed::Box::new(Impl),

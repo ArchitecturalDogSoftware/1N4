@@ -135,7 +135,6 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
 
     info!(async "starting client process").await?;
 
-    #[expect(clippy::redundant_pub_crate, reason = "seems to be a false-positive relating to macro expansion")]
     let code = tokio::select! {
         // Exit code of 130 for ^C is standard; 128 (to mark a signal) + 2 (the code for the ^C interrupt).
         _ = terminate => info!(async "received termination signal").await.map(|()| ExitCode::from(130)),

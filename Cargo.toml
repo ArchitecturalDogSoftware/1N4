@@ -23,21 +23,43 @@ package.publish = false
 package.repository = "https://github.com/ArchitecturalDogSoftware/1N4"
 
 [workspace.lints]
-clippy.allow_attributes = "warn"
-clippy.cargo = "warn"
-clippy.expect_used = "warn"
-clippy.missing_docs_in_private_items = { level = "warn", priority = 1 }
-clippy.module_name_repetitions = { level = "allow", priority = 1 }
-clippy.multiple_crate_versions = { level = "allow", priority = 1 }
-clippy.nursery = "warn"
-clippy.todo = "warn"
-clippy.panic = "warn"
-clippy.pedantic = "warn"
+# Give better warnings for all Cargo manifests.
+clippy.cargo = { level = "warn", priority = -1 }
+# This is unavoidable with a project of this size.
+clippy.multiple_crate_versions = "allow"
+
+# Overly pedantic warnings are appreciated here.
+clippy.pedantic = { level = "warn", priority = -1 }
+# False positives seem to rarely occur with this enabled, and the lints are appreciated.
+clippy.nursery = { level = "warn", priority = -1 }
+# Helps avoid conflicting type names.
+clippy.module_name_repetitions = "allow"
+# Adding unnecessary type annotations tends to make code less readable IMO.
 clippy.redundant_type_annotations = "warn"
-clippy.undocumented_unsafe_blocks = { level = "deny", priority = 1 }
-clippy.unwrap_used = { level = "deny", priority = 1 }
+
+# Prefer the usage of `#[expect]` attributes over `#[allow]`.
+clippy.allow_attributes = "warn"
+# Enforce the usage of attribute reasons.
+clippy.allow_attributes_without_reason = "deny"
+
+# Ensure all public items are documented.
 rust.missing_docs = "warn"
+# Ensure all private items are also documented.
+clippy.missing_docs_in_private_items = "warn"
+
+# Preferably avoid panics if at all possible.
+clippy.expect_used = "warn"
+# Explicitly panicking is slightly more okay, but still should be avoided.
+clippy.panic = "warn"
+# These should not be present unless the implementation is being worked on.
+clippy.todo = "warn"
+# Unwrap should not be used at all.
+clippy.unwrap_used = "deny"
+
+# Disallow the usage of unsafe.
 rust.unsafe_code = "deny"
+# Unsafe blocks *must* have safety comments, no exceptions.
+clippy.undocumented_unsafe_blocks = "deny"
 
 [workspace.dependencies]
 anyhow = "1.0"

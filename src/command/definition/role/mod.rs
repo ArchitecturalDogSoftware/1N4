@@ -103,7 +103,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
         context.failure(title, None::<&str>).await?;
 
         return crate::client::event::pass();
-    };
+    }
 
     let name = if let Some(role) = context.api.cache.role(*role_id) {
         role.name.clone()
