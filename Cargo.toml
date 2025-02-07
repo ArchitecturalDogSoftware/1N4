@@ -68,8 +68,8 @@ clap = "4.5"
 ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
 ina-logging = { version = "*", path = "./lib/ina-logging/" }
 ina-macro = { version = "*", path = "./lib/ina-macro/" }
-ina-threading = { version = "*", path = "./lib/ina-threading" }
-ina-storage = { version = "*", path = "./lib/ina-storage" }
+ina-threading = { version = "*", path = "./lib/ina-threading/" }
+ina-storage = { version = "*", path = "./lib/ina-storage/" }
 serde = "1.0"
 time = "0.3"
 thiserror = "2.0"
