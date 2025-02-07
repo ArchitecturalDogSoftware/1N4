@@ -1,6 +1,11 @@
+# Default output directory for the publish script (`../scripts/publish.sh`)
 /bin
+# Default log output directory during run-time.
 /log
+# Default data output directory during run-time.
 /res/data
+# Cargo compilation artifact directory.
 /target
 
+# Local environment variables.
 .env
