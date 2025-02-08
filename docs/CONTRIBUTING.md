@@ -54,7 +54,7 @@ using [`act`](https://nektosact.com/).
 ### Data
 
 - All configuration data files should be in the TOML format (`.toml`).
-- TOML files are by linted and formatted by [Taplo](https://taplo.tamasfe.dev/).
+- TOML files are linted and formatted by [Taplo](https://taplo.tamasfe.dev/).
   - Always indent using four spaces, not tabs.
   - Lines should never exceed 120 characters.
 - Arrays and objects may be single-line if they do not exceed the character limit.
@@ -68,17 +68,41 @@ All code should strive to follow the [Rust API Guidelines](https://rust-lang.git
 but here are some key rules:
 
 - All source files should be in the Rust file format (`.rs`).
+- Rust files are linted by [rust-analyzer](https://rust-analyzer.github.io/).
+  - This project is linted with [Clippy](https://doc.rust-lang.org/clippy/)
+    instead of the regular `cargo check` command.
+    This can be configured by setting the `rust-analyzer.check.command` option to `clippy`.
+  - Lints are enabled for the entire workspace to guide you towards preferred practices.
+- Rust files are formatted by [Rustfmt](https://github.com/rust-lang/rustfmt).
+  - Formatting rules are already configured by the `rustfmt.toml` file at the crate root,
+    and should not be modified through the command-line or otherwise.
+- When ignoring lints, you *must* provide the attribute with a 'reason' field.
+  - E.g., `#[expect(lint_name, reason = "why this lint is being ignored")]`.
+  - Allow attributes are highly discouraged;
+    expect attributes should be used instead when at all possible.
+  - When ignoring the `unsafe_code` lint specifically,
+    the attribute's 'reason' field must explain why the unsafe code is necessary.
 - All types, fields, and methods should be fully documented,
   even if not part of the public API.
 - Logic should be easy to follow.
   If something is overly confusing or obscure,
   it should be explained in a comment.
-- Code should have consistent formatting.
-  Use the included `rustfmt.toml` file as your format configuration.
 - Names must be consistent and clear.
   Single-letter names are only allowed within single-line closures.
 - Code should be as safe and performant as possible.
   Avoid repeated allocations, computation, and the usage of Unsafe Rust.
+  - If unsafe *is* used,
+    it is **required** to have documentation explaining why it is safe.
+    This should come in the form of a comment above the usage starting with "Safety:",
+    followed by the reason that the code will not cause undefined behavior.
+- Prefer returning results over panicking under most circumstances.
+  - Panics are considered okay if they arise due to issues present at compile-time.
+    For example, failing to read a file should never panic,
+    but calling blocking functions within an asynchronous runtime should *always* panic.
+  - Code containing `unreachable!` is expressly allowed,
+    however it must be provided a string argument
+    (and optionally an additional line comment)
+    describing why it will not cause a panic.
 
 #### Rust Documentation
 
