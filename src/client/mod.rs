@@ -290,10 +290,11 @@ impl Instance {
                         continue;
                     }
 
-                    let shard = shard_stream.values().find(|s| s.id() == shard_id).unwrap_or_else(|| unreachable!());
-                    let is_identified = shard.state().is_identified();
+                    let Some(shard) = shard_stream.values().find(|s| s.id() == shard_id) else {
+                        unreachable!("the value is guaranteed to be present within this stream");
+                    };
 
-                    identified[shard_id.number() as usize] = is_identified;
+                    identified[shard_id.number() as usize] = shard.state().is_identified();
                 }
             }
         }

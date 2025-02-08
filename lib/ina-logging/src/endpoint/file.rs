@@ -55,7 +55,9 @@ impl Endpoint for FileEndpoint {
 
     async fn setup(&mut self, settings: &Settings) -> Result<()> {
         let time = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
-        let name = time.format(FILE_NAME_FORMAT).unwrap_or_else(|_| unreachable!());
+        let Ok(name) = time.format(FILE_NAME_FORMAT) else {
+            unreachable!("this only fails due to an invalid format, which would fail at compile-time")
+        };
         let path = settings.directory.join(name).with_extension("log");
 
         tokio::fs::create_dir_all(&settings.directory).await?;

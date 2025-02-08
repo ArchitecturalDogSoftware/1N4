@@ -137,11 +137,13 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
             match state.get(locale, &category, &key) {
                 Ok(text) => {
                     if text.is_missing() && ina_logging::thread::is_started().await {
-                        let Text::Missing(category, key) = &text else { unreachable!() };
+                        let Text::Missing(category, key) = &text else {
+                            unreachable!("the text is guaranteed to be missing at this point");
+                        };
 
-                        // TODO: is it fine to ignore the possible error here?
-                        // This is with the assumption that the logger will not fail to output.
-                        ina_logging::error!(async "missing text for key '{category}::{key}'").await.ok();
+                        // This is error is intentionally ignored because it's better to return the text regardless of
+                        // whether this log fails.
+                        _ = ina_logging::error!(async "missing text for key '{category}::{key}'").await;
                     }
 
                     Response::Text(text)

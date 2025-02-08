@@ -117,7 +117,7 @@ impl Color {
             3.0 .. 4.0 => (0.0, x, chroma),
             4.0 .. 5.0 => (x, 0.0, chroma),
             5.0 .. 6.0 => (chroma, 0.0, x),
-            _ => unreachable!(),
+            _ => unreachable!(), // The value cannot exceed 6.0
         };
 
         Self::from_scaled(r1 + modifier, g1 + modifier, b1 + modifier)
@@ -200,7 +200,7 @@ impl Color {
         } else if (max - b).abs() < f64::EPSILON {
             ((r - g) / chroma) + 4.0
         } else {
-            unreachable!()
+            unreachable!() // One of the previous cases will always be true.
         };
 
         let lightness = (max + min) / 2.0;

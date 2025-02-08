@@ -56,15 +56,15 @@ fn default_status_file() -> PathBuf {
 }
 
 /// Returns the default re-sharding interval.
-const fn default_reshard_interval() -> NonZeroU64 {
-    let Some(interval) = NonZeroU64::new(8) else { unreachable!() };
+fn default_reshard_interval() -> NonZeroU64 {
+    let Some(interval) = NonZeroU64::new(8) else { unreachable!("the default interval must be non-zero") };
 
     interval
 }
 
 /// Returns the default status change interval.
-const fn default_status_interval() -> NonZeroU64 {
-    let Some(interval) = NonZeroU64::new(30) else { unreachable!() };
+fn default_status_interval() -> NonZeroU64 {
+    let Some(interval) = NonZeroU64::new(30) else { unreachable!("the default interval must be non-zero") };
 
     interval
 }

@@ -166,7 +166,9 @@ pub mod display {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             use owo_colors::OwoColorize;
 
-            let time = self.timestamp.time.format(&Iso8601::DEFAULT).unwrap_or_else(|_| unreachable!());
+            let Ok(time) = self.timestamp.time.format(&Iso8601::DEFAULT) else {
+                unreachable!("this only fails due to an invalid format, which would fail at compile-time")
+            };
 
             if let Some(stream) = self.stream {
                 write!(f, "{}", format_args!("[{time}]").if_supports_color(stream, |v| v.dimmed()))
@@ -179,7 +181,11 @@ pub mod display {
     #[cfg(not(feature = "terminal"))]
     impl<'r> Display for TimestampDisplay<'r> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "[{}]", self.timestamp.time.format(&Iso8601::DEFAULT).unwrap_or_else(|_| unreachable!()))
+            let Ok(time) = self.timestamp.time.format(&Iso8601::DEFAULT) else {
+                unreachable!("this only fails due to an invalid format, which would fail at compile-time")
+            };
+
+            write!(f, "[{time}]")
         }
     }
 

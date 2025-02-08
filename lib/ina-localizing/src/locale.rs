@@ -78,7 +78,9 @@ impl Locale {
             Territory::Alpha3(c) => !c.iter().all(char::is_ascii_uppercase),
             Territory::Numeric(_) => false,
         }) {
-            return Err(Error::InvalidTerritory(territory.unwrap_or_else(|| unreachable!())));
+            let Some(territory) = territory else { unreachable!("the territory is always present at this point") };
+
+            return Err(Error::InvalidTerritory(territory));
         }
 
         Ok(Self { language, territory })

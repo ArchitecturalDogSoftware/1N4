@@ -45,8 +45,8 @@ pub struct Settings {
 }
 
 /// Returns the default queue capacity.
-const fn default_queue_capacity() -> NonZeroUsize {
-    let Some(capacity) = NonZeroUsize::new(8) else { unreachable!() };
+fn default_queue_capacity() -> NonZeroUsize {
+    let Some(capacity) = NonZeroUsize::new(8) else { unreachable!("the default capacity must be non-zero") };
 
     capacity
 }
