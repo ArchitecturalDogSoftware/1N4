@@ -68,7 +68,7 @@ pub fn main() -> Result<ExitCode> {
     // In this case, this is the very first function being called, which means that no other threads are actively
     // accessing any environment variables.
     #[cfg(debug_assertions)]
-    #[expect(unsafe_code, reason = "this is safe because this is the very first function being called")]
+    #[expect(unsafe_code, reason = "setting environment variables at run-time requires the usage of unsafe")]
     unsafe {
         // We only want to capture backtraces on debug builds, as this can have a large performance impact.
         std::env::set_var("RUST_BACKTRACE", "1");
