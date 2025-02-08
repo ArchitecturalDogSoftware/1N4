@@ -69,15 +69,15 @@ but here are some key rules:
 
 - All source files should be in the Rust file format (`.rs`).
 - Rust files are linted by [rust-analyzer](https://rust-analyzer.github.io/).
-  - For this project, it's preferred that you lint with [Clippy](https://doc.rust-lang.org/clippy/)
+  - This project is linted with [Clippy](https://doc.rust-lang.org/clippy/)
     instead of the regular `cargo check` command.
     This can be configured by setting the `rust-analyzer.check.command` option to `clippy`.
   - Lints are enabled for the entire workspace to guide you towards preferred practices.
-- Rust files are formatted by [`Rustfmt`](https://github.com/rust-lang/rustfmt).
+- Rust files are formatted by [Rustfmt](https://github.com/rust-lang/rustfmt).
   - Formatting rules are already configured by the `rustfmt.toml` file at the crate root,
     and should not be modified through the command-line or otherwise.
 - When ignoring lints, you *must* provide the attribute with a 'reason' field.
-  - e.g., `#[expect(lint_name, reason = "why this lint is being ignored")]`.
+  - E.g., `#[expect(lint_name, reason = "why this lint is being ignored")]`.
   - Allow attributes are highly discouraged;
     expect attributes should be used instead when at all possible.
   - When ignoring the `unsafe_code` lint specifically,
