@@ -76,8 +76,8 @@ but here are some key rules:
 - Rust files are formatted by [`Rustfmt`](https://github.com/rust-lang/rustfmt).
   - Formatting rules are already configured by the `rustfmt.toml` file at the crate root,
     and should not be modified through the command-line or otherwise.
-- When ignoring lints, you *must* provide the attribute with a 'reason' field
-  (e.g., `#[expect(lint_name, reason = "why this lint is being ignored")]`).
+- When ignoring lints, you *must* provide the attribute with a 'reason' field.
+  - e.g., `#[expect(lint_name, reason = "why this lint is being ignored")]`.
   - Allow attributes are highly discouraged;
     expect attributes should be used instead when at all possible.
   - When ignoring the `unsafe_code` lint specifically,
