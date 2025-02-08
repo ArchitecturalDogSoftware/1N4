@@ -73,9 +73,15 @@ but here are some key rules:
     instead of the regular `cargo check` command.
     This can be configured by setting the `rust-analyzer.check.command` option to `clippy`.
   - Lints are enabled for the entire workspace to guide you towards preferred practices.
-- Rust files are formatted by [`rustfmt`](https://github.com/rust-lang/rustfmt).
+- Rust files are formatted by [`Rustfmt`](https://github.com/rust-lang/rustfmt).
   - Formatting rules are already configured by the `rustfmt.toml` file at the crate root,
     and should not be modified through the command-line or otherwise.
+- When ignoring lints, you *must* provide the attribute with a 'reason' field
+  (e.g., `#[expect(lint_name, reason = "why this lint is being ignored")]`).
+  - Allow attributes are highly discouraged;
+    expect attributes should be used instead when at all possible.
+  - When ignoring the `unsafe_code` lint specifically,
+    the attribute's 'reason' field must explain why the unsafe code is necessary.
 - All types, fields, and methods should be fully documented,
   even if not part of the public API.
 - Logic should be easy to follow.
@@ -94,7 +100,9 @@ but here are some key rules:
     For example, failing to read a file should never panic,
     but calling blocking functions within an asynchronous runtime should *always* panic.
   - Code containing `unreachable!` is expressly allowed,
-    however it must be provided a string argument describing why it will not cause a panic.
+    however it must be provided a string argument
+    (and optionally an additional line comment)
+    describing why it will not cause a panic.
 
 #### Rust Documentation
 
