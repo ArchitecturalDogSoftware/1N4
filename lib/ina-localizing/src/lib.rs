@@ -196,7 +196,7 @@ impl Localizer {
                 continue;
             };
 
-            if let Ok(locale) = name.to_string_lossy().parse() {
+            if let Some(locale) = name.to_str().and_then(|v| v.parse().ok()) {
                 locales.push(locale);
             } else {
                 warn!(async "invalid locale file name: {}", path.to_string_lossy()).await?;
