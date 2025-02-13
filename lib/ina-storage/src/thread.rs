@@ -31,7 +31,9 @@ use crate::{Result, Storage};
 static THREAD: StorageThread = StorageThread::new();
 
 /// The storage thread's type.
-pub type StorageThread = Static<StatefulInvoker<RwLock<Storage>, Request, Response>>;
+pub type StorageThread = Static<StorageThreadInner>;
+/// The storage thread's inner type.
+pub type StorageThreadInner = StatefulInvoker<RwLock<Storage>, Request, Response>;
 
 /// A request sent to the storage thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,6 +67,18 @@ pub enum Response {
     Read(Arc<[u8]>),
 }
 
+/// Creates a new localization thread.
+///
+/// # Errors
+///
+/// This function will return an error if the thread fails to spawn.
+fn create(settings: Settings) -> Result<StorageThreadInner> {
+    let capacity = settings.queue_capacity;
+    let storage = RwLock::new(Storage::new(settings));
+
+    Ok(StatefulInvoker::spawn_with_runtime("storage", capacity, storage, self::run)?)
+}
+
 /// Starts the storage thread.
 ///
 /// # Panics
@@ -75,11 +89,7 @@ pub enum Response {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    let capacity = settings.queue_capacity;
-    let storage = RwLock::new(Storage::new(settings));
-    let handle = StatefulInvoker::spawn_with_runtime("storage", capacity, storage, self::run)?;
-
-    THREAD.async_api().initialize(handle).await;
+    THREAD.async_api().initialize(self::create(settings)?).await;
 
     Ok(())
 }
@@ -94,11 +104,7 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    let capacity = settings.queue_capacity;
-    let storage = RwLock::new(Storage::new(settings));
-    let handle = StatefulInvoker::spawn_with_runtime("storage", capacity, storage, self::run)?;
-
-    THREAD.sync_api().initialize(handle);
+    THREAD.sync_api().initialize(self::create(settings)?);
 
     Ok(())
 }
