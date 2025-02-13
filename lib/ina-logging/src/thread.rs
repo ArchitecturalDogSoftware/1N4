@@ -34,6 +34,8 @@ static THREAD: LoggingThread = LoggingThread::new();
 
 /// The logging thread's type.
 pub type LoggingThread = StaticJoining<Consumer<Request, Result<()>>>;
+/// The logging thread's inner type.
+pub type LoggingThreadInner = Joining<Consumer<Request, Result<()>>>;
 
 /// A request send to the logging thread.
 #[derive(Debug)]
@@ -50,6 +52,21 @@ pub enum Request {
     Endpoint(Arc<RwLock<dyn Endpoint>>),
 }
 
+/// Creates a new logging thread.
+///
+/// # Errors
+///
+/// This function will return an error if the thread fails to spawn.
+fn create(settings: Settings) -> Result<LoggingThreadInner> {
+    let capacity = settings.queue_capacity;
+    let handle = Consumer::spawn_with_runtime("logging", capacity, |r| self::run(settings, r))?;
+
+    Ok(Joining::new(handle).inspect_handle(|handle| {
+        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
+        handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
+    }))
+}
+
 /// Starts the logging thread.
 ///
 /// # Panics
@@ -60,14 +77,7 @@ pub enum Request {
 ///
 /// This function will return an error if the thread could not be initialized.
 pub async fn start(settings: Settings) -> Result<()> {
-    let capacity = settings.queue_capacity;
-    let handle = Consumer::spawn_with_runtime("logging", capacity, |r| self::run(settings, r))?;
-    let handle = Joining::new(handle).inspect_handle(|handle| {
-        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
-        handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
-    });
-
-    THREAD.async_api().initialize(handle).await;
+    THREAD.async_api().initialize(self::create(settings)?).await;
 
     Ok(())
 }
@@ -84,14 +94,7 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread could not be initialized.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    let capacity = settings.queue_capacity;
-    let handle = Consumer::spawn_with_runtime("logging", capacity, |r| self::run(settings, r))?;
-    let handle = Joining::new(handle).inspect_handle(|handle| {
-        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
-        handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
-    });
-
-    THREAD.sync_api().initialize(handle);
+    THREAD.sync_api().initialize(self::create(settings)?);
 
     Ok(())
 }
