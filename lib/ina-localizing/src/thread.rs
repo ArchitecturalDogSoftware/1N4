@@ -29,7 +29,9 @@ use crate::{Localizer, Result};
 static THREAD: LocalizationThread = LocalizationThread::new();
 
 /// The localization thread's type.
-pub type LocalizationThread = Static<StatefulInvoker<RwLock<Localizer>, Request, Response>>;
+pub type LocalizationThread = Static<LocalizationThreadInner>;
+/// The localization thread's inner type.
+pub type LocalizationThreadInner = StatefulInvoker<RwLock<Localizer>, Request, Response>;
 
 /// A request sent to the localization thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,6 +69,18 @@ pub enum Response {
     Keys(Box<[Arc<str>]>),
 }
 
+/// Creates a new localization thread.
+///
+/// # Errors
+///
+/// This function will return an error if the thread fails to spawn.
+fn create(settings: Settings) -> Result<LocalizationThreadInner> {
+    let capacity = settings.queue_capacity;
+    let localizer = RwLock::new(Localizer::new(settings));
+
+    Ok(StatefulInvoker::spawn_with_runtime("localizing", capacity, localizer, self::run)?)
+}
+
 /// Starts the localization thread.
 ///
 /// # Panics
@@ -77,11 +91,7 @@ pub enum Response {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    let capacity = settings.queue_capacity;
-    let localizer = RwLock::new(Localizer::new(settings));
-    let handle = StatefulInvoker::spawn_with_runtime("localizing", capacity, localizer, self::run)?;
-
-    THREAD.async_api().initialize(handle).await;
+    THREAD.async_api().initialize(self::create(settings)?).await;
 
     Ok(())
 }
@@ -96,13 +106,7 @@ pub async fn start(settings: Settings) -> Result<()> {
 ///
 /// This function will return an error if the thread fails to spawn.
 pub fn blocking_start(settings: Settings) -> Result<()> {
-    assert!(!THREAD.sync_api().is_initialized(), "the thread has already been initialized");
-
-    let capacity = settings.queue_capacity;
-    let localizer = RwLock::new(Localizer::new(settings));
-    let handle = StatefulInvoker::spawn_with_runtime("localizing", capacity, localizer, self::run)?;
-
-    THREAD.sync_api().initialize(handle);
+    THREAD.sync_api().initialize(self::create(settings)?);
 
     Ok(())
 }
