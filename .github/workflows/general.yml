@@ -57,7 +57,7 @@ jobs:
               id: goenv
               env:
                 PACKAGES: |
-                    yamlfmt:github.com/google/yamlfmt:v0.15
+                    yamlfmt:github.com/google/yamlfmt:v0.16
                     actionlint:github.com/rhysd/actionlint:v1
                 HASH_LEN_TARGET: '64'
                 MIN_HASH_LEN: '16'
