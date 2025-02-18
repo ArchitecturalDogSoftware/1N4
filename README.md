@@ -42,6 +42,7 @@ If you are running your own instance of 1N4, ensure that the following environme
 - `DEVELOPMENT_CHANNEL_ID` - The bot's 'development channel',
   which is where things like error logs are sent.
   1N4 assumes that the given channel is within the guild specified by `DEVELOPMENT_GUILD_ID`
+- `ENCRYPTION_KEY` - The password used for encrypting and decrypting sensitive files.
 
 ## Contributing
 

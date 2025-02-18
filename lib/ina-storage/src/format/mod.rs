@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "format-compression")]
 pub use self::compression::Compress;
+#[cfg(feature = "format-encryption")]
+pub use self::encryption::Encrypt;
 #[cfg(feature = "format-json")]
 pub use self::json::Json;
 #[cfg(feature = "format-messagepack")]
@@ -31,6 +33,9 @@ pub use self::postcard::Postcard;
 /// The compression format.
 #[cfg(feature = "format-compression")]
 pub mod compression;
+/// The encryption format.
+#[cfg(feature = "format-encryption")]
+pub mod encryption;
 /// The JSON format.
 #[cfg(feature = "format-json")]
 pub mod json;

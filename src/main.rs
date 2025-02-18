@@ -120,6 +120,7 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
 
     info!(async "loaded {loaded_locales} localization locales").await?;
 
+    ina_storage::format::encryption::set_password_resolver(|| std::env::var("ENCRYPTION_KEY").ok());
     ina_storage::thread::start(arguments.data_settings).await?;
 
     info!(async "initialized storage instance").await?;
