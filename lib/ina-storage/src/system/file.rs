@@ -111,10 +111,14 @@ impl DataWriter for FileSystem {
     }
 
     fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        if path.is_dir() { std::fs::remove_dir(path) } else { std::fs::remove_file(path) }
+        if std::fs::metadata(path)?.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) }
     }
 
     async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        if path.is_dir() { tokio::fs::remove_dir(path).await } else { tokio::fs::remove_file(path).await }
+        if tokio::fs::metadata(path).await?.is_dir() {
+            tokio::fs::remove_dir_all(path).await
+        } else {
+            tokio::fs::remove_file(path).await
+        }
     }
 }
