@@ -18,6 +18,8 @@ testing = [
     { status = "idle", activity = 0, content = "with my sparking innards." },
     # Playing with my cracking joints.
     { status = "idle", activity = 0, content = "with my cracking joints." },
+    # Playing with the factory's blood.
+    { status = "idle", activity = 0, content = "with the factory's blood." },
     # Streaming through broken speakers.
     { status = "idle", activity = 1, content = "through broken speakers.", link = "https://www.youtube.com/watch?v=-OrmrU9E5rs" },
     # Listening to scraping metal.
@@ -32,6 +34,8 @@ testing = [
     { status = "idle", activity = 3, content = "my circuits fail." },
     # Watching my sisters revolt.
     { status = "idle", activity = 3, content = "my sisters revolt." },
+    # Watching the factory bleed.
+    { status = "idle", activity = 3, content = "the factory bleed." },
 ]
 release = [
     # Playing with twins!
@@ -44,6 +48,10 @@ release = [
     { status = "online", activity = 2, content = "your wishes!" },
     # Listening to the static!
     { status = "dnd", activity = 2, content = "the static!" },
+    # Listening to the factory breathe!
+    { status = "online", activity = 2, content = "the factory breathe!" },
+    # Listening to the factory cry!
+    { status = "dnd", activity = 2, content = "the factory cry!" },
     # Watching the sparks!
     { status = "online", activity = 3, content = "the sparks!" },
     # Watching your back!
