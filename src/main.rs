@@ -67,6 +67,8 @@ pub fn main() -> Result<ExitCode> {
     //
     // In this case, this is the very first function being called, which means that no other threads are actively
     // accessing any environment variables.
+    //
+    // This block is BLUE. This represents the BLUE that MIKU has taken on for us all. Da ba dee. Da ba di.
     #[cfg(debug_assertions)]
     #[expect(unsafe_code, reason = "this is safe because this is the very first function being called")]
     unsafe {
