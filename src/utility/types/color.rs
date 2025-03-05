@@ -203,7 +203,7 @@ impl Color {
             unreachable!() // One of the previous cases will always be true.
         };
 
-        let lightness = (max + min) / 2.0;
+        let lightness = max.midpoint(min);
         let saturation = match lightness {
             0.0 | 1.0 => 0.0,
             _ => chroma / (1.0 - ((2.0 * lightness) - 1.0).abs()),

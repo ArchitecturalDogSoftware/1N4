@@ -162,7 +162,7 @@ where
     if has_subcommands {
         flags.push(localize!(async(try in locale) category::UI, "help-tag-subcommands").await?);
     }
-    if contexts.is_some_and(|v| v.iter().any(|v| *v == InteractionContextType::BotDm)) {
+    if contexts.is_some_and(|v| v.contains(&InteractionContextType::BotDm)) {
         flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?);
     }
     if nsfw.unwrap_or(false) {
