@@ -125,7 +125,7 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
     ina_storage::format::encryption::set_password_resolver(|| std::env::var("ENCRYPTION_KEY").ok());
     ina_storage::thread::start(arguments.data_settings).await?;
 
-    info!(async "initialized storage instance").await?;
+    info!(async "initialized storage thread").await?;
 
     let instance = Instance::new(arguments.bot_settings).await?;
 
@@ -146,6 +146,10 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
             Err(error) => error!(async "unhandled error encountered: {error}").await.map(|()| ExitCode::FAILURE),
         },
     }?;
+
+    ina_storage::thread::close().await;
+
+    info!(async "closed storage thread").await?;
 
     ina_localizing::thread::close().await;
 
