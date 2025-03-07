@@ -71,3 +71,14 @@ pub fn development_guild_id() -> Result<Id<GuildMarker>> {
 pub fn development_channel_id() -> Result<Id<ChannelMarker>> {
     self::get_id("DEVELOPMENT_CHANNEL_ID")
 }
+
+/// Returns the Discord token environment variable, if present.
+///
+/// This can be configured using `ENCRYPTION_KEY`.
+///
+/// # Errors
+///
+/// This function will return an error if the environment variable is not defined.
+pub fn encryption_key() -> Result<Arc<str>> {
+    self::get("ENCRYPTION_KEY")
+}
