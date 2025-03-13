@@ -125,19 +125,19 @@ impl Logger {
 
     /// Returns the number of entries within the inner queue of this [`Logger`].
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.queue.len()
     }
 
     /// Returns whether the inner queue of this [`Logger`] is empty.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.queue.is_empty()
     }
 
     /// Returns whether the inner queue of this [`Logger`] is full.
     #[must_use]
-    pub fn is_full(&self) -> bool {
+    pub const fn is_full(&self) -> bool {
         self.len() >= self.capacity()
     }
 
