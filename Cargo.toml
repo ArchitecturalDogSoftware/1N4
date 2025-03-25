@@ -62,19 +62,19 @@ rust.unsafe_code = "deny"
 clippy.undocumented_unsafe_blocks = "deny"
 
 [workspace.dependencies]
-anyhow = "1.0"
-async-trait = "0.1"
-clap = "4.5"
+anyhow = "~1.0"
+async-trait = "~0.1"
+clap = "~4.5"
 ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
 ina-logging = { version = "*", path = "./lib/ina-logging/" }
 ina-macro = { version = "*", path = "./lib/ina-macro/" }
 ina-threading = { version = "*", path = "./lib/ina-threading/" }
 ina-storage = { version = "*", path = "./lib/ina-storage/" }
-serde = "1.0"
-time = "0.3"
-thiserror = "2.0"
-tokio = "1.44"
-toml = "0.8"
+serde = "~1.0"
+time = "~0.3"
+thiserror = "~2.0"
+tokio = "~1.44"
+toml = "~0.8"
 
 [lints]
 workspace = true
@@ -91,23 +91,23 @@ strip = "symbols"
 
 [dependencies]
 anyhow.workspace = true
-async-stream = "0.3"
+async-stream = "~0.3"
 async-trait.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env", "wrap_help"] }
-directories = "6.0"
-dotenvy = { version = "0.15", optional = true }
+directories = "~6.0"
+dotenvy = { version = "~0.15", optional = true }
 ina-localizing.workspace = true
 ina-logging.workspace = true
 ina-macro.workspace = true
 ina-threading.workspace = true
 ina-storage = { workspace = true, features = ["format-compression", "format-encryption", "format-messagepack"] }
-rand = { version = "0.9", default-features = false, features = ["nightly", "thread_rng"] }
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rand = { version = "~0.9", default-features = false, features = ["nightly", "thread_rng"] }
+rustls = { version = "~0.23", default-features = false, features = ["ring"] }
 serde = { workspace = true, features = ["derive"] }
 thiserror.workspace = true
 time = { workspace = true, features = ["local-offset", "serde"] }
 tokio = { workspace = true, features = ["full"] }
-tokio-stream = "0.1"
+tokio-stream = "~0.1"
 toml = { workspace = true, features = ["preserve_order"] }
 twilight-cache-inmemory = "~0.16"
 twilight-gateway = "~0.16"
