@@ -71,7 +71,6 @@ impl Anchor {
     }
 
     /// Returns a message update future builder for the associated message.
-    #[expect(clippy::missing_const_for_fn, reason = "false positive; the arc'd api cannot be const-derefed")]
     pub fn update<'ar>(&self, api: ApiRef<'ar>) -> UpdateMessage<'ar> {
         let Self { channel_id, message_id, .. } = self;
 

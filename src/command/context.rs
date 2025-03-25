@@ -79,7 +79,6 @@ where
     }
 
     /// Returns the interaction client of this [`Context<T>`].
-    #[expect(clippy::missing_const_for_fn, reason = "false positive; the arc'd api cannot be const-derefed")]
     pub fn client(&self) -> InteractionClient {
         self.api.client.interaction(self.interaction.application_id)
     }
