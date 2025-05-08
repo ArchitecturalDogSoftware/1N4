@@ -38,6 +38,19 @@ Rust source files (`.rs`) and script files (`.sh`, `.bat`).
 There is a copyright header template available to you
 within the [`LICENSE_TEMPLATE`](./LICENSE_TEMPLATE.md) file in the [`docs/`](./) directory.
 
+## Dependencies
+
+This project uses [`cargo-deny`](https://github.com/embarkstudios/cargo-deny) to lint its dependencies.
+It checks for
+duplicate/banned crates,
+incompatible licenses,
+untrusted sources,
+security advisories,
+and unmaintained/yanked dependencies,
+but these checks can have false positives.
+In particular, the list of allowed licenses is the minimal list of what is used by 1N4's current dependencies,
+not the minimal list of what we will accept --- we are open to adding more!
+
 ## Programming Conventions
 
 This is a non-exhaustive and relatively pedantic list of the expected rules for contributed source code.
