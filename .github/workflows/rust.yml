@@ -86,3 +86,23 @@ jobs:
               run: cargo clippy --verbose
             - name: Action - Run RustFmt
               run: cargo fmt --all -- --check
+
+    # Check dependencies for duplicate/banned crates, incompatible licenses, and untrusted sources.
+    deny-other:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - uses: EmbarkStudios/cargo-deny-action@v2
+              with:
+                command: check bans licenses sources
+
+    # Check for security advisories from dependencies (or unmaintained/yanked dependencies).
+    #
+    # Seperated from other `cargo deny` checks to distinguish these warnings from the more predictable checks.
+    deny-security:
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+            - uses: EmbarkStudios/cargo-deny-action@v2
+              with:
+                command: check advisories
