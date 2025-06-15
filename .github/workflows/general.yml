@@ -21,10 +21,13 @@ on: [push, pull_request]
 jobs:
     toml:
         runs-on: ubuntu-24.04
-        # Taplo doesn't have a SemVer tag for v0.10.*, so we will have to update patch-by-patch.
-        container: tamasfe/taplo:0.10.0
         steps:
             - uses: actions/checkout@v4
+            - name: Setup - Install Taplo
+              uses: taiki-e/install-action@v2
+              with:
+                # Taplo doesn't have a SemVer tag for v0.10.*, so we will have to update patch-by-patch.
+                tool: taplo@0.10.0
 
             - name: Action - Check TOML formatting
               run: taplo format --check
