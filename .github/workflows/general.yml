@@ -21,8 +21,8 @@ on: [push, pull_request]
 jobs:
     toml:
         runs-on: ubuntu-24.04
-        # Doesn't have a SemVer tag for v0.9.*, we will have to update patch-by-patch.
-        container: tamasfe/taplo:0.9.3
+        # Taplo doesn't have a SemVer tag for v0.10.*, so we will have to update patch-by-patch.
+        container: tamasfe/taplo:0.10.0
         steps:
             - uses: actions/checkout@v4
 
@@ -57,7 +57,7 @@ jobs:
               id: goenv
               env:
                 PACKAGES: |
-                    yamlfmt:github.com/google/yamlfmt:v0.16
+                    yamlfmt:github.com/google/yamlfmt:v0.17
                     actionlint:github.com/rhysd/actionlint:v1
                 HASH_LEN_TARGET: '64'
                 MIN_HASH_LEN: '16'

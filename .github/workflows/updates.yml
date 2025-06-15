@@ -31,7 +31,7 @@ jobs:
             GO_VERSION: '1'
             # Spec: `binary:path:vSemVer`
             GO_PACKAGES: |
-                yamlfmt:github.com/google/yamlfmt:v0.16
+                yamlfmt:github.com/google/yamlfmt:v0.17
                 actionlint:github.com/rhysd/actionlint:v1
             # Spec: `package:SemVer`
             PYTHON_PACKAGES: |
@@ -39,7 +39,7 @@ jobs:
             # Spec: `namespace/repository:tag:SemVer(:search filter)?`
             DOCKER_CONTAINERS: |
                 mvdan/shfmt:v3-alpine:v3:-alpine
-                tamasfe/taplo:0.9.3:0.9.3
+                tamasfe/taplo:0.10.0:0.10.0
             # Spec: `namespace/repository@semver`
             ACTIONS: |
                 actions/cache@v4
