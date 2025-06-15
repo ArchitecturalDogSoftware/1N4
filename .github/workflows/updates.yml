@@ -39,12 +39,12 @@ jobs:
             # Spec: `namespace/repository:tag:SemVer(:search filter)?`
             DOCKER_CONTAINERS: |
                 mvdan/shfmt:v3-alpine:v3:-alpine
-                tamasfe/taplo:0.10.0:0.10.0
             # Spec: `namespace/repository@semver`
-            ACTIONS: |
+            GITHUB_RELEASES: |
                 actions/cache@v4
                 actions/checkout@v4
                 actions/setup-go@v5
+                tamasfe/taplo@0.10.0
             # Spec: `product-version:short-name-version:subdir`
             #
             # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
@@ -206,7 +206,7 @@ jobs:
 
                 case "$latest" in
                     "$semver_target"* )
-                        echo "$name is up to date! ($latest_display in $semver_target_display)"
+                        echo "$name is up to date! ($latest_display (latest) in target $semver_target_display)"
                         ;;
 
                     * )
@@ -302,7 +302,7 @@ jobs:
 
                     compare_semver "$repository" "$latest" "$semver_target"
                 done < <(trim_whitespace "$DOCKER_CONTAINERS")
-            - name: Check GitHub Actions
+            - name: Check GitHub releases
               run: |
                 while read -r package; do
                     if [ -z "$package" ]; then
@@ -318,17 +318,26 @@ jobs:
                     # E.g., `v4`.
                     semver_target="$(get_column "$package" 2 '@')"
 
-                    tags="$(download "$GITHUB_API_URL/repos/$namespace/$repository/tags")"
+                    # This returns only one page of thirty releases by default, but it seems like they're sorted by
+                    # latest first, so that should be fine. We only need the latest few anyways. We don't use the
+                    # dedicated endpoint for the latest release in case there are multiple simultaneous releases for
+                    # whatever reason, in which cases we want to apply our own filtering to pick the top one.
+                    #
+                    # <https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#list-releases>
+                    releases="$(download "$GITHUB_API_URL/repos/$namespace/$repository/releases")"
+                    # Filter to only tag names, extract the tag name out, filter to only tags that begin with a number
+                    # or with `v` and then a number, sort each line as a version number, then take the latest.
                     latest="$(
-                        echo "$tags" |
-                            grep '^ *"name": \?".*",\?$' |
-                            sed 's/ *"name": \?"\(.*\)",\?$/\1/' |
+                        echo "$releases" |
+                            grep '^ *"tag_name": \?".*",\?$' |
+                            sed 's/ *"tag_name": \?"\(.*\)",\?$/\1/' |
+                            grep '^v\?[0-9]' |
                             sort -rV |
                             head -n 1
                     )"
 
                     compare_semver "$path" "$latest" "$semver_target"
-                done < <(trim_whitespace "$ACTIONS")
+                done < <(trim_whitespace "$GITHUB_RELEASES")
             - name: Check GitHub Actions runners
               run: |
                 git clone --depth 1 'https://github.com/actions/runner-images'
