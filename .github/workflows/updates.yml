@@ -36,9 +36,6 @@ jobs:
             # Spec: `package:SemVer`
             PYTHON_PACKAGES: |
                 mdformat:0.7
-            # Spec: `namespace/repository:tag:SemVer(:search filter)?`
-            DOCKER_CONTAINERS: |
-                mvdan/shfmt:v3-alpine:v3:-alpine
             # Spec: `namespace/repository@semver`
             GITHUB_RELEASES: |
                 actions/cache@v4
@@ -190,18 +187,18 @@ jobs:
 
                 declare_function compare_semver << 'EOF'
                 name="$1"
-                latest="$2"
+                # Ensures there's a `v` at the start
+                latest="v${2#v}"
                 # Assumes `vMAJOR.MINOR`, `vMAJOR.MINOR`, or `vMAJOR.MINOR.PATCH`, not full SemVer.
-                semver_target="$3"
+                semver_target="v${3#v}"
                 no_v="${4:-'--v'}"
 
                 if [ "$no_v" = '--no-v' ]; then
+                    latest_display="${latest#v}"
+                    semver_target_display="${semver_target#v}"
+                else
                     latest_display="$latest"
                     semver_target_display="$semver_target"
-                else
-                    # Ensures there's a `v` at the start
-                    latest_display="v${latest#v}"
-                    semver_target_display="v${semver_target#v}"
                 fi
 
                 case "$latest" in
@@ -210,7 +207,7 @@ jobs:
                         ;;
 
                     * )
-                        echo "New $name version available! ($latest_display not in $semver_target_display)" >&2
+                        echo "New $name version available! ($latest_display (latest) not in target $semver_target_display)" >&2
                         exit 1
                         ;;
                 esac
@@ -258,50 +255,6 @@ jobs:
 
                     compare_semver "$package_name" "$latest" "$package_version"
                 done < <(trim_whitespace "$PYTHON_PACKAGES")
-            - name: Check Docker containers
-              run: |
-                api_base='https://hub.docker.com/v2'
-
-                # TODO: Adapt to work with Taplo.
-                while read -r package; do
-                    if [ -z "$package" ]; then
-                        continue
-                    fi
-
-                    # E.g., `mvdan/shfmt`.
-                    path="$(get_column "$package" 1)"
-                    # E.g., `mvdan`.
-                    namespace="$(get_column "$path" 1 '/')"
-                    # E.g., `shfmt`.
-                    repository="$(get_column "$path" 2 '/')"
-                    # E.g., `v3`.
-                    semver_target="$(get_column "$package" 3)"
-                    # E.g., `-alpine` (or none).
-                    search_filter="$(get_column "$package" 4)"
-
-                    url="$(
-                        echo "$api_base/namespaces/$namespace/repositories/$repository/tags \
-                            ?page_size=25 \
-                            &page=1 \
-                            &ordering=last_updated" |
-                        tr -d '[:space:]'
-                    )"
-                    if [ -n "$search_filter" ]; then
-                        url="$url&name=$search_filter"
-                    fi
-
-                    versions="$(wget -qO - "$url")"
-                    latest="$(
-                        echo "$versions" |
-                            grep -o -m 1 '"name":"[^"]*"' |
-                            sed 's/"name":"\(.*\)"/\1/' |
-                            grep -v '^[^0-9]\+$' |
-                            sort -rV |
-                            head -n 1
-                    )"
-
-                    compare_semver "$repository" "$latest" "$semver_target"
-                done < <(trim_whitespace "$DOCKER_CONTAINERS")
             - name: Check GitHub releases
               run: |
                 while read -r package; do
