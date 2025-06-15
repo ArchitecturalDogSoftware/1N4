@@ -21,10 +21,12 @@ on: [push, pull_request]
 jobs:
     toml:
         runs-on: ubuntu-24.04
-        # Doesn't have a SemVer tag for v0.9.*, we will have to update patch-by-patch.
-        container: tamasfe/taplo:0.9.3
         steps:
             - uses: actions/checkout@v4
+            - name: Setup - Install Taplo
+              uses: taiki-e/install-action@v2
+              with:
+                tool: taplo@0.10
 
             - name: Action - Check TOML formatting
               run: taplo format --check
@@ -33,14 +35,27 @@ jobs:
 
     shell:
         runs-on: ubuntu-24.04
-        container: mvdan/shfmt:v3-alpine
         steps:
             - uses: actions/checkout@v4
-            - name: Setup - Install ShellCheck
-              run: apk add shellcheck
+            - name: Setup - Disable APT updating manpages
+              run: |
+                # Processing APT triggers for `man-db` can take a while when `taiki-e/install-action@v2` is
+                # uninstalling the old version of ShellCheck bundled with this GitHub Actions runner. Given that a CI
+                # runner doesn't need perfect manpages, it should be safe to disable `man-db` triggers.
+                #
+                # This particular snippet was suggested by
+                # [Georg Sauthoff](https://stackoverflow.com/users/427158/maxschlepzig) in
+                # <https://stackoverflow.com/a/79289673>. CC BY-SA 4.0.
+                echo 'set man-db/auto-update false' | sudo debconf-communicate
+                sudo dpkg-reconfigure man-db
 
-            - name: Action - Lint shell scripts with shellcheck
-              run: shfmt --find . | tr '\n' '\0' | xargs -0 shellcheck
+            - name: Setup - Install shfmt and ShellCheck
+              uses: taiki-e/install-action@v2
+              with:
+                tool: shfmt@3,shellcheck@0.10
+
+            - name: Action - Lint shell scripts with ShellCheck
+              run: shfmt --find=0 . | xargs -0 shellcheck
             - name: Action - Check shell script formatting
               run: shfmt --diff .
 
@@ -57,7 +72,7 @@ jobs:
               id: goenv
               env:
                 PACKAGES: |
-                    yamlfmt:github.com/google/yamlfmt:v0.16
+                    yamlfmt:github.com/google/yamlfmt:v0.17
                     actionlint:github.com/rhysd/actionlint:v1
                 HASH_LEN_TARGET: '64'
                 MIN_HASH_LEN: '16'
