@@ -26,8 +26,7 @@ jobs:
             - name: Setup - Install Taplo
               uses: taiki-e/install-action@v2
               with:
-                # Taplo doesn't have a SemVer tag for v0.10.*, so we will have to update patch-by-patch.
-                tool: taplo@0.10.0
+                tool: taplo@0.10
 
             - name: Action - Check TOML formatting
               run: taplo format --check
@@ -36,14 +35,15 @@ jobs:
 
     shell:
         runs-on: ubuntu-24.04
-        container: mvdan/shfmt:v3-alpine
         steps:
             - uses: actions/checkout@v4
-            - name: Setup - Install ShellCheck
-              run: apk add shellcheck
+            - name: Setup - Install shfmt and ShellCheck
+              uses: taiki-e/install-action@v2
+              with:
+                tool: shfmt@3,shellcheck@0.10
 
             - name: Action - Lint shell scripts with shellcheck
-              run: shfmt --find . | tr '\n' '\0' | xargs -0 shellcheck
+              run: shfmt --find=0 . | xargs -0 shellcheck
             - name: Action - Check shell script formatting
               run: shfmt --diff .
 

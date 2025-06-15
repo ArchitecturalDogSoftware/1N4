@@ -41,7 +41,9 @@ jobs:
                 actions/cache@v4
                 actions/checkout@v4
                 actions/setup-go@v5
-                tamasfe/taplo@0.10.0
+                tamasfe/taplo@0.10
+                mvdan/sh@3
+                koalaman/shellcheck@0.10
             # Spec: `product-version:short-name-version:subdir`
             #
             # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
