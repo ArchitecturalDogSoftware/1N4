@@ -50,7 +50,7 @@ impl<T> IdExt<T> for Id<T> {
 /// Extends an [`Interaction`] or other interaction-like types.
 pub trait InteractionExt {
     /// Returns a display representation of this interaction's type.
-    fn display_label(&self) -> InteractionLabelDisplay;
+    fn display_label(&self) -> InteractionLabelDisplay<'_>;
 }
 
 /// Displays an interaction label.
@@ -94,7 +94,7 @@ impl Display for InteractionLabelDisplay<'_> {
 
 impl InteractionExt for Interaction {
     #[inline]
-    fn display_label(&self) -> InteractionLabelDisplay {
+    fn display_label(&self) -> InteractionLabelDisplay<'_> {
         InteractionLabelDisplay { interaction: self }
     }
 }
@@ -148,10 +148,10 @@ impl GuildExt for TemplateGuild {
 /// Extends a [`User`] or other user-like types.
 pub trait UserExt {
     /// Returns a display implementation of this user's name.
-    fn display_name(&self) -> UserNameDisplay;
+    fn display_name(&self) -> UserNameDisplay<'_>;
 
     /// Returns a display implementation of this user's account tag.
-    fn display_tag(&self) -> UserTagDisplay;
+    fn display_tag(&self) -> UserTagDisplay<'_>;
 
     /// Returns the user's icon hash.
     fn icon_hash(&self) -> Option<ImageHash>;
@@ -199,11 +199,11 @@ impl Display for UserTagDisplay<'_> {
 }
 
 impl UserExt for CachedMember {
-    fn display_name(&self) -> UserNameDisplay {
+    fn display_name(&self) -> UserNameDisplay<'_> {
         UserNameDisplay { nick: self.nick(), name: None, user: "unknown" }
     }
 
-    fn display_tag(&self) -> UserTagDisplay {
+    fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay { user: "unknown", tag: None }
     }
 
@@ -217,11 +217,11 @@ impl UserExt for CachedMember {
 }
 
 impl UserExt for CurrentUser {
-    fn display_name(&self) -> UserNameDisplay {
+    fn display_name(&self) -> UserNameDisplay<'_> {
         UserNameDisplay { nick: None, name: None, user: &self.name }
     }
 
-    fn display_tag(&self) -> UserTagDisplay {
+    fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay { user: &self.name, tag: NonZeroU16::new(self.discriminator) }
     }
 
@@ -235,11 +235,11 @@ impl UserExt for CurrentUser {
 }
 
 impl UserExt for Member {
-    fn display_name(&self) -> UserNameDisplay {
+    fn display_name(&self) -> UserNameDisplay<'_> {
         UserNameDisplay { nick: self.nick.as_deref(), name: self.user.global_name.as_deref(), user: &self.user.name }
     }
 
-    fn display_tag(&self) -> UserTagDisplay {
+    fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay { user: &self.user.name, tag: NonZeroU16::new(self.user.discriminator) }
     }
 
@@ -253,7 +253,7 @@ impl UserExt for Member {
 }
 
 impl UserExt for PartialMember {
-    fn display_name(&self) -> UserNameDisplay {
+    fn display_name(&self) -> UserNameDisplay<'_> {
         UserNameDisplay {
             nick: self.nick.as_deref(),
             name: self.user.as_ref().and_then(|u| u.global_name.as_deref()),
@@ -261,7 +261,7 @@ impl UserExt for PartialMember {
         }
     }
 
-    fn display_tag(&self) -> UserTagDisplay {
+    fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay {
             user: self.user.as_ref().map_or("unknown", |u| &(*u.name)),
             tag: self.user.as_ref().and_then(|u| NonZeroU16::new(u.discriminator)),
@@ -278,11 +278,11 @@ impl UserExt for PartialMember {
 }
 
 impl UserExt for PartialUser {
-    fn display_name(&self) -> UserNameDisplay {
+    fn display_name(&self) -> UserNameDisplay<'_> {
         UserNameDisplay { nick: None, name: None, user: &self.username }
     }
 
-    fn display_tag(&self) -> UserTagDisplay {
+    fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay { user: &self.username, tag: NonZeroU16::new(self.discriminator) }
     }
 
@@ -296,11 +296,11 @@ impl UserExt for PartialUser {
 }
 
 impl UserExt for User {
-    fn display_name(&self) -> UserNameDisplay {
+    fn display_name(&self) -> UserNameDisplay<'_> {
         UserNameDisplay { nick: None, name: self.global_name.as_deref(), user: &self.name }
     }
 
-    fn display_tag(&self) -> UserTagDisplay {
+    fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay { user: &self.name, tag: NonZeroU16::new(self.discriminator) }
     }
 

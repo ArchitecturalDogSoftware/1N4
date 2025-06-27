@@ -38,7 +38,7 @@ impl Timestamp {
     pub const fn display(
         &self,
         #[cfg(feature = "terminal")] stream: Option<owo_colors::Stream>,
-    ) -> self::display::TimestampDisplay {
+    ) -> self::display::TimestampDisplay<'_> {
         self::display::TimestampDisplay {
             timestamp: self,
             #[cfg(feature = "terminal")]
@@ -65,7 +65,7 @@ pub struct Level<'lv> {
     pub error: bool,
 }
 
-impl Level<'_> {
+impl<'lv> Level<'lv> {
     /// The debug log level.
     #[cfg(debug_assertions)]
     pub const DEBUG: Self = Self {
@@ -101,7 +101,7 @@ impl Level<'_> {
     pub const fn display(
         &self,
         #[cfg(feature = "terminal")] stream: Option<owo_colors::Stream>,
-    ) -> self::display::LevelDisplay {
+    ) -> self::display::LevelDisplay<'lv, '_> {
         self::display::LevelDisplay {
             level: self,
             #[cfg(feature = "terminal")]
@@ -133,7 +133,7 @@ impl<'lv> Entry<'lv> {
     pub const fn display(
         &self,
         #[cfg(feature = "terminal")] stream: Option<owo_colors::Stream>,
-    ) -> self::display::EntryDisplay {
+    ) -> self::display::EntryDisplay<'lv, '_> {
         self::display::EntryDisplay {
             entry: self,
             #[cfg(feature = "terminal")]

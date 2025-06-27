@@ -47,12 +47,12 @@ pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {
     }
 
     /// Returns an asynchronous API for this stored value type.
-    fn as_async_api(&self) -> AsyncHolderApi<Self> {
+    fn as_async_api(&self) -> AsyncHolderApi<'_, Self> {
         Self::async_api().with(self)
     }
 
     /// Returns a synchronous API for this stored value type.
-    fn as_sync_api(&self) -> SyncHolderApi<Self> {
+    fn as_sync_api(&self) -> SyncHolderApi<'_, Self> {
         Self::sync_api().with(self)
     }
 }
@@ -65,7 +65,7 @@ pub struct AsyncApi<T: Stored>(PhantomData<T>);
 
 impl<T: Stored> AsyncApi<T> {
     /// Creates an asynchronous API that holds the given value.
-    pub const fn with(self, value: &T) -> AsyncHolderApi<T> {
+    pub const fn with(self, value: &T) -> AsyncHolderApi<'_, T> {
         AsyncHolderApi(value)
     }
 
@@ -232,7 +232,7 @@ pub struct SyncApi<T: Stored>(PhantomData<T>);
 
 impl<T: Stored> SyncApi<T> {
     /// Creates a synchronous API that holds the given value.
-    pub const fn with(self, value: &T) -> SyncHolderApi<T> {
+    pub const fn with(self, value: &T) -> SyncHolderApi<'_, T> {
         SyncHolderApi(value)
     }
 

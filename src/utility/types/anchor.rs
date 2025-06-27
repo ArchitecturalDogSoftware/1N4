@@ -55,7 +55,7 @@ impl Anchor {
     }
 
     /// Returns a display implementation for this [`Anchor`]'s link.
-    pub const fn display_link(&self) -> AnchorLinkDisplay {
+    pub const fn display_link(&self) -> AnchorLinkDisplay<'_> {
         AnchorLinkDisplay(self)
     }
 

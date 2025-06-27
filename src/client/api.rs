@@ -42,7 +42,7 @@ impl Api {
 
     /// Returns a reference to this [`Api`].
     #[must_use]
-    pub const fn as_ref(&self) -> ApiRef {
+    pub const fn as_ref(&self) -> ApiRef<'_> {
         ApiRef { settings: &self.settings, client: &self.client, cache: &self.cache }
     }
 }

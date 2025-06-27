@@ -230,7 +230,7 @@ where
     }
 
     /// Returns a borrowed version of this [`Text`].
-    pub const fn as_borrowed(&self) -> TextRef<I> {
+    pub const fn as_borrowed(&self) -> TextRef<'_, '_, I> {
         match self {
             Self::Present(t) => TextRef::Present(t),
             Self::Inherit(l, t) => TextRef::Inherit(*l, t),

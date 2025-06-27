@@ -79,7 +79,7 @@ where
     }
 
     /// Returns the interaction client of this [`Context<T>`].
-    pub fn client(&self) -> InteractionClient {
+    pub fn client(&self) -> InteractionClient<'_> {
         self.api.client.interaction(self.interaction.application_id)
     }
 

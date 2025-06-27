@@ -95,7 +95,7 @@ impl<H> Static<H> {
     /// assert!(!THREAD.async_api().is_initialized().await);
     /// # }
     /// ```
-    pub const fn async_api(&self) -> AsyncStaticApi<H>
+    pub const fn async_api(&self) -> AsyncStaticApi<'_, H>
     where
         H: Send + Sync,
     {
@@ -113,7 +113,7 @@ impl<H> Static<H> {
     ///
     /// assert!(!THREAD.sync_api().is_initialized());
     /// ```
-    pub const fn sync_api(&self) -> SyncStaticApi<H> {
+    pub const fn sync_api(&self) -> SyncStaticApi<'_, H> {
         SyncStaticApi { inner: &self.inner }
     }
 }
@@ -197,7 +197,7 @@ where
     /// assert!(!THREAD.async_api().is_initialized().await);
     /// # }
     /// ```
-    pub const fn async_api(&self) -> AsyncStaticApi<Joining<H>>
+    pub const fn async_api(&self) -> AsyncStaticApi<'_, Joining<H>>
     where
         H: Send + Sync,
     {
@@ -215,7 +215,7 @@ where
     ///
     /// assert!(!THREAD.sync_api().is_initialized());
     /// ```
-    pub const fn sync_api(&self) -> SyncStaticApi<Joining<H>> {
+    pub const fn sync_api(&self) -> SyncStaticApi<'_, Joining<H>> {
         SyncStaticApi { inner: &self.inner }
     }
 }
@@ -342,7 +342,7 @@ where
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
-    pub async fn get(&self) -> RwLockReadGuard<H> {
+    pub async fn get(&self) -> RwLockReadGuard<'_, H> {
         RwLockReadGuard::map(self.inner.read().await, |v| v.as_ref().expect("the thread has not been initialized"))
     }
 
@@ -373,7 +373,7 @@ where
     /// # Panics
     ///
     /// Panics if the thread has not been initialized.
-    pub async fn get_mut(&self) -> RwLockMappedWriteGuard<H> {
+    pub async fn get_mut(&self) -> RwLockMappedWriteGuard<'_, H> {
         RwLockWriteGuard::map(self.inner.write().await, |v| v.as_mut().expect("the thread has not been initialized"))
     }
 
@@ -515,7 +515,7 @@ impl<H> SyncStaticApi<'_, H> {
     /// # Panics
     ///
     /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
-    pub fn get(&self) -> RwLockReadGuard<H> {
+    pub fn get(&self) -> RwLockReadGuard<'_, H> {
         RwLockReadGuard::map(self.inner.blocking_read(), |v| v.as_ref().expect("the thread has not been initialized"))
     }
 
@@ -546,7 +546,7 @@ impl<H> SyncStaticApi<'_, H> {
     ///
     /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
     #[must_use]
-    pub fn get_mut(&self) -> RwLockMappedWriteGuard<H> {
+    pub fn get_mut(&self) -> RwLockMappedWriteGuard<'_, H> {
         RwLockWriteGuard::map(self.inner.blocking_write(), |v| v.as_mut().expect("the thread has not been initialized"))
     }
 
