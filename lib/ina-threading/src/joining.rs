@@ -20,7 +20,7 @@ use crate::Handle;
 
 /// A thread that is automatically joined when dropped.
 #[must_use = "this thread will drop and attempt to join immediately if left unused"]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct Joining<H>
 where
     H: Handle,
