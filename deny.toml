@@ -4,7 +4,7 @@
 # current dependencies, but adding more is certainly an option.
 #
 # <https://spdx.org/licenses/>
-allow = ["AGPL-3.0", "Apache-2.0", "BSD-3-Clause", "ISC", "MIT", "MPL-2.0", "Unicode-3.0"]
+allow = ["AGPL-3.0", "Apache-2.0", "BSD-3-Clause", "CDLA-Permissive-2.0", "ISC", "MIT", "MPL-2.0", "Unicode-3.0"]
 
 # <https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html>
 [advisories]
