@@ -21,3 +21,18 @@ ignore = [
 [bans]
 # Don't warn about multiple versions of crates.
 multiple-versions = "allow"
+
+# <https://embarkstudios.github.io/cargo-deny/checks/sources/cfg.html>
+[sources]
+allow-git = [
+    # Only temporary! `RemasteredArch/license_page` is tracking a PR branch from this repository instead of upstream
+    # `cargo-license` because it replaces an unmaintained dependency (triggering warnings about `RUSTSEC-2021-0139`).
+    #
+    # Tracking issue: <https://github.com/RemasteredArch/license_page/issues/1>. Feel free to bother me
+    # (@RemasteredArch) about removing this allow list entry if that issue closes (or if the PR lands and I haven't
+    # started tracking upstream again).
+    "https://github.com/Nitrokey/cargo-license",
+    # This might or might not be temporary. This is my (@RemasteredArch) repository, so as a maintainer, there's an
+    # assumed level of trust, but I might put `license_page` on crates.io too, we'll see.
+    "https://github.com/RemasteredArch/license_page",
+]
