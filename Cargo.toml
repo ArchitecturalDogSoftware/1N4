@@ -116,3 +116,7 @@ twilight-mention = "~0.16"
 twilight-model = "~0.16"
 twilight-util = { version = "~0.16", features = ["full"] }
 twilight-validate = "~0.16"
+
+[build-dependencies]
+camino = "1.1.10"
+license_page = { git = "https://github.com/RemasteredArch/license_page" }
