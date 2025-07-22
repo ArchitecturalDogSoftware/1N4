@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Copyright © 2024 Jaxydog
+// Copyright © 2025 RemasteredArch
 //
 // This file is part of 1N4.
 //
@@ -22,7 +23,11 @@ use ina_localizing::localize;
 use twilight_model::application::command::{Command, CommandOptionType, CommandType};
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
+use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
+use twilight_model::channel::message::EmojiReactionType;
+use twilight_model::channel::message::component::ButtonStyle;
 use twilight_model::guild::{PartialMember, Permissions, Role};
+use twilight_model::http::attachment::Attachment;
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
@@ -33,13 +38,20 @@ use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
+use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
+use crate::utility::types::custom_id::CustomId;
 use crate::utility::{category, color};
 
 crate::define_entry!("help", CommandType::ChatInput, struct {
     contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
 }, struct {
     command: on_command,
+    component: on_component,
 }, struct {});
+
+crate::define_components! {
+    licenses => on_licenses_component;
+}
 
 /// Executes the command.
 ///
@@ -89,9 +101,51 @@ async fn on_command<'ap: 'ev, 'ev>(
         user.as_embed_author()?
     };
 
-    let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).footer(footer);
+    let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).footer(footer).build();
 
-    context.embed(embed.build(), Visibility::Ephemeral).await?;
+    let command_name = self::entry().name;
+    let licenses_button = ButtonBuilder::new(ButtonStyle::Secondary)
+        .label(localize!(async(try in locale) category::UI, "help-button-licenses").await?.to_string())?
+        .emoji(EmojiReactionType::Unicode { name: "📃".to_string() })?
+        .custom_id(CustomId::new(command_name, "licenses")?)?
+        .build();
+    let buttons = ActionRowBuilder::new().component(licenses_button)?.build();
+
+    crate::follow_up_response!(context, struct {
+        components: &[buttons.into()],
+        embeds: &[embed],
+    })
+    .await?;
+
+    crate::client::event::pass()
+}
+
+/// Executes the licenses component, sending a copy of `$OUT_DIR/licenses.md` (see `build.rs`) to
+/// the user.
+///
+/// # Errors
+///
+/// This function will return an error if the component could not be executed.
+async fn on_licenses_component<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    _: CustomId,
+) -> EventResult {
+    const LICENSES_FILE_NAME: &str = "licenses.md";
+    const LICENSES_FILE_CONTENT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/licenses.md"));
+    // Almost completely arbitrary. Can be anything, so long as it is unique within the same
+    // message.
+    const LICENSES_FILE_ID: u64 = 0;
+
+    context.defer(Visibility::Ephemeral).await?;
+
+    let license_file =
+        Attachment::from_bytes(LICENSES_FILE_NAME.to_string(), LICENSES_FILE_CONTENT.to_vec(), LICENSES_FILE_ID);
+
+    crate::follow_up_response!(context, struct {
+        attachments: &[license_file],
+    })
+    .await?;
 
     crate::client::event::pass()
 }

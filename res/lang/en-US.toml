@@ -103,6 +103,8 @@ help-tag-subcommands = "Has sub-commands"
 help-tag-dms = "Usable in DMs"
 help-tag-nsfw = "NSFW"
 
+help-button-licenses = "Licenses"
+
 localizer-reloaded = "Reloaded!"
 localizer-locales = "Locales"
 localizer-unknown = "Unknown locale"
