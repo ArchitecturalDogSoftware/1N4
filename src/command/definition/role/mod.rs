@@ -100,7 +100,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     if icon.as_emoji().is_err() {
         let title = localize!(async(try in locale) category::UI, "role-invalid-icon").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -121,14 +121,14 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     if selectors.inner.iter().any(|s| &s.id == role_id) {
         let title = localize!(async(try in locale) category::UI, "role-selector-duplicate").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
     if selectors.inner.len() >= COMPONENT_COUNT * ACTION_ROW_COMPONENT_COUNT {
         let title = localize!(async(try in locale) category::UI, "role-selector-limit").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -138,7 +138,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     let text = localize!(async(try in locale) category::UI, "role-selector-added").await?;
 
-    context.success(text, None::<&str>).await?;
+    context.success_message(text, None::<&str>).await?;
 
     crate::client::event::pass()
 }
@@ -171,7 +171,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
     if !SelectorList::async_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -179,7 +179,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
     let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     };
@@ -190,6 +190,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
         components: &components,
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }
@@ -222,7 +223,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
     if !SelectorList::async_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -230,7 +231,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
     let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     };
@@ -241,6 +242,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
         components: &components,
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }
@@ -276,7 +278,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
     if !SelectorList::async_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -284,7 +286,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
     let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     };
@@ -296,7 +298,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
 
     let text = localize!(async(try in locale) category::UI, "role-finished").await?;
 
-    context.success(text, None::<&str>).await?;
+    context.success_message(text, None::<&str>).await?;
 
     crate::client::event::pass()
 }
@@ -345,7 +347,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
     };
 
     context.api.client.update_guild_member(guild_id, user_id).roles(&member.roles).await?;
-    context.success(title, None::<&str>).await?;
+    context.success_message(title, None::<&str>).await?;
 
     crate::client::event::pass()
 }
@@ -381,7 +383,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     if !SelectorList::async_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -389,7 +391,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     let Ok(mut selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     };
@@ -397,7 +399,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     if !selectors.inner.iter().any(|e| e.id == role_id) {
         let title = localize!(async(try in locale) category::UI, "role-remove-missing").await?;
 
-        context.failure(title, None::<&str>).await?;
+        context.failure_message(title, None::<&str>).await?;
 
         return crate::client::event::pass();
     }
@@ -409,7 +411,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
 
         let title = localize!(async(try in locale) category::UI, "role-remove-emptied").await?;
 
-        context.success(title, None::<&str>).await?;
+        context.success_message(title, None::<&str>).await?;
     } else {
         selectors.as_async_api().write().await?;
 
@@ -419,6 +421,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
             components: &components,
         })
         .await?;
+        context.complete();
     }
 
     crate::client::event::pass()

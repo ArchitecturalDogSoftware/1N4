@@ -136,6 +136,11 @@ where
         self.defer_any(visibility, InteractionResponseType::DeferredUpdateMessage).await
     }
 
+    /// Set [`Self`] as being [`ContextState::Completed`], marking the end of an interaction.
+    pub const fn complete(&mut self) {
+        self.state = ContextState::Completed;
+    }
+
     /// Responds to the interaction with a text message.
     ///
     /// # Errors
@@ -239,7 +244,7 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    async fn finish<N, D>(&mut self, color: u32, title: N, description: Option<D>) -> Result<()>
+    async fn finish_with_message<N, D>(&mut self, color: u32, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,
         D: Display + Send,
@@ -259,12 +264,12 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn success<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    pub async fn success_message<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::SUCCESS.rgb(), title, description).await
+        self.finish_with_message(color::SUCCESS.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded completion message.
@@ -273,12 +278,12 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn complete<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    pub async fn complete_message<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::BRANDING.rgb(), title, description).await
+        self.finish_with_message(color::BRANDING.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded warning message.
@@ -287,12 +292,12 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn warning<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    pub async fn warning_message<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::BACKDROP.rgb(), title, description).await
+        self.finish_with_message(color::BACKDROP.rgb(), title, description).await
     }
 
     /// Finishes an interaction with an embedded failure message.
@@ -301,12 +306,12 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn failure<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
+    pub async fn failure_message<N, D>(&mut self, title: N, description: Option<D>) -> Result<()>
     where
         N: Display + Send,
         D: Display + Send,
     {
-        self.finish(color::FAILURE.rgb(), title, description).await
+        self.finish_with_message(color::FAILURE.rgb(), title, description).await
     }
 }
 

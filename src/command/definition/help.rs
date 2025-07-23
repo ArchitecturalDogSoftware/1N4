@@ -147,6 +147,7 @@ async fn on_command<'ap: 'ev, 'ev>(
         embeds: &[embed],
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }
@@ -223,6 +224,7 @@ async fn on_licenses_component<'ap: 'ev, 'ev>(
         attachments: &[license_file],
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }
@@ -256,6 +258,7 @@ async fn on_privacy_policy_component<'ap: 'ev, 'ev>(
         attachments: &[privacy_policy_file],
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }
@@ -289,6 +292,7 @@ async fn on_security_policy_component<'ap: 'ev, 'ev>(
         attachments: &[security_policy_file],
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }
