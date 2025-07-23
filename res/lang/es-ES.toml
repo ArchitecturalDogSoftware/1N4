@@ -103,7 +103,13 @@ help-tag-subcommands = "Tiene subcomandos"
 help-tag-dms = "Utilizable en mensajes directos"
 help-tag-nsfw = "NSFW"
 
+help-button-build-information = "Información de compilación"
+help-button-source-code = "Código fuente"
 help-button-licenses = "Licencias"
+help-button-privacy-policy = "Directiva de privacidad"
+help-button-security-policy = "Directiva de seguridad"
+
+help-embed-build-information-header = "Información de compilación"
 
 localizer-reloaded = "¡Actualizado!"
 localizer-locales = "Configuraciones regionales"

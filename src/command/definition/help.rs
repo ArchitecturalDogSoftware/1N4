@@ -50,7 +50,10 @@ crate::define_entry!("help", CommandType::ChatInput, struct {
 }, struct {});
 
 crate::define_components! {
+    build_information => on_build_information_component;
     licenses => on_licenses_component;
+    privacy_policy => on_privacy_policy_component;
+    security_policy => on_security_policy_component;
 }
 
 /// Executes the command.
@@ -59,7 +62,7 @@ crate::define_components! {
 ///
 /// This function will return an error if the command could not be executed.
 async fn on_command<'ap: 'ev, 'ev>(
-    _: &CommandEntry,
+    command_entry: &CommandEntry,
     mut context: Context<'ap, 'ev, &'ev CommandData>,
     _: CommandOptionResolver<'ev>,
 ) -> EventResult {
@@ -103,19 +106,93 @@ async fn on_command<'ap: 'ev, 'ev>(
 
     let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).footer(footer).build();
 
-    let command_name = self::entry().name;
+    let command_name = command_entry.name;
+
+    let build_information_button = ButtonBuilder::new(ButtonStyle::Secondary)
+        .label(localize!(async(try in locale) category::UI, "help-button-build-information").await?.to_string())?
+        .emoji(EmojiReactionType::Unicode { name: "ℹ️".to_string() })?
+        .custom_id(CustomId::new(command_name, "build_information")?)?
+        .build();
+    let source_code_button = ButtonBuilder::new(ButtonStyle::Link)
+        .url(env!("CARGO_PKG_REPOSITORY"))?
+        .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())?
+        .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })?
+        .build();
     let licenses_button = ButtonBuilder::new(ButtonStyle::Secondary)
         .label(localize!(async(try in locale) category::UI, "help-button-licenses").await?.to_string())?
         .emoji(EmojiReactionType::Unicode { name: "📃".to_string() })?
         .custom_id(CustomId::new(command_name, "licenses")?)?
         .build();
-    let buttons = ActionRowBuilder::new().component(licenses_button)?.build();
+    let privacy_policy_button = ButtonBuilder::new(ButtonStyle::Secondary)
+        .label(localize!(async(try in locale) category::UI, "help-button-privacy-policy").await?.to_string())?
+        .emoji(EmojiReactionType::Unicode { name: "🔐".to_string() })?
+        .custom_id(CustomId::new(command_name, "privacy_policy")?)?
+        .build();
+    let security_policy_button = ButtonBuilder::new(ButtonStyle::Secondary)
+        .label(localize!(async(try in locale) category::UI, "help-button-security-policy").await?.to_string())?
+        .emoji(EmojiReactionType::Unicode { name: "📢".to_string() })?
+        .custom_id(CustomId::new(command_name, "security_policy")?)?
+        .build();
+
+    let buttons = ActionRowBuilder::new()
+        .component(build_information_button)?
+        .component(source_code_button)?
+        .component(licenses_button)?
+        .component(privacy_policy_button)?
+        .component(security_policy_button)?
+        .build();
 
     crate::follow_up_response!(context, struct {
         components: &[buttons.into()],
         embeds: &[embed],
     })
     .await?;
+
+    crate::client::event::pass()
+}
+
+/// Executes the build information component, sending an embed listing properties of this build of
+/// 1N4, such as the version and enabled features.
+///
+/// # Errors
+///
+/// This function will return an error if the component could not be executed.
+async fn on_build_information_component<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    _: CustomId,
+) -> EventResult {
+    mod info {
+        include!(concat!(env!("OUT_DIR"), "/build_info.rs"));
+    }
+
+    context.defer(Visibility::Ephemeral).await?;
+
+    let mut buffer = String::new();
+    writeln!(buffer, "- `VERSION`: `{}`", env!("CARGO_PKG_VERSION"))?;
+    writeln!(buffer, "- `FEATURES`: `{}`", info::FEATURES)?;
+    writeln!(buffer, "- `COMMIT_HASH`: `{}`", info::COMMIT_HASH)?;
+    writeln!(buffer, "- `TARGET_TRIPLE`: `{}`", info::TARGET_TRIPLE)?;
+    writeln!(buffer, "- `PROFILE`: `{}`", info::PROFILE)?;
+
+    let locale = match context.as_locale() {
+        Ok(locale) => Some(locale),
+        Err(ina_localizing::Error::MissingLocale) => None,
+        Err(error) => return Err(error.into()),
+    };
+
+    let title = localize!(async(try in locale) category::UI, "help-embed-build-information-header").await?.to_string();
+    let color = color::BRANDING.rgb();
+    let author = if let Some(user) = context.api.cache.current_user() {
+        user.as_embed_author()?
+    } else {
+        let user = context.api.client.current_user().await?.model().await?;
+
+        user.as_embed_author()?
+    };
+
+    let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).build();
+    context.embed(embed, Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
@@ -144,6 +221,72 @@ async fn on_licenses_component<'ap: 'ev, 'ev>(
 
     crate::follow_up_response!(context, struct {
         attachments: &[license_file],
+    })
+    .await?;
+
+    crate::client::event::pass()
+}
+
+/// Executes the privacy policy component, sending a copy of `docs/PRIVACY_POLICY.md` to the user.
+///
+/// # Errors
+///
+/// This function will return an error if the component could not be executed.
+async fn on_privacy_policy_component<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    _: CustomId,
+) -> EventResult {
+    const PRIVACY_POLICY_FILE_NAME: &str = "PRIVACY_POLICY.md";
+    const PRIVACY_POLICY_FILE_CONTENT: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/PRIVACY_POLICY.md"));
+    // Almost completely arbitrary. Can be anything, so long as it is unique within the same
+    // message.
+    const PRIVACY_POLICY_FILE_ID: u64 = 0;
+
+    context.defer(Visibility::Ephemeral).await?;
+
+    let privacy_policy_file = Attachment::from_bytes(
+        PRIVACY_POLICY_FILE_NAME.to_string(),
+        PRIVACY_POLICY_FILE_CONTENT.to_vec(),
+        PRIVACY_POLICY_FILE_ID,
+    );
+
+    crate::follow_up_response!(context, struct {
+        attachments: &[privacy_policy_file],
+    })
+    .await?;
+
+    crate::client::event::pass()
+}
+
+/// Executes the security policy component, sending a copy of `docs/SECURITY.md` to the user.
+///
+/// # Errors
+///
+/// This function will return an error if the component could not be executed.
+async fn on_security_policy_component<'ap: 'ev, 'ev>(
+    _: &CommandEntry,
+    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
+    _: CustomId,
+) -> EventResult {
+    const SECURITY_POLICY_FILE_NAME: &str = "SECURITY.md";
+    const SECURITY_POLICY_FILE_CONTENT: &[u8] =
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/SECURITY.md"));
+    // Almost completely arbitrary. Can be anything, so long as it is unique within the same
+    // message.
+    const SECURITY_POLICY_FILE_ID: u64 = 0;
+
+    context.defer(Visibility::Ephemeral).await?;
+
+    let security_policy_file = Attachment::from_bytes(
+        SECURITY_POLICY_FILE_NAME.to_string(),
+        SECURITY_POLICY_FILE_CONTENT.to_vec(),
+        SECURITY_POLICY_FILE_ID,
+    );
+
+    crate::follow_up_response!(context, struct {
+        attachments: &[security_policy_file],
     })
     .await?;
 
