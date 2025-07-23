@@ -25,6 +25,7 @@ use std::io::{BufWriter, Read, Write};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use license_page::CrateList;
+use license_page::opt::{GetLicensesOpt, ToMarkdownPageOpt};
 
 fn main() -> std::io::Result<()> {
     // These environment variables are provided by Cargo, so they should always be present. It
@@ -125,8 +126,35 @@ fn get_current_commit(root_dir: &Utf8Path) -> std::io::Result<String> {
 /// file is generated in [CommonMark](https://commonmark.org/) Markdown and is located at
 /// `$OUT_DIR/licenses.md`.
 fn generate_license_page(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::io::Result<()> {
+    const CRATE_LICENSES_SECTION_PREAMBLE: &str = "\
+These are the licenses of 1N4 and its dependencies.
+We are not lawyers, but in short:
+1N4 depends on code written by other people, who allow us to use and share their code under certain conditions.
+These conditions are formally are formally written into software licenses.
+For many of these, the restrictions boil down to just providing attribution, which this file serves to do.
+For some of them, such as 1N4's license, the licenses are designed to grant you, the user, certain freedoms.
+For example, you're entitled to a copy of the full source code behind any 1N4 instance (or any software based on it).
+
+In this section, we list each license or combination of licenses (and exceptions) used by 1N4 and its dependencies.
+The next section contains the full text of each license or exception.";
+
     println!("cargo::rerun-if-changed={}", root_dir.join("Cargo.lock"));
 
+    #[expect(clippy::unwrap_used, reason = "Cargo should define this value and with only UTF-8")]
+    let profile = std::env::var("PROFILE").unwrap();
+
+    let mut get_licenses_opt = GetLicensesOpt::new();
+    // Assume that debug-only dependencies will not be included whatsoever in release binaries.
+    *get_licenses_opt.avoid_dev_deps_mut() = profile != "debug";
+    // Assume that these _should_ be included, because though they might not be included in the
+    // binary, their _output_ might be, which might include code under their license.
+    *get_licenses_opt.avoid_proc_macros_mut() = false;
+    *get_licenses_opt.avoid_build_deps_mut() = false;
+
+    let mut to_markdown_page_opt = ToMarkdownPageOpt::new();
+    *to_markdown_page_opt.crate_licenses_preamble_mut() = Some(CRATE_LICENSES_SECTION_PREAMBLE.to_string());
+
     let mut out = BufWriter::new(File::create(out_dir.join("licenses.md"))?);
-    CrateList::from_crate_directory(root_dir.as_str()).to_markdown_license_page(&mut out)
+    CrateList::from_crate_directory(root_dir.as_str(), get_licenses_opt)
+        .to_markdown_license_page(&mut out, to_markdown_page_opt)
 }

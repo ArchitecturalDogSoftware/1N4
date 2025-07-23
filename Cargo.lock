@@ -1210,7 +1210,7 @@ dependencies = [
 [[package]]
 name = "license_page"
 version = "0.1.0"
-source = "git+https://github.com/RemasteredArch/license_page#c19f73ed30250f2e6c1c55a1d1ae1150d89507b5"
+source = "git+https://github.com/RemasteredArch/license_page#4eef5acca8ee619f5d39d2fb05eb3940cb04bb54"
 dependencies = [
  "cargo-license",
  "cargo_metadata",
