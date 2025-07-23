@@ -103,6 +103,14 @@ help-tag-subcommands = "Has sub-commands"
 help-tag-dms = "Usable in DMs"
 help-tag-nsfw = "NSFW"
 
+help-button-build-information = "Build Information"
+help-button-source-code = "Source Code"
+help-button-licenses = "Licenses"
+help-button-privacy-policy = "Privacy Policy"
+help-button-security-policy = "Security Policy"
+
+help-embed-build-information-header = "Build Information"
+
 localizer-reloaded = "Reloaded!"
 localizer-locales = "Locales"
 localizer-unknown = "Unknown locale"

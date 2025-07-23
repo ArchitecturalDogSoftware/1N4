@@ -98,7 +98,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
     let list = list.iter().map(|l| format!("`{l}`"));
     let locales = format!("{locales}:\n> {}", list.collect::<Box<[_]>>().join(", "));
 
-    context.success(title, Some(locales)).await?;
+    context.success_message(title, Some(locales)).await?;
 
     crate::client::event::pass()
 }
@@ -128,7 +128,7 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
         let Ok(locale) = locale_str.parse::<Locale>() else {
             let title = localize!(async(try in locale) category::UI, "localize-unknown").await?;
 
-            context.failure(title, Some(format!("`{locale_str}`"))).await?;
+            context.failure_message(title, Some(format!("`{locale_str}`"))).await?;
 
             return crate::client::event::pass();
         };

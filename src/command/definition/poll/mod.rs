@@ -193,7 +193,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
     if let Some(Err(error)) = image_url.map(ImageSource::url) {
         let error_title = localize!(async(try in locale) category::UI, "poll-invalid-url").await?;
 
-        context.failure(error_title, Some(format!("> {error}"))).await?;
+        context.failure_message(error_title, Some(format!("> {error}"))).await?;
 
         return crate::client::event::pass();
     }
@@ -220,6 +220,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
         flags: MessageFlags::EPHEMERAL,
     })
     .await?;
+    context.complete();
 
     crate::client::event::pass()
 }

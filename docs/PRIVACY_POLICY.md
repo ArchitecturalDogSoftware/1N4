@@ -16,7 +16,7 @@ Third party instances of 1N4 may:
     which entitles you to a copy of the source code powering the third party 1N4 instance,
     licensed under the same terms.
 - Handle your data differently.
-  - You should contact the operators of the third party instance's operators for more information.
+  - You should contact the operators of the third party instance for more information.
 
 ## What 1N4 Collects
 
