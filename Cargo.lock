@@ -1018,6 +1018,7 @@ dependencies = [
  "ina-storage",
  "ina-threading",
  "license_page",
+ "paste",
  "rand",
  "rustls",
  "serde",
