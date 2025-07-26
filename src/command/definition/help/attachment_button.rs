@@ -15,6 +15,16 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+//! Definitions for button components for the `/help` command response that respond with files when
+//! pressed.
+//!
+//! These files are embedded into the binary at build time, but will also check `res/attachments`
+//! for the file (specifically, any file named as it is sent in the response message) when called
+//! at runtime. This allows instance administrators to change the contents without compiling their
+//! own binary.
+
+/// Creates a module containing a generator function and a callback for a button component that
+/// responds with a file.
 macro_rules! attachment_button {
     (
         $button_id:ident,
@@ -25,8 +35,12 @@ macro_rules! attachment_button {
         $output_file_name:expr,
     ) => {
         ::paste::paste! {
+            #[doc = "Definitions for a generator ([`button`]) and a component callback ([`" on_ $button_id _component "`]) for `" $button_id "`."]
             pub mod $button_id {
                 #[doc = "Creates a button (ID `" $button_id "`), which responds with an attachment."]
+                #[doc = "\nSee [`" on_ $button_id _component "`] for more information on the response."]
+                #[doc = "\n# Errors\n"]
+                #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
                 pub async fn button(
                     locale: Option<::ina_localizing::locale::Locale>,
                     command_name: &'static ::std::primitive::str
