@@ -18,7 +18,7 @@
 //! Definitions for button components for the `/help` command response that respond with files when
 //! pressed.
 //!
-//! These files are embedded into the binary at build time, but will also check `res/attachments`
+//! These files are embedded into the binary at build time, but will also check `res/attachments/`
 //! for the file (specifically, any file named as it is sent in the response message) when called
 //! at runtime. This allows instance administrators to change the contents without compiling their
 //! own binary.
@@ -35,8 +35,9 @@ macro_rules! attachment_button {
         $output_file_name:expr,
     ) => {
         ::paste::paste! {
-            #[doc = "Definitions for a generator ([`button`]) and a component callback ([`" on_ $button_id _component "`]) for `" $button_id "`."]
             pub mod $button_id {
+                #![doc = "Definitions for a generator ([`button`]) and a component callback ([`" on_ $button_id _component "`]) for `" $button_id "`."]
+
                 #[doc = "Creates a button (ID `" $button_id "`), which responds with an attachment."]
                 #[doc = "\nSee [`" on_ $button_id _component "`] for more information on the response."]
                 #[doc = "\n# Errors\n"]
