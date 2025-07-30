@@ -15,13 +15,13 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-//! Definitions for button components for the `/help` command response that respond with files when
-//! pressed.
+//! Definitions for button components for the `/help` command response that respond with files when pressed.
 //!
-//! These files are embedded into the binary at build time, but will also check `res/attachments/`
-//! for the file (specifically, any file named as it is sent in the response message) when called
-//! at runtime. This allows instance administrators to change the contents without compiling their
-//! own binary.
+//! These files are embedded into the binary at build time, but will also check the [help attachments directory] for the
+//! file (specifically, any file named as it is sent in the response message) when called at runtime. This allows
+//! instance administrators to change the contents without compiling their own binary.
+//!
+//! [help attachments directory]: crate::client::settings::Settings::help_attachments_directory
 
 /// Creates a module containing a generator function and a callback for a button component that
 /// responds with a file.
@@ -71,10 +71,11 @@ macro_rules! attachment_button {
             #[doc = ::std::concat!(
                 "Executes the `",
                 ::std::stringify!($button_id),
-                "` component, sending either a copy of the given file from `res/attachments/` or an embedded copy."
+                "` component, sending either a copy of the given file from the [help attachments directory] or an embedded copy."
             )]
             #[doc = "\n# Errors\n"]
             #[doc = "This function will return an error if the component could not be executed."]
+            #[doc = "\n\n[help attachments directory]: crate::client::settings::Settings::help_attachments_directory"]
             pub async fn on_component<'ap: 'ev, 'ev>(
                 _: &$crate::command::registry::CommandEntry,
                 mut context: $crate::command::context::Context<
@@ -93,14 +94,12 @@ macro_rules! attachment_button {
                 // Almost completely arbitrary. Can be anything, so long as it is unique within the same message.
                 const FILE_ID: ::std::primitive::u64 = 0;
 
-                // TO-DO: this is better as a thread settings call.
-                let resources_dir = ::std::env::current_dir()
-                    .map_or_else(|_| ::std::path::PathBuf::from("./res/attachments"), |v| v.join("res/attachments"));
-
                 let mut buf = ::std::vec::Vec::new();
-                let file_content = ::std::fs::File::open(resources_dir.join($output_file_name))
-                    .and_then(|mut f| f.read_to_end(&mut buf).map(|_| buf.as_slice()))
-                    .unwrap_or(FILE_CONTENT);
+                let file_content = ::std::fs::File::open(
+                    context.api.settings.help_attachments_directory.join($output_file_name)
+                )
+                .and_then(|mut f| f.read_to_end(&mut buf).map(|_| buf.as_slice()))
+                .unwrap_or(FILE_CONTENT);
 
                 context.defer($crate::command::context::Visibility::Ephemeral).await?;
 

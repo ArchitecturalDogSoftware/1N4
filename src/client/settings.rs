@@ -35,6 +35,15 @@ pub struct Settings {
     #[serde(default = "default_status_interval")]
     pub status_interval: NonZeroU64,
 
+    /// The location of the directory holding attachment overrides for the `/help` command.
+    ///
+    /// Some of the buttons on the `/help` response trigger messages with attachments. These
+    /// attachments are embedded into the bot, but it will look for files of the same name in this
+    /// directory before defaulting to the embedded copy.
+    #[arg(long = "help-attachments-directory", default_value_os_t = self::default_help_attachments_directory())]
+    #[serde(default = "default_help_attachments_directory")]
+    pub help_attachments_directory: PathBuf,
+
     /// The number of shards to spawn.
     #[arg(short = 's', long = "shards")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -60,6 +69,12 @@ fn default_reshard_interval() -> NonZeroU64 {
     let Some(interval) = NonZeroU64::new(8) else { unreachable!("the default interval must be non-zero") };
 
     interval
+}
+
+/// Returns the default help attachments directory location.
+fn default_help_attachments_directory() -> PathBuf {
+    std::env::current_dir()
+        .map_or_else(|_| ::std::path::PathBuf::from("./res/attachments"), |v| v.join("res/attachments"))
 }
 
 /// Returns the default status change interval.
