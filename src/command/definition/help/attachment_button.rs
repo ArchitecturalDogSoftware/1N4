@@ -46,8 +46,11 @@ macro_rules! attachment_button {
                 ::std::stringify!($button_id),
                 "`), which responds with an attachment.",
             )]
-            #[doc = "\nSee [`on_component`] for more information on the response."]
-            #[doc = "\n# Errors\n"]
+            #[doc = ""]
+            #[doc = "See [`on_component`] for more information on the response."]
+            #[doc = ""]
+            #[doc = "# Errors"]
+            #[doc = ""]
             #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
             pub async fn button(
                 locale: Option<::ina_localizing::locale::Locale>,
@@ -73,9 +76,12 @@ macro_rules! attachment_button {
                 ::std::stringify!($button_id),
                 "` component, sending either a copy of the given file from the [help attachments directory] or an embedded copy."
             )]
-            #[doc = "\n# Errors\n"]
+            #[doc = ""]
+            #[doc = "# Errors"]
+            #[doc = ""]
             #[doc = "This function will return an error if the component could not be executed."]
-            #[doc = "\n\n[help attachments directory]: crate::client::settings::Settings::help_attachments_directory"]
+            #[doc = ""]
+            #[doc = "[help attachments directory]: crate::client::settings::Settings::help_attachments_directory"]
             pub async fn on_component<'ap: 'ev, 'ev>(
                 _: &$crate::command::registry::CommandEntry,
                 mut context: $crate::command::context::Context<
