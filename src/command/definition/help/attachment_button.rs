@@ -34,78 +34,90 @@ macro_rules! attachment_button {
         $input_file_name:expr,
         $output_file_name:expr,
     ) => {
-            pub mod $button_id {
-                #![doc = ::std::concat!("Definitions for a generator ([`button`]) and a component callback ([`on_component`]) for `", ::std::stringify!($button_id), "`.")]
+        pub mod $button_id {
+            #![doc = ::std::concat!(
+                "Definitions for a generator ([`button`]) and a component callback ([`on_component`]) for `",
+                ::std::stringify!($button_id),
+                "`.",
+            )]
 
-                #[doc = ::std::concat!("Creates a button (ID `", ::std::stringify!($button_id), "`), which responds with an attachment.")]
-                #[doc = "\nSee [`on_component`] for more information on the response."]
-                #[doc = "\n# Errors\n"]
-                #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
-                pub async fn button(
-                    locale: Option<::ina_localizing::locale::Locale>,
-                    command_name: &'static ::std::primitive::str
-                ) -> ::anyhow::Result<::twilight_model::channel::message::component::Button> {
-                    let button = $crate::utility::types::builder::ButtonBuilder::new(
-                        ::twilight_model::channel::message::component::ButtonStyle::Secondary
-                    )
-                    .label(
-                        ::ina_localizing::localize!(
-                            async(try in locale) $crate::utility::category::UI, $localization_key
-                        ).await?.to_string()
-                    )?
-                    .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })?
-                    .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)?
-                    .build();
+            #[doc = ::std::concat!(
+                "Creates a button (ID `",
+                ::std::stringify!($button_id),
+                "`), which responds with an attachment.",
+            )]
+            #[doc = "\nSee [`on_component`] for more information on the response."]
+            #[doc = "\n# Errors\n"]
+            #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
+            pub async fn button(
+                locale: Option<::ina_localizing::locale::Locale>,
+                command_name: &'static ::std::primitive::str
+            ) -> ::anyhow::Result<::twilight_model::channel::message::component::Button> {
+                let button = $crate::utility::types::builder::ButtonBuilder::new(
+                    ::twilight_model::channel::message::component::ButtonStyle::Secondary
+                )
+                .label(
+                    ::ina_localizing::localize!(
+                        async(try in locale) $crate::utility::category::UI, $localization_key
+                    ).await?.to_string()
+                )?
+                .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })?
+                .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)?
+                .build();
 
-                    Ok(button)
-                }
+                Ok(button)
+            }
 
-                #[doc = ::std::concat!("Executes the `", ::std::stringify!($button_id), "` component, sending either a copy of the given file from `res/attachments/` or an embedded copy.")]
-                #[doc = "\n# Errors\n"]
-                #[doc = "This function will return an error if the component could not be executed."]
-                pub async fn on_component<'ap: 'ev, 'ev>(
-                    _: &$crate::command::registry::CommandEntry,
-                    mut context: $crate::command::context::Context<
-                        'ap,
-                        'ev,
-                        &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData
-                    >,
-                    _: $crate::utility::types::custom_id::CustomId,
-                ) -> $crate::client::event::EventResult {
-                    use ::std::io::Read;
+            #[doc = ::std::concat!(
+                "Executes the `",
+                ::std::stringify!($button_id),
+                "` component, sending either a copy of the given file from `res/attachments/` or an embedded copy."
+            )]
+            #[doc = "\n# Errors\n"]
+            #[doc = "This function will return an error if the component could not be executed."]
+            pub async fn on_component<'ap: 'ev, 'ev>(
+                _: &$crate::command::registry::CommandEntry,
+                mut context: $crate::command::context::Context<
+                    'ap,
+                    'ev,
+                    &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData
+                >,
+                _: $crate::utility::types::custom_id::CustomId,
+            ) -> $crate::client::event::EventResult {
+                use ::std::io::Read;
 
-                    const OUTPUT_FILE_NAME: &::std::primitive::str = $output_file_name;
-                    const FILE_CONTENT: &[::std::primitive::u8] = include_bytes!(
-                        ::std::concat!($embedded_input_dir, "/", $input_file_name)
-                    );
-                    // Almost completely arbitrary. Can be anything, so long as it is unique within the same message.
-                    const FILE_ID: ::std::primitive::u64 = 0;
+                const OUTPUT_FILE_NAME: &::std::primitive::str = $output_file_name;
+                const FILE_CONTENT: &[::std::primitive::u8] = include_bytes!(
+                    ::std::concat!($embedded_input_dir, "/", $input_file_name)
+                );
+                // Almost completely arbitrary. Can be anything, so long as it is unique within the same message.
+                const FILE_ID: ::std::primitive::u64 = 0;
 
-                    // TO-DO: this is better as a thread settings call.
-                    let resources_dir = ::std::env::current_dir()
-                        .map_or_else(|_| ::std::path::PathBuf::from("./res/attachments"), |v| v.join("res/attachments"));
+                // TO-DO: this is better as a thread settings call.
+                let resources_dir = ::std::env::current_dir()
+                    .map_or_else(|_| ::std::path::PathBuf::from("./res/attachments"), |v| v.join("res/attachments"));
 
-                    let mut buf = ::std::vec::Vec::new();
-                    let file_content = ::std::fs::File::open(resources_dir.join($output_file_name))
-                        .and_then(|mut f| f.read_to_end(&mut buf).map(|_| buf.as_slice()))
-                        .unwrap_or(FILE_CONTENT);
+                let mut buf = ::std::vec::Vec::new();
+                let file_content = ::std::fs::File::open(resources_dir.join($output_file_name))
+                    .and_then(|mut f| f.read_to_end(&mut buf).map(|_| buf.as_slice()))
+                    .unwrap_or(FILE_CONTENT);
 
-                    context.defer($crate::command::context::Visibility::Ephemeral).await?;
+                context.defer($crate::command::context::Visibility::Ephemeral).await?;
 
-                    let license_file = ::twilight_model::http::attachment::Attachment::from_bytes(
-                        OUTPUT_FILE_NAME.to_string(),
-                        file_content.to_vec(),
-                        FILE_ID,
-                    );
+                let license_file = ::twilight_model::http::attachment::Attachment::from_bytes(
+                    OUTPUT_FILE_NAME.to_string(),
+                    file_content.to_vec(),
+                    FILE_ID,
+                );
 
-                    $crate::follow_up_response!(context, struct {
-                        attachments: &[license_file],
-                    })
-                    .await?;
-                    context.complete();
+                $crate::follow_up_response!(context, struct {
+                    attachments: &[license_file],
+                })
+                .await?;
+                context.complete();
 
-                    $crate::client::event::pass()
-                }
+                $crate::client::event::pass()
+            }
         }
     };
 
