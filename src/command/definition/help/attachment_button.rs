@@ -34,12 +34,11 @@ macro_rules! attachment_button {
         $input_file_name:expr,
         $output_file_name:expr,
     ) => {
-        ::paste::paste! {
             pub mod $button_id {
-                #![doc = "Definitions for a generator ([`button`]) and a component callback ([`" on_ $button_id _component "`]) for `" $button_id "`."]
+                #![doc = ::std::concat!("Definitions for a generator ([`button`]) and a component callback ([`on_component`]) for `", ::std::stringify!($button_id), "`.")]
 
-                #[doc = "Creates a button (ID `" $button_id "`), which responds with an attachment."]
-                #[doc = "\nSee [`" on_ $button_id _component "`] for more information on the response."]
+                #[doc = ::std::concat!("Creates a button (ID `", ::std::stringify!($button_id), "`), which responds with an attachment.")]
+                #[doc = "\nSee [`on_component`] for more information on the response."]
                 #[doc = "\n# Errors\n"]
                 #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
                 pub async fn button(
@@ -55,16 +54,16 @@ macro_rules! attachment_button {
                         ).await?.to_string()
                     )?
                     .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })?
-                    .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, stringify!($button_id))?)?
+                    .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)?
                     .build();
 
                     Ok(button)
                 }
 
-                #[doc = "Executes the `" $button_id "` component, sending either a copy of the given file from `res/attachments/` or an embedded copy."]
+                #[doc = ::std::concat!("Executes the `", ::std::stringify!($button_id), "` component, sending either a copy of the given file from `res/attachments/` or an embedded copy.")]
                 #[doc = "\n# Errors\n"]
                 #[doc = "This function will return an error if the component could not be executed."]
-                pub async fn [<on_ $button_id _component>]<'ap: 'ev, 'ev>(
+                pub async fn on_component<'ap: 'ev, 'ev>(
                     _: &$crate::command::registry::CommandEntry,
                     mut context: $crate::command::context::Context<
                         'ap,
@@ -77,7 +76,7 @@ macro_rules! attachment_button {
 
                     const OUTPUT_FILE_NAME: &::std::primitive::str = $output_file_name;
                     const FILE_CONTENT: &[::std::primitive::u8] = include_bytes!(
-                        concat!($embedded_input_dir, "/", $input_file_name)
+                        ::std::concat!($embedded_input_dir, "/", $input_file_name)
                     );
                     // Almost completely arbitrary. Can be anything, so long as it is unique within the same message.
                     const FILE_ID: ::std::primitive::u64 = 0;
@@ -107,7 +106,6 @@ macro_rules! attachment_button {
 
                     $crate::client::event::pass()
                 }
-            }
         }
     };
 

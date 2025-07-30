@@ -116,7 +116,6 @@ twilight-mention = "~0.16"
 twilight-model = "~0.16"
 twilight-util = { version = "~0.16", features = ["full"] }
 twilight-validate = "~0.16"
-paste = "1.0.15"
 
 [build-dependencies]
 camino = "1.1.10"

@@ -43,9 +43,11 @@ use crate::utility::{category, color};
 
 mod attachment_button;
 
-use attachment_button::licenses::on_licenses_component;
-use attachment_button::privacy_policy::on_privacy_policy_component;
-use attachment_button::security_policy::on_security_policy_component;
+// [`crate::define_components`] expects identifiers, not paths, so we need to have these directly
+// in scope.
+use self::attachment_button::licenses::on_component as on_licenses_component;
+use self::attachment_button::privacy_policy::on_component as on_privacy_policy_component;
+use self::attachment_button::security_policy::on_component as on_security_policy_component;
 
 crate::define_entry!("help", CommandType::ChatInput, struct {
     contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
@@ -123,9 +125,9 @@ async fn on_command<'ap: 'ev, 'ev>(
         .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())?
         .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })?
         .build();
-    let licenses_button = attachment_button::licenses::button(locale, command_name).await?;
-    let privacy_policy_button = attachment_button::privacy_policy::button(locale, command_name).await?;
-    let security_policy_button = attachment_button::security_policy::button(locale, command_name).await?;
+    let licenses_button = self::attachment_button::licenses::button(locale, command_name).await?;
+    let privacy_policy_button = self::attachment_button::privacy_policy::button(locale, command_name).await?;
+    let security_policy_button = self::attachment_button::security_policy::button(locale, command_name).await?;
 
     let buttons = ActionRowBuilder::new()
         .component(build_information_button)?
