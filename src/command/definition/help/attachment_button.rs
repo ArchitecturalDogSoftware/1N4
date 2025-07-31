@@ -53,7 +53,7 @@ macro_rules! attachment_button {
             #[doc = ""]
             #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
             pub async fn button(
-                locale: Option<::ina_localizing::locale::Locale>,
+                locale: ::std::option::Option<::ina_localizing::locale::Locale>,
                 command_name: &'static ::std::primitive::str
             ) -> ::anyhow::Result<::twilight_model::channel::message::component::Button> {
                 let button = $crate::utility::types::builder::ButtonBuilder::new(
@@ -68,7 +68,7 @@ macro_rules! attachment_button {
                 .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)?
                 .build();
 
-                Ok(button)
+                ::anyhow::Result::Ok(button)
             }
 
             #[doc = ::std::concat!(

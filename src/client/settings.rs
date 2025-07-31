@@ -73,8 +73,7 @@ fn default_reshard_interval() -> NonZeroU64 {
 
 /// Returns the default help attachments directory location.
 fn default_help_attachments_directory() -> PathBuf {
-    std::env::current_dir()
-        .map_or_else(|_| ::std::path::PathBuf::from("./res/attachments"), |v| v.join("res/attachments"))
+    std::env::current_dir().map_or_else(|_| PathBuf::from("./res/attachments"), |v| v.join("res/attachments"))
 }
 
 /// Returns the default status change interval.
