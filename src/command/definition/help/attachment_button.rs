@@ -100,23 +100,26 @@ macro_rules! attachment_button {
                 // Almost completely arbitrary. Can be anything, so long as it is unique within the same message.
                 const FILE_ID: ::std::primitive::u64 = 0;
 
-                let mut buf = ::std::vec::Vec::new();
-                let file_content = ::std::fs::File::open(
-                    context.api.settings.help_attachments_directory.join($output_file_name)
-                )
-                .and_then(|mut f| f.read_to_end(&mut buf).map(|_| buf.as_slice()))
-                .unwrap_or(FILE_CONTENT);
-
                 context.defer($crate::command::context::Visibility::Ephemeral).await?;
 
-                let license_file = ::twilight_model::http::attachment::Attachment::from_bytes(
+                let file_content = if let ::anyhow::Result::Ok(mut file) = ::std::fs::File::open(
+                    context.api.settings.help_attachments_directory.join($output_file_name)
+                ) {
+                    let mut buf = ::std::vec::Vec::new();
+                    file.read_to_end(&mut buf)?;
+                    buf
+                } else {
+                    FILE_CONTENT.to_vec()
+                };
+
+                let attachment = ::twilight_model::http::attachment::Attachment::from_bytes(
                     OUTPUT_FILE_NAME.to_string(),
                     file_content.to_vec(),
                     FILE_ID,
                 );
 
                 $crate::follow_up_response!(context, struct {
-                    attachments: &[license_file],
+                    attachments: &[attachment],
                 })
                 .await?;
                 context.complete();
