@@ -102,14 +102,18 @@ macro_rules! attachment_button {
 
                 context.defer($crate::command::context::Visibility::Ephemeral).await?;
 
-                let file_content = if let ::anyhow::Result::Ok(mut file) = ::std::fs::File::open(
+                let file_content = match ::std::fs::File::open(
                     context.api.settings.help_attachments_directory.join($output_file_name)
                 ) {
-                    let mut buf = ::std::vec::Vec::new();
-                    file.read_to_end(&mut buf)?;
-                    buf
-                } else {
-                    FILE_CONTENT.to_vec()
+                    ::std::io::Result::Ok(mut file) => {
+                        let mut buf = ::std::vec::Vec::new();
+                        file.read_to_end(&mut buf)?;
+                        buf
+                    }
+                    ::std::io::Result::Err(error) if error.kind() == ::std::io::ErrorKind::NotFound => {
+                        FILE_CONTENT.to_vec()
+                    }
+                    ::std::io::Result::Err(error) => return ::anyhow::Result::Err(error.into()),
                 };
 
                 let attachment = ::twilight_model::http::attachment::Attachment::from_bytes(
