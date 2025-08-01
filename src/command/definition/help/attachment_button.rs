@@ -114,7 +114,7 @@ macro_rules! attachment_button {
 
                 let attachment = ::twilight_model::http::attachment::Attachment::from_bytes(
                     OUTPUT_FILE_NAME.to_string(),
-                    file_content.to_vec(),
+                    file_content,
                     FILE_ID,
                 );
 
