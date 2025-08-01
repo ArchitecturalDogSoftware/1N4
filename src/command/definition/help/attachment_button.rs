@@ -1,0 +1,163 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// Copyright © 2024 Jaxydog
+// Copyright © 2025 RemasteredArch
+//
+// This file is part of 1N4.
+//
+// 1N4 is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public
+// License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+// version.
+//
+// 1N4 is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
+// <https://www.gnu.org/licenses/>.
+
+//! Definitions for button components for the `/help` command response that respond with files when pressed.
+//!
+//! These files are embedded into the binary at build time, but will also check the [help attachments directory] for the
+//! file (specifically, any file named as it is sent in the response message) when called at runtime. This allows
+//! instance administrators to change the contents without compiling their own binary.
+//!
+//! [help attachments directory]: crate::client::settings::Settings::help_attachments_directory
+
+/// Creates a module containing a generator function and a callback for a button component that
+/// responds with a file.
+macro_rules! attachment_button {
+    (
+        $button_id:ident,
+        $localization_key:expr,
+        $icon:expr,
+        $embedded_input_dir:expr,
+        $input_file_name:expr,
+        $output_file_name:expr,
+    ) => {
+        pub mod $button_id {
+            #![doc = ::std::concat!(
+                "Definitions for a generator ([`button`]) and a component callback ([`on_component`]) for `",
+                ::std::stringify!($button_id),
+                "`.",
+            )]
+
+            #[doc = ::std::concat!(
+                "Creates a button (ID `",
+                ::std::stringify!($button_id),
+                "`), which responds with an attachment.",
+            )]
+            #[doc = ""]
+            #[doc = "See [`on_component`] for more information on the response."]
+            #[doc = ""]
+            #[doc = "# Errors"]
+            #[doc = ""]
+            #[doc = "This function will return an error if the button is constructed incorrectly or if localization fails."]
+            pub async fn button(
+                locale: ::std::option::Option<::ina_localizing::locale::Locale>,
+                command_name: &'static ::std::primitive::str
+            ) -> ::anyhow::Result<::twilight_model::channel::message::component::Button> {
+                let button = $crate::utility::types::builder::ButtonBuilder::new(
+                    ::twilight_model::channel::message::component::ButtonStyle::Secondary
+                )
+                .label(
+                    ::ina_localizing::localize!(
+                        async(try in locale) $crate::utility::category::UI, $localization_key
+                    ).await?.to_string()
+                )?
+                .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })?
+                .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)?
+                .build();
+
+                ::anyhow::Result::Ok(button)
+            }
+
+            #[doc = ::std::concat!(
+                "Executes the `",
+                ::std::stringify!($button_id),
+                "` component, sending either a copy of the given file from the [help attachments directory] or an embedded copy."
+            )]
+            #[doc = ""]
+            #[doc = "# Errors"]
+            #[doc = ""]
+            #[doc = "This function will return an error if the component could not be executed."]
+            #[doc = ""]
+            #[doc = "[help attachments directory]: crate::client::settings::Settings::help_attachments_directory"]
+            pub async fn on_component<'ap: 'ev, 'ev>(
+                _: &$crate::command::registry::CommandEntry,
+                mut context: $crate::command::context::Context<
+                    'ap,
+                    'ev,
+                    &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData
+                >,
+                _: $crate::utility::types::custom_id::CustomId,
+            ) -> $crate::client::event::EventResult {
+                use ::std::io::Read;
+
+                const OUTPUT_FILE_NAME: &::std::primitive::str = $output_file_name;
+                const FILE_CONTENT: &[::std::primitive::u8] = include_bytes!(
+                    ::std::concat!($embedded_input_dir, "/", $input_file_name)
+                );
+                // Almost completely arbitrary. Can be anything, so long as it is unique within the same message.
+                const FILE_ID: ::std::primitive::u64 = 0;
+
+                context.defer($crate::command::context::Visibility::Ephemeral).await?;
+
+                let file_content = match ::std::fs::File::open(
+                    context.api.settings.help_attachments_directory.join($output_file_name)
+                ) {
+                    ::std::io::Result::Ok(mut file) => {
+                        let mut buf = ::std::vec::Vec::new();
+                        file.read_to_end(&mut buf)?;
+                        buf
+                    }
+                    ::std::io::Result::Err(error) if error.kind() == ::std::io::ErrorKind::NotFound => {
+                        FILE_CONTENT.to_vec()
+                    }
+                    ::std::io::Result::Err(error) => return ::anyhow::Result::Err(error.into()),
+                };
+
+                let attachment = ::twilight_model::http::attachment::Attachment::from_bytes(
+                    OUTPUT_FILE_NAME.to_string(),
+                    file_content,
+                    FILE_ID,
+                );
+
+                $crate::follow_up_response!(context, struct {
+                    attachments: &[attachment],
+                })
+                .await?;
+                context.complete();
+
+                $crate::client::event::pass()
+            }
+        }
+    };
+
+    ($button_id:ident, $localization_key:expr, $icon:expr, $embedded_input_dir:expr, $input_file_name:expr,) => {
+        attachment_button!(
+            $button_id,
+            $localization_key,
+            $icon,
+            $embedded_input_dir,
+            $input_file_name,
+            $input_file_name,
+        );
+    }
+}
+
+attachment_button!(licenses, "help-button-licenses", "📃", env!("OUT_DIR"), "licenses.md",);
+attachment_button!(
+    privacy_policy,
+    "help-button-privacy-policy",
+    "🔐",
+    concat!(env!("CARGO_MANIFEST_DIR"), "/docs"),
+    "PRIVACY_POLICY.md",
+);
+attachment_button!(
+    security_policy,
+    "help-button-security-policy",
+    "📢",
+    concat!(env!("CARGO_MANIFEST_DIR"), "/docs"),
+    "SECURITY.md",
+    "SECURITY_POLICY.md",
+);

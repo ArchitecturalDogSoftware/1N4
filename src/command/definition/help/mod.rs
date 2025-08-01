@@ -27,7 +27,6 @@ use twilight_model::application::interaction::message_component::MessageComponen
 use twilight_model::channel::message::EmojiReactionType;
 use twilight_model::channel::message::component::ButtonStyle;
 use twilight_model::guild::{PartialMember, Permissions, Role};
-use twilight_model::http::attachment::Attachment;
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
@@ -41,6 +40,14 @@ use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
 use crate::utility::types::custom_id::CustomId;
 use crate::utility::{category, color};
+
+mod attachment_button;
+
+// [`crate::define_components`] expects identifiers, not paths, so we need to have these directly
+// in scope.
+use self::attachment_button::licenses::on_component as on_licenses_component;
+use self::attachment_button::privacy_policy::on_component as on_privacy_policy_component;
+use self::attachment_button::security_policy::on_component as on_security_policy_component;
 
 crate::define_entry!("help", CommandType::ChatInput, struct {
     contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
@@ -118,21 +125,9 @@ async fn on_command<'ap: 'ev, 'ev>(
         .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())?
         .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })?
         .build();
-    let licenses_button = ButtonBuilder::new(ButtonStyle::Secondary)
-        .label(localize!(async(try in locale) category::UI, "help-button-licenses").await?.to_string())?
-        .emoji(EmojiReactionType::Unicode { name: "📃".to_string() })?
-        .custom_id(CustomId::new(command_name, "licenses")?)?
-        .build();
-    let privacy_policy_button = ButtonBuilder::new(ButtonStyle::Secondary)
-        .label(localize!(async(try in locale) category::UI, "help-button-privacy-policy").await?.to_string())?
-        .emoji(EmojiReactionType::Unicode { name: "🔐".to_string() })?
-        .custom_id(CustomId::new(command_name, "privacy_policy")?)?
-        .build();
-    let security_policy_button = ButtonBuilder::new(ButtonStyle::Secondary)
-        .label(localize!(async(try in locale) category::UI, "help-button-security-policy").await?.to_string())?
-        .emoji(EmojiReactionType::Unicode { name: "📢".to_string() })?
-        .custom_id(CustomId::new(command_name, "security_policy")?)?
-        .build();
+    let licenses_button = self::attachment_button::licenses::button(locale, command_name).await?;
+    let privacy_policy_button = self::attachment_button::privacy_policy::button(locale, command_name).await?;
+    let security_policy_button = self::attachment_button::security_policy::button(locale, command_name).await?;
 
     let buttons = ActionRowBuilder::new()
         .component(build_information_button)?
@@ -194,105 +189,6 @@ async fn on_build_information_component<'ap: 'ev, 'ev>(
 
     let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).build();
     context.embed(embed, Visibility::Ephemeral).await?;
-
-    crate::client::event::pass()
-}
-
-/// Executes the licenses component, sending a copy of `$OUT_DIR/licenses.md` (see `build.rs`) to
-/// the user.
-///
-/// # Errors
-///
-/// This function will return an error if the component could not be executed.
-async fn on_licenses_component<'ap: 'ev, 'ev>(
-    _: &CommandEntry,
-    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
-    _: CustomId,
-) -> EventResult {
-    const LICENSES_FILE_NAME: &str = "licenses.md";
-    const LICENSES_FILE_CONTENT: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/licenses.md"));
-    // Almost completely arbitrary. Can be anything, so long as it is unique within the same
-    // message.
-    const LICENSES_FILE_ID: u64 = 0;
-
-    context.defer(Visibility::Ephemeral).await?;
-
-    let license_file =
-        Attachment::from_bytes(LICENSES_FILE_NAME.to_string(), LICENSES_FILE_CONTENT.to_vec(), LICENSES_FILE_ID);
-
-    crate::follow_up_response!(context, struct {
-        attachments: &[license_file],
-    })
-    .await?;
-    context.complete();
-
-    crate::client::event::pass()
-}
-
-/// Executes the privacy policy component, sending a copy of `docs/PRIVACY_POLICY.md` to the user.
-///
-/// # Errors
-///
-/// This function will return an error if the component could not be executed.
-async fn on_privacy_policy_component<'ap: 'ev, 'ev>(
-    _: &CommandEntry,
-    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
-    _: CustomId,
-) -> EventResult {
-    const PRIVACY_POLICY_FILE_NAME: &str = "PRIVACY_POLICY.md";
-    const PRIVACY_POLICY_FILE_CONTENT: &[u8] =
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/PRIVACY_POLICY.md"));
-    // Almost completely arbitrary. Can be anything, so long as it is unique within the same
-    // message.
-    const PRIVACY_POLICY_FILE_ID: u64 = 0;
-
-    context.defer(Visibility::Ephemeral).await?;
-
-    let privacy_policy_file = Attachment::from_bytes(
-        PRIVACY_POLICY_FILE_NAME.to_string(),
-        PRIVACY_POLICY_FILE_CONTENT.to_vec(),
-        PRIVACY_POLICY_FILE_ID,
-    );
-
-    crate::follow_up_response!(context, struct {
-        attachments: &[privacy_policy_file],
-    })
-    .await?;
-    context.complete();
-
-    crate::client::event::pass()
-}
-
-/// Executes the security policy component, sending a copy of `docs/SECURITY.md` to the user.
-///
-/// # Errors
-///
-/// This function will return an error if the component could not be executed.
-async fn on_security_policy_component<'ap: 'ev, 'ev>(
-    _: &CommandEntry,
-    mut context: Context<'ap, 'ev, &'ev MessageComponentInteractionData>,
-    _: CustomId,
-) -> EventResult {
-    const SECURITY_POLICY_FILE_NAME: &str = "SECURITY.md";
-    const SECURITY_POLICY_FILE_CONTENT: &[u8] =
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/SECURITY.md"));
-    // Almost completely arbitrary. Can be anything, so long as it is unique within the same
-    // message.
-    const SECURITY_POLICY_FILE_ID: u64 = 0;
-
-    context.defer(Visibility::Ephemeral).await?;
-
-    let security_policy_file = Attachment::from_bytes(
-        SECURITY_POLICY_FILE_NAME.to_string(),
-        SECURITY_POLICY_FILE_CONTENT.to_vec(),
-        SECURITY_POLICY_FILE_ID,
-    );
-
-    crate::follow_up_response!(context, struct {
-        attachments: &[security_policy_file],
-    })
-    .await?;
-    context.complete();
 
     crate::client::event::pass()
 }
