@@ -23,7 +23,7 @@ mod as_translation;
 /// Implements the [`Stored`] derive macro.
 mod stored;
 
-/// Implements the [`AsTranslation`](<ina::utility::traits::convert::AsTranslation>) trait for the deriving type.
+/// Implements the `ina_localizing::AsTranslation` trait for the deriving type.
 ///
 /// # Examples
 ///
@@ -94,7 +94,7 @@ pub fn as_translation(input: TokenStream) -> TokenStream {
     crate::as_translation::procedure(input)
 }
 
-/// Implements the [`Stored`](<ina_storage::stored::Stored>) trait for the deriving type.
+/// Implements the `ina_storage::stored::Stored` trait for the deriving type.
 ///
 /// # Examples
 ///

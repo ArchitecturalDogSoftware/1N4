@@ -271,7 +271,7 @@ impl SelectMenuBuilder {
             return Err(Error::InvalidType("channel_type"));
         }
 
-        let list = self.0.channel_types.get_or_insert(Vec::with_capacity(1));
+        let list = self.0.channel_types.get_or_insert_with(|| Vec::with_capacity(1));
 
         list.push(channel_type);
         list.dedup();
@@ -300,7 +300,7 @@ impl SelectMenuBuilder {
             return Err(Error::InvalidValue);
         }
 
-        let list = self.0.default_values.get_or_insert(Vec::with_capacity(1));
+        let list = self.0.default_values.get_or_insert_with(|| Vec::with_capacity(1));
         let max_len = self.0.max_values.unwrap_or(1).into();
 
         if list.len() > max_len {
@@ -368,7 +368,7 @@ impl SelectMenuBuilder {
         }
 
         let option: SelectMenuOption = option.into();
-        let list = self.0.options.get_or_insert(Vec::with_capacity(1));
+        let list = self.0.options.get_or_insert_with(|| Vec::with_capacity(1));
 
         if list.len() > SELECT_OPTION_COUNT {
             return Err(Error::LimitExceeded("option", list.len(), SELECT_OPTION_COUNT));
