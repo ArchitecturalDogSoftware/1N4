@@ -29,3 +29,7 @@ serde = { workspace = true, features = ["derive"] }
 time = { workspace = true, features = ["formatting", "local-offset", "macros"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["macros", "sync", "time"] }
+
+[dev-dependencies]
+# `macros` and `rt-multi-threaded` allow the use of the `#[tokio::main]` macro in documentation tests.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }

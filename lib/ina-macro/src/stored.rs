@@ -21,7 +21,7 @@ use syn::punctuated::Punctuated;
 use syn::{Attribute, DeriveInput, Error, Expr, Ident, LitStr, Result, Token, Type, bracketed, parse_macro_input};
 
 /// The `data_format` attribute.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct StoredFormatAttribute {
     /// The format type.
     pub kind: Type,
@@ -65,7 +65,7 @@ impl StoredFormatAttribute {
 }
 
 /// The `data_path` attribute.
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct StoredPathAttribute {
     /// The format literal.
     pub format: LitStr,

@@ -24,5 +24,9 @@ ina-logging.workspace = true
 ina-threading.workspace = true
 serde = { workspace = true, features = ["derive", "rc"] }
 thiserror.workspace = true
-tokio = { workspace = true, features = ["fs", "macros", "sync"] }
+tokio = { workspace = true, features = ["fs", "sync"] }
 toml.workspace = true
+
+[dev-dependencies]
+# `macros` and `rt-multi-threaded` allow the use of the `#[tokio::main]` macro in documentation tests.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }

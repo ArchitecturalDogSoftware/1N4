@@ -21,3 +21,7 @@ default = []
 [dependencies]
 thiserror.workspace = true
 tokio = { workspace = true, features = ["rt", "sync", "time"] }
+
+[dev-dependencies]
+# `macros` and `rt-multi-threaded` allow the use of the `#[tokio::main]` macro in documentation tests.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }

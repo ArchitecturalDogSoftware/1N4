@@ -140,12 +140,19 @@ The next section contains the full text of each license or exception.";
 
     println!("cargo::rerun-if-changed={}", root_dir.join("Cargo.lock"));
 
-    #[expect(clippy::unwrap_used, reason = "Cargo should define this value and with only UTF-8")]
-    let profile = std::env::var("PROFILE").unwrap();
-
     let mut get_licenses_opt = GetLicensesOpt::new();
-    // Assume that debug-only dependencies will not be included whatsoever in release binaries.
-    *get_licenses_opt.avoid_dev_deps_mut() = profile != "debug";
+    // Don't include the dependencies only used in ["tests, examples, and benchmarks"][used_in],
+    // because they're "not used when compiling a package for building" and "not propagated to
+    // other packages which depend on this package," so I don't think that they're relevant to
+    // built binaries.
+    //
+    // In an ideal world, I would enabled this if I could detect if this is currently being built
+    // in "dev mode" (unrelated to the "dev" profile usually referred to as "debug"), but I think
+    // that would require a hack, which I'm inclined to avoid --- I doubt the accuracy of the
+    // licenses file matters for these builds.
+    //
+    // [used_in]: <https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#development-dependencies>
+    *get_licenses_opt.avoid_dev_deps_mut() = true;
     // Assume that these _should_ be included, because though they might not be included in the
     // binary, their _output_ might be, which might include code under their license.
     *get_licenses_opt.avoid_proc_macros_mut() = false;
