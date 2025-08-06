@@ -1,3 +1,6 @@
+# The binary crate's name, as it appears in the `Cargo.toml`.
+ARG APP_NAME=ina
+
 # Run build step natively.
 #
 # This has to be on Debian because AFAIK Alpine doesn't provide foreign architecture packages to enable
@@ -16,8 +19,7 @@ ARG TARGETARCH
 # E.g., for `TARGET_PLATFORM=linux/arm64`, one should match with `TARGET_ARCH_RUST=aarch64`, which will generate the
 # target triple `aarch64-unknown-linux-musl` for Rust.
 ARG TARGET_ARCH_RUST
-# The binary crate's name, as it appears in the `Cargo.toml`.
-ARG APP_NAME=ina
+ARG APP_NAME
 
 WORKDIR /app
 RUN \
@@ -36,34 +38,38 @@ RUN \
 set -eu
 
 if [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then
+    # Will probably only return something like `x86_64-unknown-linux-gnu`.
+    native_target_triple="$(rustup target list --installed --quiet)"
+    TARGET_ARCH_RUST="${native_target_triple%-unknown-linux-gnu}"
+
     apt-get update
     apt-get install -y musl-dev
-
-    cargo build --locked --release
-    binary_path="target/release/$APP_NAME"
 else
-    # The target triple as expected by Rust.
-    target_triple="$TARGET_ARCH_RUST-unknown-linux-musl"
-    # The target triple as is used in lowercase environment variable names.
-    target_triple_variable="$(echo "$target_triple" | tr '-' '_')"
-    # The target triple as is used in uppercase environment variable names.
-    target_triple_variable_upper="$(echo "$target_triple_variable" | tr '[:lower:]' '[:upper:]')"
-    # The toolchain-specific prefix for GCC binary names.
-    toolchain_prefix="$TARGET_ARCH_RUST-linux-musl"
-
     dpkg --add-architecture "$TARGETARCH"
     apt-get update
     apt-get install -y "musl-dev:$TARGETARCH"
-
-    rustup target add "$target_triple"
-
-    export "CARGO_TARGET_${target_triple_variable_upper}_LINKER=${toolchain_prefix}-gcc"
-    export "CC_${target_triple_variable}=${toolchain_prefix}-gcc"
-    export "CXX_${target_triple_variable}=${toolchain_prefix}-g++"
-
-    cargo build --target "$target_triple" --locked --release
-    binary_path="target/$target_triple/release/$APP_NAME"
 fi
+
+# The target triple as expected by Rust.
+target_triple="$TARGET_ARCH_RUST-unknown-linux-musl"
+# The target triple as is used in lowercase environment variable names.
+target_triple_variable="$(echo "$target_triple" | tr '-' '_')"
+# The target triple as is used in uppercase environment variable names.
+target_triple_variable_upper="$(echo "$target_triple_variable" | tr '[:lower:]' '[:upper:]')"
+# The toolchain-specific prefix for GCC binary names.
+toolchain_prefix="$TARGET_ARCH_RUST-linux-musl"
+
+rustup target add "$target_triple"
+
+# Make a statically-linked binary.
+export "CARGO_TARGET_${target_triple_variable_upper}_RUSTFLAGS=-C link-self-contained=yes -C linker=rust-lld -C target-feature=+crt-static"
+# Use the musl-specific build tools.
+export "CARGO_TARGET_${target_triple_variable_upper}_LINKER=${toolchain_prefix}-gcc"
+export "CC_${target_triple_variable}=${toolchain_prefix}-gcc"
+export "CXX_${target_triple_variable}=${toolchain_prefix}-g++"
+
+cargo build --target "$target_triple" --locked --release
+binary_path="target/$target_triple/release/$APP_NAME"
 
 mkdir /out
 cp -r res /out/res 
@@ -72,20 +78,30 @@ EOF
 
 # Create an output image for the target platform.
 FROM alpine:latest AS server
+
+ARG APP_NAME
 ARG UID=10001
+
+WORKDIR /app
+
+COPY --from=build /out/server /bin/server
+RUN ln -s /bin/server "/bin/$APP_NAME" # Currently unused.
+
+COPY --from=build /out/res /app/res
+
+# Create a dummy `.env` file so that `dotenvy` won't be mad it can't find one. This lets Docker handle loading the
+# `.env` file without actually inserting it into container, though that's of course still an option with
+# `--mount 'type=bind,source=./.env,target=/app/.env,readonly'`.
+RUN touch /app/.env
+
 RUN adduser \
     --disabled-password \
     --gecos '' \
     --home '/nonexistent' \
     --shell '/sbin/nologin' \
     --no-create-home \
-    --uid "${UID}" \
+    --uid "$UID" \
     appuser
 USER appuser
 
-WORKDIR /app
-
-COPY --from=build /out/server /bin/server
-COPY --from=build /out/res /app/res
-
-CMD ["/bin/server"]
+ENTRYPOINT ["/bin/server"]

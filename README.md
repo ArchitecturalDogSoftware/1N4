@@ -50,27 +50,33 @@ Alternatively, 1N4 is available through a Docker container running Alpine Linux.
 
 ```sh
 # Build for the host platform.
-docker buildx build --tag 'ArchitecturalDog/1N4' .
+docker buildx build --tag 'ArchitecturalDogSoftware/ina' .
 
 # Or build for another target.
 #
 # Compiles for the target triple `$TARGET_ARCH_RUST-unknown-linux-musl`.
-docker buildx build --tag 'ArchitecturalDog/1N4' \
+docker buildx build --tag 'ArchitecturalDogSoftware/ina' \
     --platform 'arm64' --build-arg 'TARGET_ARCH_RUST=aarch64' \
     .
 
 # Start the Docker container and attach the TTY.
 #
-# TO-DO: secrets, custom resources.
-docker run --tty 'ArchitecturalDog/1N4'
+# Instead of `--env-file`, you could manually set each of the required
+# environment variables using `--env VAR=value`.
+#
+# 1N4 loads various resources at runtime, by default from `./res/`. Mount this
+# directory with `--mount 'type=bind,source=./res,target=/app/res,readonly'`.
+docker run --tty \
+    --env-file '.env' \
+    'ArchitecturalDogSoftware/ina'
 ```
 
 If a different target CPU architecture is chosen,
 Rust will cross-compile for that architecture from a native image.
 The last build step that puts the image together still relies on emulating the target architecture, however.
 [Documentation](https://docs.docker.com/build/building/multi-platform/#qemu) points towards [`tonistiigi/binfmt`](https://github.com/tonistiigi/binfmt)
-as being the easy option,
-but your package manager may provide its own packages.
+as being the easy option to set up QEMU for this,
+but your package manager may provide its own packages if you prefer that.
 For example, one can set up emulation on Ubuntu 24.04 (and probably other Debian derivatives) like so:
 
 ```sh
@@ -81,10 +87,10 @@ curl --fail --show-error --location --remote-name \
     "https://github.com/qemu/qemu/blob/$qemu_ref/scripts/qemu-binfmt-conf.sh"
 chmod u+x './qemu-binfmt-conf.sh'
 
-# `--systemd ALL` registers every interpreter at startup with a systemd service.
-# Without this flag, you'll have to re-run this script every time you restart.
-# You can also specify individual CPU architectures to register, `ALL` registers
-# every architecture supported by QEMU.
+# `--systemd 'ALL'` registers every interpreter at startup with a systemd
+# service. Without this flag, you'll have to re-run this script every time you
+# restart. You can also specify individual CPU architectures to register, `ALL`
+# registers every architecture supported by QEMU.
 #
 # `./qemu-binfmt-conf.sh --help` for more information.
 ./qemu-binfmt-conf.sh --qemu-suffix '-static' --qemu-path '/usr/bin' \
