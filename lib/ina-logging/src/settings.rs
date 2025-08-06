@@ -26,11 +26,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 #[group(id = "LogSettings")]
 pub struct Settings {
-    /// Disables logger output.
-    #[arg(short = 'q', long = "quiet")]
-    #[serde(default)]
-    pub quiet: bool,
-
     /// The logger's file output directory.
     #[cfg(feature = "file")]
     #[arg(id = "LOG_DIR", long = "log-directory", default_value_os_t = self::default_directory())]

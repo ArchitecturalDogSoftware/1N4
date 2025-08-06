@@ -47,6 +47,8 @@ If you are running your own instance of 1N4, ensure that the following environme
 ### Docker
 
 Alternatively, 1N4 is available through a Docker container running Alpine Linux.
+File logging is disabled by default,
+use [Docker's native logging facilities](https://docs.docker.com/engine/logging/) instead.
 
 ```sh
 # Build for the host platform.

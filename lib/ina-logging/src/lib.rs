@@ -96,13 +96,13 @@ impl Logger {
     /// Returns whether this [`Logger`] is enabled.
     #[must_use]
     pub fn is_enabled(&self) -> bool {
-        !self.settings.quiet && !self.endpoints.is_empty()
+        !self.endpoints.is_empty()
     }
 
     /// Returns whether this [`Logger`] is disabled.
     #[must_use]
     pub fn is_disabled(&self) -> bool {
-        self.settings.quiet || self.endpoints.is_empty()
+        self.endpoints.is_empty()
     }
 
     /// Returns the queue timeout of this [`Logger`].

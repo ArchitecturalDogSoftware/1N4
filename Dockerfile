@@ -105,3 +105,4 @@ RUN adduser \
 USER appuser
 
 ENTRYPOINT ["/bin/server"]
+CMD ["--disable-file-logging"]
