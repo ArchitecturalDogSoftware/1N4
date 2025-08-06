@@ -19,7 +19,7 @@ or you can install and run her directly through Git and Cargo.
 
 ```sh
 # Clone and move into the repository.
-git clone https://github.com/ArchitecturalDogSoftware/1N4.git
+git clone 'https://github.com/ArchitecturalDogSoftware/1N4.git'
 cd 1N4
 
 # Build in release mode.
@@ -43,6 +43,54 @@ If you are running your own instance of 1N4, ensure that the following environme
   which is where things like error logs are sent.
   1N4 assumes that the given channel is within the guild specified by `DEVELOPMENT_GUILD_ID`
 - `ENCRYPTION_KEY` - The password used for encrypting and decrypting sensitive files.
+
+### Docker
+
+Alternatively, 1N4 is available through a Docker container running Alpine Linux.
+
+```sh
+# Build for the host platform.
+docker buildx build --tag 'ArchitecturalDog/1N4' .
+
+# Or build for another target.
+#
+# Compiles for the target triple `$TARGET_ARCH_RUST-unknown-linux-musl`.
+docker buildx build --tag 'ArchitecturalDog/1N4' \
+    --platform 'arm64' --build-arg 'TARGET_ARCH_RUST=aarch64' \
+    .
+
+# Start the Docker container and attach the TTY.
+#
+# TO-DO: secrets, custom resources.
+docker run --tty 'ArchitecturalDog/1N4'
+```
+
+If a different target CPU architecture is chosen,
+Rust will cross-compile for that architecture from a native image.
+The last build step that puts the image together still relies on emulating the target architecture, however.
+[Documentation](https://docs.docker.com/build/building/multi-platform/#qemu) points towards [`tonistiigi/binfmt`](https://github.com/tonistiigi/binfmt)
+as being the easy option,
+but your package manager may provide its own packages.
+For example, one can set up emulation on Ubuntu 24.04 (and probably other Debian derivatives) like so:
+
+```sh
+apt install 'binfmt-support' 'qemu-user-static'
+
+qemu_ref='master' # Or set to a specific version, e.g., `v8.2.2`.
+curl --fail --show-error --location --remote-name \
+    "https://github.com/qemu/qemu/blob/$qemu_ref/scripts/qemu-binfmt-conf.sh"
+chmod u+x './qemu-binfmt-conf.sh'
+
+# `--systemd ALL` registers every interpreter at startup with a systemd service.
+# Without this flag, you'll have to re-run this script every time you restart.
+# You can also specify individual CPU architectures to register, `ALL` registers
+# every architecture supported by QEMU.
+#
+# `./qemu-binfmt-conf.sh --help` for more information.
+./qemu-binfmt-conf.sh --qemu-suffix '-static' --qemu-path '/usr/bin' \
+    --persistent 'yes' \
+    --systemd 'ALL'
+```
 
 ## Contributing
 
