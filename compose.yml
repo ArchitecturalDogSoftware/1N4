@@ -1,0 +1,30 @@
+name: ina
+
+services:
+    bot:
+        build:
+            context: .
+            tags:
+                - ArchitecturalDogSoftware/ina
+            args:
+                UID: 10001
+        env_file:
+            - path: ./.env
+              format: raw
+        volumes:
+            - type: bind
+              source: ./log
+              target: /app/log
+            - type: bind
+              source: ./res
+              target: /app/res
+              read_only: true
+            - type: bind
+              source: ./res/data
+              target: /app/res/data
+        post_start:
+            - command: chown -R 10001:10001 /app/log /app/res/data
+              user: root
+        pre_stop:
+            - command: chown -R $HOST_USER /app/log /app/res/data
+              user: root

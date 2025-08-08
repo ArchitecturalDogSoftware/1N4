@@ -110,6 +110,18 @@ COPY --from=build /out/res /app/res
 # `--mount 'type=bind,source=./.env,target=/app/.env,readonly'`.
 RUN touch /app/.env
 
+RUN << EOF
+cat << EOS > /startup.sh
+#!/bin/sh
+until [ -w /app/log ] && [ -w /app/res/data ]; do
+    sleep 1
+done
+/bin/$APP_NAME "\$@"
+EOS
+
+chmod +x /startup.sh
+EOF
+
 RUN adduser \
     --disabled-password \
     --gecos '' \
@@ -120,5 +132,4 @@ RUN adduser \
     appuser
 USER appuser
 
-ENTRYPOINT ["/bin/server"]
-CMD ["--disable-file-logging"]
+ENTRYPOINT ["/startup.sh"]
