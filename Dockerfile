@@ -37,7 +37,10 @@ ARG TARGETARCH
 ARG TARGET_ARCH_RUST
 ARG APP_NAME
 
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
 WORKDIR /app
+
 RUN \
     --mount=type=bind,source=.git,target=.git,readonly \
     --mount=type=bind,source=.cargo,target=.cargo,readonly \
@@ -49,22 +52,16 @@ RUN \
     --mount=type=bind,source=build.rs,target=build.rs,readonly \
     --mount=type=bind,source=Cargo.toml,target=Cargo.toml,readonly \
     --mount=type=bind,source=Cargo.lock,target=Cargo.lock,readonly \
-    << EOF
-# No `-o pipefail` because Debian Bookworm's `sh` shell doesn't provide it. POSIX 2024 will fix this Soon:tm:.
-set -eu
-
+    <<EOF
 if [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then
     # Will probably only return something like `x86_64-unknown-linux-gnu`.
     native_target_triple="$(rustup target list --installed --quiet)"
     TARGET_ARCH_RUST="${native_target_triple%-unknown-linux-gnu}"
-
-    apt-get update
-    apt-get install -y musl-dev
-else
-    dpkg --add-architecture "$TARGETARCH"
-    apt-get update
-    apt-get install -y "musl-dev:$TARGETARCH"
 fi
+
+dpkg --add-architecture "$TARGETARCH"
+apt-get update
+apt-get install --no-install-recommends --yes "musl-dev:$TARGETARCH"
 
 # The target triple as expected by Rust.
 target_triple="$TARGET_ARCH_RUST-unknown-linux-musl"
@@ -93,15 +90,20 @@ cp "$binary_path" /out/server
 EOF
 
 # Create an output image for the target platform.
-FROM alpine:latest AS server
+FROM alpine:3 AS server
 
 ARG APP_NAME
 ARG UID=10001
+ARG TARGETARCH
+
+SHELL ["/bin/ash", "-euo", "pipefail", "-c"]
+
+RUN : # If this fails with "exec format error," it's probably because you don't have emulation set up.
 
 WORKDIR /app
 
 COPY --from=build /out/server /bin/server
-RUN ln -s /bin/server "/bin/$APP_NAME" # Currently unused.
+RUN ln -s /bin/server "/bin/$APP_NAME"
 
 COPY --from=build /out/res /app/res
 
@@ -110,7 +112,7 @@ COPY --from=build /out/res /app/res
 # `--mount 'type=bind,source=./.env,target=/app/.env,readonly'`.
 RUN touch /app/.env
 
-RUN << EOF
+RUN <<EOF
 cat << EOS > /startup.sh
 #!/bin/sh
 until [ -w /app/log ] && [ -w /app/res/data ]; do
