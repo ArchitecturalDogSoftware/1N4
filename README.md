@@ -47,72 +47,8 @@ If you are running your own instance of 1N4, ensure that the following environme
 ### Docker
 
 Alternatively, 1N4 is available through a Docker container running Alpine Linux.
-You can use the default settings with `docker compose up`,
-but this requires that `HOST_USER` be set in the environment (such as with another line in `.env`)
-to your Unix user ID and group ID separated with a colon, such as `1002:1002`.
-If you'd like to export the built image
-or apply command-line arguments to the running container without editing `compose.yml`
-by building and running manually:
-
-```sh
-# Build for the host platform.
-docker buildx build --tag 'ArchitecturalDogSoftware/ina' .
-
-# Or build for another target.
-#
-# Compiles for the target triple `$TARGET_ARCH_RUST-unknown-linux-musl`.
-docker buildx build --tag 'ArchitecturalDogSoftware/ina' \
-    --platform 'arm64' --build-arg 'TARGET_ARCH_RUST=aarch64' \
-    .
-
-# Give the user in the Docker container permissions to write to necessary
-# directories. You can skip mounting `./log/` if you set `--no-file-logging`
-# and use Docker's native logging facilities instead.
-chown -R 10001:10001 './log' './res/data'
-
-# Start the Docker container and attach the TTY.
-#
-# Instead of `--env-file`, you could manually set each of the required
-# environment variables using `--env VAR=value`. You can also let 1N4 load
-# environment variables from `.env` instead of Docker by mounting it:
-# `--mount 'type=bind,source=./.env,target=/app/.env,readonly'`.
-docker run --tty \
-    --env-file '.env' \
-    --mount 'type=bind,source=./log,target=/app/log' \
-    --mount 'type=bind,source=./res,target=/app/res,readonly' \
-    --mount 'type=bind,source=./res/data,target=/app/res/data' \
-    'ArchitecturalDogSoftware/ina'
-
-# Reset ownership of the necessary directories back to the current user.
-chown -R "$(id -u):$(id -g)" './log' './res/data'
-```
-
-If a different target CPU architecture is chosen,
-Rust will cross-compile for that architecture from a native image.
-The last build step that puts the image together still relies on emulating the target architecture, however.
-[Documentation](https://docs.docker.com/build/building/multi-platform/#qemu) points towards [`tonistiigi/binfmt`](https://github.com/tonistiigi/binfmt)
-as being the easy option to set up QEMU for this,
-but your package manager may provide its own packages if you prefer that.
-For example, one can set up emulation on Ubuntu 24.04 (and probably other Debian derivatives) like so:
-
-```sh
-apt install 'binfmt-support' 'qemu-user-static'
-
-qemu_ref='master' # Or set to a specific version, e.g., `v8.2.2`.
-curl --fail --show-error --location --remote-name \
-    "https://raw.githubusercontent.com/qemu/qemu/refs/heads/$qemu_ref/scripts/qemu-binfmt-conf.sh"
-chmod u+x './qemu-binfmt-conf.sh'
-
-# `--systemd 'ALL'` registers every interpreter at startup with a systemd
-# service. Without this flag, you'll have to re-run this script every time you
-# restart. You can also specify individual CPU architectures to register, `ALL`
-# registers every architecture supported by QEMU.
-#
-# `./qemu-binfmt-conf.sh --help` for more information.
-./qemu-binfmt-conf.sh --qemu-suffix '-static' --qemu-path '/usr/bin' \
-    --persistent 'yes' \
-    --systemd 'ALL'
-```
+See 1N4's [Docker documentation](./docs/DOCKER.md) for instructions on how to run it
+using the Docker CLI, Docker Compose, or a script.
 
 ## Contributing
 
