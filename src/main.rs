@@ -76,11 +76,15 @@ pub fn main() -> Result<ExitCode> {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let arguments = Arguments::parse();
+    let arguments = get_config();
 
     ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
-    ina_logging::thread::blocking_endpoint(TerminalEndpoint::new())?;
-    ina_logging::thread::blocking_endpoint(FileEndpoint::new())?;
+    if !arguments.bot_settings.disable_console_logging {
+        ina_logging::thread::blocking_endpoint(TerminalEndpoint::new())?;
+    }
+    if !arguments.bot_settings.disable_file_logging {
+        ina_logging::thread::blocking_endpoint(FileEndpoint::new())?;
+    }
     ina_logging::thread::blocking_setup()?;
 
     info!("initialized logging thread")?;
@@ -158,4 +162,19 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
     info!(async "closed localization thread").await?;
 
     Ok(code)
+}
+
+/// Resolve command-line arguments.
+///
+/// This is distinct from just [`Arguments::parse`] because it applies extra changes on top.
+fn get_config() -> Arguments {
+    let mut args = Arguments::parse();
+
+    if args.bot_settings.quiet {
+        args.bot_settings.disable_file_logging = true;
+        args.bot_settings.disable_console_logging = true;
+    }
+    args.bot_settings.quiet = args.bot_settings.disable_file_logging && args.bot_settings.disable_console_logging;
+
+    args
 }

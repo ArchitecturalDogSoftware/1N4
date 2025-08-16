@@ -19,7 +19,7 @@ or you can install and run her directly through Git and Cargo.
 
 ```sh
 # Clone and move into the repository.
-git clone https://github.com/ArchitecturalDogSoftware/1N4.git
+git clone 'https://github.com/ArchitecturalDogSoftware/1N4.git'
 cd 1N4
 
 # Build in release mode.
@@ -43,6 +43,12 @@ If you are running your own instance of 1N4, ensure that the following environme
   which is where things like error logs are sent.
   1N4 assumes that the given channel is within the guild specified by `DEVELOPMENT_GUILD_ID`
 - `ENCRYPTION_KEY` - The password used for encrypting and decrypting sensitive files.
+
+### Docker
+
+Alternatively, 1N4 is available through a Docker container running Alpine Linux.
+See 1N4's [Docker documentation](./docs/DOCKER.md) for instructions on how to run it
+using the Docker CLI, Docker Compose, or a script.
 
 ## Contributing
 

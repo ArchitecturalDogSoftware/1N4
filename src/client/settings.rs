@@ -21,6 +21,7 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 
 /// The bot's settings.
+#[expect(clippy::struct_excessive_bools, reason = "not relevant to CLI arguments")]
 #[non_exhaustive]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -57,6 +58,21 @@ pub struct Settings {
     #[arg(long = "skip-command-patching")]
     #[serde(default)]
     pub skip_command_patch: bool,
+
+    /// Disables all logger output.
+    ///
+    /// Equivalent to `--disable-file-logging` and `--disable-console-logging`.
+    #[arg(short = 'q', long = "quiet")]
+    #[serde(default)]
+    pub quiet: bool,
+    /// Stops the logger from writing to files.
+    #[arg(long = "disable-file-logging")]
+    #[serde(default)]
+    pub disable_file_logging: bool,
+    /// Stops the logger from writing to `STDOUT` and `STDERR`.
+    #[arg(long = "disable-console-logging")]
+    #[serde(default)]
+    pub disable_console_logging: bool,
 }
 
 /// Returns the default status file location.
