@@ -105,8 +105,7 @@ fn get_current_commit(root_dir: &Utf8Path) -> std::io::Result<String> {
     // Trim the trailing line ending in the file.
     let head_ref = head_ref.trim_ascii_end();
 
-    // Assumes that the contents of `.git/HEAD` will always be either
-    // `refs/heads/BRANCH_NAME` or the commit hash.
+    // Assumes that the contents of `.git/HEAD` will always be either `refs/heads/BRANCH_NAME` or the commit hash.
     let Some(current_branch_path) = head_ref.strip_prefix("ref: ") else {
         return Ok(head_ref.to_string());
     };
