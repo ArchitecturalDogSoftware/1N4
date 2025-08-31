@@ -22,7 +22,7 @@ jobs:
     toml:
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - name: Setup - Install Taplo
               uses: taiki-e/install-action@v2
               with:
@@ -36,9 +36,14 @@ jobs:
     shell:
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - name: Setup - Disable APT updating manpages
               run: |
+                # No need to disable `man-db` triggers if it isn't installed.
+                if ! dpkg --list | grep -q 'man-db'; then
+                    exit 0
+                fi
+
                 # Processing APT triggers for `man-db` can take a while when `taiki-e/install-action@v2` is
                 # uninstalling the old version of ShellCheck bundled with this GitHub Actions runner. Given that a CI
                 # runner doesn't need perfect manpages, it should be safe to disable `man-db` triggers.
@@ -52,7 +57,7 @@ jobs:
             - name: Setup - Install shfmt and ShellCheck
               uses: taiki-e/install-action@v2
               with:
-                tool: shfmt@3,shellcheck@0.10
+                tool: shfmt@3,shellcheck@0.11
 
             - name: Action - Lint shell scripts with ShellCheck
               run: shfmt --find=0 . | xargs -0 shellcheck
@@ -62,7 +67,7 @@ jobs:
     yaml:
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - name: Setup - Install go
               uses: actions/setup-go@v5
               with:
@@ -299,6 +304,6 @@ jobs:
     markdown:
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v5
             - name: Action - Install and check files with mdformat
               run: pipx run mdformat~=0.7 --check .
