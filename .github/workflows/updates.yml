@@ -39,11 +39,11 @@ jobs:
             # Spec: `namespace/repository@semver`
             GITHUB_RELEASES: |
                 actions/cache@v4
-                actions/checkout@v4
+                actions/checkout@v5
                 actions/setup-go@v5
                 tamasfe/taplo@0.10
                 mvdan/sh@3
-                koalaman/shellcheck@0.10
+                koalaman/shellcheck@0.11
             # Spec: `product-version:short-name-version:subdir`
             #
             # Where `product-version` is as it appears in the Actions, and `shortname` is as it appears in the
@@ -270,7 +270,7 @@ jobs:
                     namespace="$(get_column "$path" 1 '/')"
                     # E.g., `checkout`.
                     repository="$(get_column "$path" 2 '/')"
-                    # E.g., `v4`.
+                    # E.g., `v5`.
                     semver_target="$(get_column "$package" 2 '@')"
 
                     # This returns only one page of thirty releases by default, but it seems like they're sorted by

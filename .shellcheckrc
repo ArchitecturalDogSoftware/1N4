@@ -1,0 +1,13 @@
+# Prefer using redirection or (where possible) passing the path of a file instead of piping the output of `cat`.
+#
+# - <https://github.com/koalaman/shellcheck/wiki/SC2002>
+enable=useless-use-of-cat
+
+# Use `-n`, `-z`, `-eq`, `-ne`, etc. appropriately in conditions, instead of negating the other.
+#
+# E.g., use `[ -z "$str" ]` instead of `[ ! -n "$str" ]` and vice versa.
+#
+# - <https://github.com/koalaman/shellcheck/wiki/SC2236>
+# - <https://github.com/koalaman/shellcheck/wiki/SC2237>
+# - <https://github.com/koalaman/shellcheck/wiki/SC2335>
+enable=avoid-negated-conditions
