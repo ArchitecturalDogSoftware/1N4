@@ -20,6 +20,8 @@ use proc_macro::TokenStream;
 
 /// Implements the [`AsTranslation`] derive macro.
 mod as_translation;
+/// Implements the [`optional`] annotation macro.
+mod optional;
 /// Implements the [`Stored`] derive macro.
 mod stored;
 
@@ -130,4 +132,20 @@ pub fn as_translation(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(Stored, attributes(data_path, data_format))]
 pub fn stored(input: TokenStream) -> TokenStream {
     crate::stored::procedure(input)
+}
+
+/// Make the fields of a struct [optional], create a corresponding non-optional struct, and provide
+/// conversions.
+///
+/// If you define a type called `Option` in scope that's different from [`std::option::Option`],
+/// this will break. Unfortunately, there's not a particularly good way around this, because Clap
+/// currently matches on `Option` (to infer that an argument is optional) on a strictly textual
+/// basis, it doesn't attempt to infer from the actual type. See
+/// [this comment](https://github.com/clap-rs/clap/issues/4636#issuecomment-1381969663) and
+/// [this issue](https://github.com/clap-rs/clap/issues/4626).
+///
+/// [optional]: `Option`
+#[proc_macro_attribute]
+pub fn optional(attribute: TokenStream, item: TokenStream) -> TokenStream {
+    crate::optional::procedure(attribute, item)
 }

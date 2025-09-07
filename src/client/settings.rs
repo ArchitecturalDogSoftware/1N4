@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Copyright © 2024 Jaxydog
+// Copyright © 2025 RemasteredArch
 //
 // This file is part of 1N4.
 //
@@ -18,22 +19,27 @@ use std::num::{NonZeroU32, NonZeroU64};
 use std::path::PathBuf;
 
 use clap::Args;
+use ina_macro::optional;
 use serde::{Deserialize, Serialize};
 
 /// The bot's settings.
 #[expect(clippy::struct_excessive_bools, reason = "not relevant to CLI arguments")]
 #[non_exhaustive]
+#[optional(
+    keep_derives = [Clone, Debug, Hash, PartialEq, Eq],
+    keep_annotations = [non_exhaustive, expect],
+)]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[group(id = "BotSettings")]
 pub struct Settings {
     /// The location of the file that determines the bot's status.
-    #[arg(long = "status-file", default_value_os_t = self::default_status_file())]
-    #[serde(default = "default_status_file")]
+    #[arg(long = "status-file")]
+    #[option(default = self::default_status_file())]
     pub status_file: PathBuf,
     /// The interval at which to refresh the bot's status in minutes.
-    #[arg(short = 'S', long = "status-interval", default_value_t = self::default_status_interval())]
-    #[serde(default = "default_status_interval")]
+    #[arg(short = 'S', long = "status-interval")]
+    #[option(default = self::default_status_interval())]
     pub status_interval: NonZeroU64,
 
     /// The location of the directory holding attachment overrides for the `/help` command.
@@ -41,37 +47,37 @@ pub struct Settings {
     /// Some of the buttons on the `/help` response trigger messages with attachments. These
     /// attachments are embedded into the bot, but it will look for files of the same name in this
     /// directory before defaulting to the embedded copy.
-    #[arg(long = "help-attachments-directory", default_value_os_t = self::default_help_attachments_directory())]
-    #[serde(default = "default_help_attachments_directory")]
+    #[arg(long = "help-attachments-directory")]
+    #[option(default = self::default_help_attachments_directory())]
     pub help_attachments_directory: PathBuf,
 
     /// The number of shards to spawn.
     #[arg(short = 's', long = "shards")]
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[option(default)]
     pub shards: Option<NonZeroU32>,
     /// The interval at which to reshard in hours.
-    #[arg(short = 'r', long = "reshard-interval", default_value_t = self::default_reshard_interval())]
-    #[serde(default = "default_reshard_interval")]
+    #[arg(short = 'r', long = "reshard-interval")]
+    #[option(default = self::default_reshard_interval())]
     pub reshard_interval: NonZeroU64,
 
     /// Whether to skip command patching on bot startup.
     #[arg(long = "skip-command-patching")]
-    #[serde(default)]
+    #[option(default)]
     pub skip_command_patch: bool,
 
     /// Disables all logger output.
     ///
     /// Equivalent to `--disable-file-logging` and `--disable-console-logging`.
     #[arg(short = 'q', long = "quiet")]
-    #[serde(default)]
+    #[option(default)]
     pub quiet: bool,
     /// Stops the logger from writing to files.
     #[arg(long = "disable-file-logging")]
-    #[serde(default)]
+    #[option(default)]
     pub disable_file_logging: bool,
     /// Stops the logger from writing to `STDOUT` and `STDERR`.
     #[arg(long = "disable-console-logging")]
-    #[serde(default)]
+    #[option(default)]
     pub disable_console_logging: bool,
 }
 

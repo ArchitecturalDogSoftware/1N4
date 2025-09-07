@@ -1042,6 +1042,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "ina-logging",
+ "ina-macro",
  "ina-threading",
  "serde",
  "thiserror 2.0.14",
@@ -1055,6 +1056,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "clap",
+ "ina-macro",
  "ina-threading",
  "owo-colors",
  "serde",
@@ -1084,6 +1086,7 @@ dependencies = [
  "chacha20poly1305",
  "clap",
  "flate2",
+ "ina-macro",
  "ina-threading",
  "postcard",
  "rmp-serde",

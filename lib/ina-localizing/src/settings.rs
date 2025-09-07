@@ -20,6 +20,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 
 use clap::{Args, ValueEnum};
+use ina_macro::optional;
 use serde::{Deserialize, Serialize};
 
 use crate::locale::Locale;
@@ -28,33 +29,37 @@ use crate::{Error, Result};
 
 /// The localizer's settings.
 #[non_exhaustive]
+#[optional(
+    keep_derives = [Clone, Debug, PartialEq, Eq, Serialize],
+    keep_annotations = [non_exhaustive, expect],
+)]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[group(id = "LangSettings")]
 pub struct Settings {
     /// The localizer's default locale.
-    #[arg(short = 'l', long = "default-locale", default_value_t)]
-    #[serde(default)]
+    #[arg(short = 'l', long = "default-locale")]
+    #[option(default)]
     pub default_locale: Locale,
 
     /// The directory within which to read language files.
-    #[arg(id = "LANG_DIRECTORY", long = "lang-directory", default_value_os_t = self::default_directory())]
-    #[serde(default = "default_directory")]
+    #[arg(id = "LANG_DIRECTORY", long = "lang-directory")]
+    #[option(default = self::default_directory())]
     pub directory: PathBuf,
 
     /// The behavior that the localizer will exhibit when it fails to translate a key.
-    #[arg(long = "lang-miss-behavior", default_value_t)]
-    #[serde(default)]
+    #[arg(long = "lang-miss-behavior")]
+    #[option(default)]
     pub miss_behavior: MissingBehavior,
 
     /// The localizing thread's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity", default_value_t = self::default_queue_capacity())]
-    #[serde(default = "default_queue_capacity")]
+    #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity")]
+    #[option(default = self::default_queue_capacity())]
     pub queue_capacity: NonZeroUsize,
 
     /// The amount of depth at which to search for a translation key in language files with inherited translations.
-    #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth", default_value_t = self::default_search_depth())]
-    #[serde(default = "default_search_depth")]
+    #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth")]
+    #[option(default = self::default_search_depth())]
     pub search_depth: usize,
 }
 
