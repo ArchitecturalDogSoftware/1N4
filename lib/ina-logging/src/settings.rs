@@ -18,27 +18,32 @@ use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::PathBuf;
 
 use clap::Args;
+use ina_macro::optional;
 use serde::{Deserialize, Serialize};
 
 /// The logger's settings.
 #[non_exhaustive]
+#[optional(
+    keep_derives = [Clone, Debug, PartialEq, Eq, Serialize],
+    keep_annotations = [non_exhaustive, expect],
+)]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[group(id = "LogSettings")]
 pub struct Settings {
     /// The logger's file output directory.
     #[cfg(feature = "file")]
-    #[arg(id = "LOG_DIR", long = "log-directory", default_value_os_t = self::default_directory())]
-    #[serde(default = "default_directory")]
+    #[arg(id = "LOG_DIR", long = "log-directory")]
+    #[option(default = self::default_directory())]
     pub directory: PathBuf,
 
     /// The capacity of the logger's queue. If set to '1', no buffering will occur.
-    #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity", default_value_t = self::default_queue_capacity())]
-    #[serde(default = "default_queue_capacity")]
+    #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity")]
+    #[option(default = self::default_queue_capacity())]
     pub queue_capacity: NonZeroUsize,
     /// The duration in milliseconds that the logger's queue should retain entries for before flushing.
-    #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration", default_value_t = self::default_queue_duration())]
-    #[serde(default = "default_queue_duration")]
+    #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration")]
+    #[option(default = self::default_queue_duration())]
     pub queue_duration: NonZeroU64,
 }
 

@@ -18,29 +18,33 @@ use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
 use clap::Args;
+use ina_macro::optional;
 use serde::{Deserialize, Serialize};
 
 use crate::System;
 
 /// The storage instance's settings.
 #[non_exhaustive]
+#[optional(
+    keep_derives = [Clone, Debug, PartialEq, Eq, Serialize],
+    keep_annotations = [non_exhaustive, expect],
+)]
 #[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[group(id = "DataSettings")]
 pub struct Settings {
     /// The storage system to use to read and write data.
-    #[arg(long = "data-system", default_value_t)]
-    #[serde(default)]
+    #[arg(long = "data-system")]
+    #[option(default)]
     pub system: System,
-
     /// The directory within which to manage data files.
-    #[arg(id = "DATA_DIRECTORY", long = "data-directory", default_value_os_t = self::default_directory())]
-    #[serde(default = "default_directory")]
+    #[arg(id = "DATA_DIRECTORY", long = "data-directory")]
+    #[option(default = self::default_directory())]
     pub directory: PathBuf,
 
     /// The storage thread's output queue capacity. If set to '1', no buffering will be done.
-    #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity", default_value_t = self::default_queue_capacity())]
-    #[serde(default = "default_queue_capacity")]
+    #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity")]
+    #[option(default = self::default_queue_capacity())]
     pub queue_capacity: NonZeroUsize,
 }
 
