@@ -23,11 +23,13 @@ use ina_macro::optional;
 use serde::{Deserialize, Serialize};
 
 /// The bot's settings.
-#[expect(clippy::struct_excessive_bools, reason = "not relevant to CLI arguments")]
 #[non_exhaustive]
 #[optional(
     keep_derives = [Clone, Debug, Hash, PartialEq, Eq],
     keep_annotations = [non_exhaustive, expect],
+    apply_annotations = {
+        #[expect(clippy::struct_excessive_bools, reason = "not relevant to CLI arguments")]
+    },
 )]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
