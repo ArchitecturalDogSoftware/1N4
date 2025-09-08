@@ -33,6 +33,13 @@ mod attr_paths;
 /// Parse fields and their annotation.
 mod fields;
 
+/// Retain only the specified [annotations] and derives.
+///
+/// - Retains only the [annotations] whose [`Path`] is included in `kept_attrs`.
+/// - If [`derive`] was one of the kept annotations and `keep_derives` is [`Some`], this will replace the list of
+///   derives with the list in `keep_derives`.
+///
+/// [annotations]: `Attribute`
 fn only_kept_attrs(attrs: &[Attribute], kept_attrs: &[Path], keep_derives: Option<&[Path]>) -> Vec<Attribute> {
     let derive_annotation_path = attr_paths::derive();
 
