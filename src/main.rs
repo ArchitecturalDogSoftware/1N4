@@ -76,38 +76,12 @@ pub fn main() -> Result<ExitCode> {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let arguments = get_config();
-
-    ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
-    if !arguments.bot_settings.disable_console_logging {
-        ina_logging::thread::blocking_endpoint(TerminalEndpoint::new())?;
-    }
-    if !arguments.bot_settings.disable_file_logging {
-        ina_logging::thread::blocking_endpoint(FileEndpoint::new())?;
-    }
-    ina_logging::thread::blocking_setup()?;
-
-    info!("initialized logging thread")?;
-
-    #[cfg(feature = "dotenv")]
-    {
-        dotenvy::dotenv()?;
-
-        info!("loaded environment variables")?;
-    }
-
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-    let code = runtime.block_on(self::async_main(arguments))?;
-
-    info!("exited asynchronous runtime")?;
+    let exit_code = runtime.block_on(self::async_main(self::get_config()))?;
 
     drop(runtime);
 
-    info!("closing logging thread")?;
-
-    ina_logging::thread::blocking_close();
-
-    Ok(code)
+    Ok(exit_code)
 }
 
 /// The application's main function.
@@ -116,50 +90,64 @@ pub fn main() -> Result<ExitCode> {
 ///
 /// This function will return an error if the program's execution fails.
 pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
-    info!(async "entered asynchronous runtime").await?;
+    ina_logging::thread::start(arguments.log_settings.clone()).await?;
+
+    if !arguments.bot_settings.disable_console_logging {
+        ina_logging::thread::endpoint(TerminalEndpoint::new()).await?;
+    }
+    if !arguments.bot_settings.disable_file_logging {
+        ina_logging::thread::endpoint(FileEndpoint::new()).await?;
+    }
+
+    ina_logging::thread::setup().await?;
+    info!("initialized logging thread").await?;
+
+    #[cfg(feature = "dotenv")]
+    {
+        dotenvy::dotenv()?;
+        info!("loaded environment variables").await?;
+    }
 
     ina_localizing::thread::start(arguments.lang_settings).await?;
-
-    info!(async "initialized localization thread").await?;
+    info!("initialized localization thread").await?;
 
     let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
-
-    info!(async "loaded {loaded_locales} localization locales").await?;
+    info!("loaded {loaded_locales} localization locales").await?;
 
     ina_storage::format::encryption::set_password_resolver(|| {
         crate::utility::secret::encryption_key().map(|v| v.to_string()).ok()
     });
-    ina_storage::thread::start(arguments.data_settings).await?;
 
-    info!(async "initialized storage thread").await?;
+    ina_storage::thread::start(arguments.data_settings).await?;
+    info!("initialized storage thread").await?;
 
     let instance = Instance::new(arguments.bot_settings).await?;
-
-    info!(async "initialized client instance").await?;
+    info!("initialized client instance").await?;
 
     tokio::pin! {
         let process = instance.run();
         let terminate = tokio::signal::ctrl_c();
     }
 
-    info!(async "starting client process").await?;
+    info!("starting client process").await?;
 
     let code = tokio::select! {
         // Exit code of 130 for ^C is standard; 128 (to mark a signal) + 2 (the code for the ^C interrupt).
-        _ = terminate => info!(async "received termination signal").await.map(|()| ExitCode::from(130)),
+        _ = terminate => info!("received termination signal").await.map(|()| ExitCode::from(130)),
         result = process => match result {
-            Ok(()) => info!(async "stopping client process").await.map(|()| ExitCode::SUCCESS),
-            Err(error) => error!(async "unhandled error encountered: {error}").await.map(|()| ExitCode::FAILURE),
+            Ok(()) => info!("stopping client process").await.map(|()| ExitCode::SUCCESS),
+            Err(error) => error!("unhandled error encountered: {error}").await.map(|()| ExitCode::FAILURE),
         },
     }?;
 
     ina_storage::thread::close().await;
-
-    info!(async "closed storage thread").await?;
+    info!("closed storage thread").await?;
 
     ina_localizing::thread::close().await;
+    info!("closed localization thread").await?;
 
-    info!(async "closed localization thread").await?;
+    info!("closing logging thread").await?;
+    ina_logging::thread::close().await;
 
     Ok(code)
 }
