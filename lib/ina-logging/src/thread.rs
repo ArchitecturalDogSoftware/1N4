@@ -20,7 +20,7 @@ use std::sync::Arc;
 use ina_threading::join::Join;
 use ina_threading::statics::Static;
 use ina_threading::threads::consumer::ConsumerJoinHandle;
-use tokio::runtime::Builder as RuntimeBuilder;
+use tokio::runtime::{Builder as RuntimeBuilder, Handle};
 use tokio::sync::RwLock;
 use tokio::sync::mpsc::Receiver;
 
@@ -61,8 +61,12 @@ pub async fn start(settings: Settings) -> Result<()> {
         RuntimeBuilder::new_current_thread().enable_all().build()?.block_on(self::run(settings, receiver))
     })?)
     .first(|handle| {
-        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
-        handle.sender().blocking_send(Request::Close).expect("failed to close logging thread");
+        tokio::task::block_in_place(|| {
+            Handle::current().block_on(async move {
+                #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
+                handle.sender().send(Request::Close).await.expect("failed to close logging thread");
+            });
+        });
     });
 
     HANDLE.initialize(handle).await?;
