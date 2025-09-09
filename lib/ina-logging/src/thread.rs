@@ -152,15 +152,13 @@ pub async fn is_started() -> bool {
 /// #
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), ina_logging::Error> {
-/// debug!(async "This is an asynchronous debug log!").await?;
-///
-/// debug!("This is a synchronous debug log!")?;
+/// debug!("This is an asynchronous debug log!").await?;
 /// # Ok(())
 /// # }
 /// ```
 #[macro_export]
 macro_rules! debug {
-    (async $($args:tt)+) => {{
+    ($($args:tt)+) => {{
         #[cfg(debug_assertions)]
         {
             $crate::thread::entry($crate::entry::Level::DEBUG, ::std::format!($($args)+))
@@ -170,18 +168,6 @@ macro_rules! debug {
             ::std::mem::drop(::std::format_args!($($args)+));
 
             ::std::future::ready($crate::Result::<()>::Ok(()))
-        }
-    }};
-    ($($args:tt)+) => {{
-        #[cfg(debug_assertions)]
-        {
-            $crate::thread::blocking_entry($crate::entry::Level::DEBUG, ::std::format_args!($($args)+))
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            ::std::mem::drop(::std::format_args!($($args)+));
-
-            $crate::Result::<()>::Ok(())
         }
     }};
 }
@@ -195,19 +181,14 @@ macro_rules! debug {
 /// #
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), ina_logging::Error> {
-/// info!(async "This is an asynchronous information log!").await?;
-///
-/// info!("This is a synchronous information log!")?;
+/// info!("This is an asynchronous information log!").await?;
 /// # Ok(())
 /// # }
 /// ```
 #[macro_export]
 macro_rules! info {
-    (async $($args:tt)+) => {{
-        $crate::thread::entry($crate::entry::Level::INFO, ::std::format!($($args)+))
-    }};
     ($($args:tt)+) => {{
-        $crate::thread::blocking_entry($crate::entry::Level::INFO, ::std::format_args!($($args)+))
+        $crate::thread::entry($crate::entry::Level::INFO, ::std::format!($($args)+))
     }};
 }
 
@@ -220,19 +201,14 @@ macro_rules! info {
 /// #
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), ina_logging::Error> {
-/// warn!(async "This is an asynchronous warning log!").await?;
-///
-/// warn!("This is a synchronous warning log!")?;
+/// warn!("This is an asynchronous warning log!").await?;
 /// # Ok(())
 /// # }
 /// ```
 #[macro_export]
 macro_rules! warn {
-    (async $($args:tt)+) => {{
-        $crate::thread::entry($crate::entry::Level::WARN, ::std::format!($($args)+))
-    }};
     ($($args:tt)+) => {{
-        $crate::thread::blocking_entry($crate::entry::Level::WARN, ::std::format_args!($($args)+))
+        $crate::thread::entry($crate::entry::Level::WARN, ::std::format!($($args)+))
     }};
 }
 
@@ -245,18 +221,13 @@ macro_rules! warn {
 /// #
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), ina_logging::Error> {
-/// error!(async "This is an asynchronous error log!").await?;
-///
-/// error!("This is a synchronous error log!")?;
+/// error!("This is an asynchronous error log!").await?;
 /// # Ok(())
 /// # }
 /// ```
 #[macro_export]
 macro_rules! error {
-    (async $($args:tt)+) => {{
-        $crate::thread::entry($crate::entry::Level::ERROR, ::std::format!($($args)+))
-    }};
     ($($args:tt)+) => {{
-        $crate::thread::blocking_entry($crate::entry::Level::ERROR, ::std::format_args!($($args)+))
+        $crate::thread::entry($crate::entry::Level::ERROR, ::std::format!($($args)+))
     }};
 }
