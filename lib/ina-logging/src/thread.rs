@@ -17,10 +17,10 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
-use ina_threading::SenderHandle;
-use ina_threading::joining::Joining;
-use ina_threading::statics::StaticJoining;
-use ina_threading::threads::consumer::Consumer;
+use ina_threading::join::Join;
+use ina_threading::statics::Static;
+use ina_threading::threads::consumer::ConsumerJoinHandle;
+use tokio::runtime::Builder as RuntimeBuilder;
 use tokio::sync::RwLock;
 use tokio::sync::mpsc::Receiver;
 
@@ -30,12 +30,10 @@ use crate::settings::Settings;
 use crate::{Logger, Result};
 
 /// The logging thread's handle.
-static THREAD: LoggingThread = LoggingThread::new();
+static HANDLE: Static<JoinHandle> = Static::new();
 
-/// The logging thread's type.
-pub type LoggingThread = StaticJoining<Consumer<Request, Result<()>>>;
-/// The logging thread's inner type.
-pub type LoggingThreadInner = Joining<Consumer<Request, Result<()>>>;
+/// The inner type of the thread's handle.
+pub(crate) type JoinHandle = Join<ConsumerJoinHandle<Request, Result<()>>>;
 
 /// A request send to the logging thread.
 #[derive(Debug)]
@@ -52,217 +50,29 @@ pub enum Request {
     Endpoint(Arc<RwLock<dyn Endpoint>>),
 }
 
-/// Creates a new logging thread.
-///
-/// # Errors
-///
-/// This function will return an error if the thread fails to spawn.
-fn create(settings: Settings) -> Result<LoggingThreadInner> {
-    let capacity = settings.queue_capacity;
-    let handle = Consumer::spawn_with_runtime("logging", capacity, |r| self::run(settings, r))?;
-
-    Ok(Joining::new(handle).inspect_handle(|handle| {
-        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
-        handle.as_sender().blocking_send(Request::Close).expect("failed to close logging thread");
-    }))
-}
-
 /// Starts the logging thread.
-///
-/// # Panics
-///
-/// Panics if the thread has already been initialized.
 ///
 /// # Errors
 ///
 /// This function will return an error if the thread could not be initialized.
+#[expect(clippy::missing_panics_doc, reason = "this function does not cause the panic")]
 pub async fn start(settings: Settings) -> Result<()> {
-    THREAD.async_api().initialize(self::create(settings)?).await;
+    let handle = Join::new(ConsumerJoinHandle::spawn(settings.queue_capacity, |receiver| {
+        RuntimeBuilder::new_current_thread().enable_all().build()?.block_on(self::run(settings, receiver))
+    })?)
+    .first(|handle| {
+        #[expect(clippy::expect_used, reason = "If the thread fails to close, logs will be lost silently")]
+        handle.sender().blocking_send(Request::Close).expect("failed to close logging thread");
+    });
+
+    HANDLE.initialize(handle).await?;
 
     Ok(())
-}
-
-/// Starts the logging thread.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the thread has already been initialized or if this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the thread could not be initialized.
-pub fn blocking_start(settings: Settings) -> Result<()> {
-    THREAD.sync_api().initialize(self::create(settings)?);
-
-    Ok(())
-}
-
-/// Requests that the logging thread outputs to the given endpoint.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub async fn endpoint(endpoint: impl Endpoint) -> Result<()> {
-    THREAD.async_api().get().await.as_sender().send(Request::Endpoint(Arc::new(RwLock::new(endpoint)))).await?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread outputs to the given endpoint.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized or this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub fn blocking_endpoint(endpoint: impl Endpoint) -> Result<()> {
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Endpoint(Arc::new(RwLock::new(endpoint))))?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread outputs the given log.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub async fn entry(level: Level<'static>, text: impl Display + Send) -> Result<()> {
-    let entry = Entry::new(level, text.to_string().into());
-
-    THREAD.async_api().get().await.as_sender().send(Request::Entry(entry)).await?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread outputs the given log.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized or this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub fn blocking_entry(level: Level<'static>, text: impl Display) -> Result<()> {
-    let entry = Entry::new(level, text.to_string().into());
-
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Entry(entry))?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread flushes its buffer.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub async fn flush() -> Result<()> {
-    THREAD.async_api().get().await.as_sender().send(Request::Flush).await?;
-
-    Ok(())
-}
-
-/// Requests that the logging thread flushes its buffer.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the thread has not been initialized or this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub fn blocking_flush() -> Result<()> {
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Flush)?;
-
-    Ok(())
-}
-
-/// Initializes the logging thread.
-///
-/// # Panics
-///
-/// Panics if the logging thread is not initialized.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub async fn setup() -> Result<()> {
-    THREAD.async_api().get().await.as_sender().send(Request::Setup).await?;
-
-    Ok(())
-}
-
-/// Initializes the logging thread.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the logging thread is not initialized or if this is called in an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-pub fn blocking_setup() -> Result<()> {
-    THREAD.sync_api().get().as_sender().blocking_send(Request::Setup)?;
-
-    Ok(())
-}
-
-/// Returns whether the thread has been started.
-pub async fn is_started() -> bool {
-    THREAD.async_api().is_initialized().await
-}
-
-/// Returns whether the thread has been started.
-///
-/// # Panics
-///
-/// Panics if this is called in an asynchronous context.
-pub fn blocking_is_started() -> bool {
-    THREAD.sync_api().is_initialized()
 }
 
 /// Closes the logging thread.
-///
-/// # Panics
-///
-/// Panics if the logging thread is not initialized.
 pub async fn close() {
-    THREAD.async_api().close().await;
-}
-
-/// Closes the logging thread.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the logging thread is not initialized or if this is called in an asynchronous context.
-pub fn blocking_close() {
-    THREAD.sync_api().close();
+    HANDLE.uninitialize().await;
 }
 
 /// Runs the thread process.
@@ -282,10 +92,55 @@ async fn run(settings: Settings, mut receiver: Receiver<Request>) -> Result<()> 
                 Some(Request::Flush) => logger.flush().await?,
                 Some(Request::Endpoint(endpoint)) => logger.push_endpoint(endpoint).await?,
                 Some(Request::Setup) => logger.setup().await?,
-                None | Some(Request::Close) => return logger.close().await,
+                Some(Request::Close) | None => return logger.close().await,
             },
         }
     }
+}
+
+/// Requests that the logging thread outputs to the given endpoint.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn endpoint(endpoint: impl Endpoint) -> Result<()> {
+    let request = Request::Endpoint(Arc::new(RwLock::new(endpoint)));
+
+    HANDLE.try_get().await?.sender().send(request).await.map_err(Into::into)
+}
+
+/// Requests that the logging thread outputs the given log.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn entry(level: Level<'static>, text: impl Display + Send) -> Result<()> {
+    let request = Request::Entry(Entry::new(level, text.to_string().into()));
+
+    HANDLE.try_get().await?.sender().send(request).await.map_err(Into::into)
+}
+
+/// Requests that the logging thread flushes its buffer.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn flush() -> Result<()> {
+    HANDLE.try_get().await?.sender().send(Request::Flush).await.map_err(Into::into)
+}
+
+/// Initializes the logging thread.
+///
+/// # Errors
+///
+/// This function will return an error if the message could not be sent.
+pub async fn setup() -> Result<()> {
+    HANDLE.try_get().await?.sender().send(Request::Setup).await.map_err(Into::into)
+}
+
+/// Returns whether the thread has been started.
+pub async fn is_started() -> bool {
+    HANDLE.is_initialized().await
 }
 
 /// Outputs a debug log.

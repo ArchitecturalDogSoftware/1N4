@@ -28,6 +28,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::task::{JoinError, JoinSet};
 
 use crate::entry::Entry;
+use crate::thread::JoinHandle;
 
 /// Defines various output endpoints for the logger.
 pub mod endpoint;
@@ -66,9 +67,9 @@ pub enum Error {
     /// A request failed to send.
     #[error("a request failed to send")]
     Send(#[from] SendError<Request>),
-    /// The thread failed to spawn.
+    /// An error related to the static thread handle.
     #[error(transparent)]
-    ThreadSpawn(#[from] ina_threading::Error),
+    Thread(#[from] ina_threading::statics::Error<JoinHandle>),
 }
 
 /// A logger with buffered output.

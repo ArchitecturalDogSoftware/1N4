@@ -28,7 +28,7 @@ owo-colors = { version = "~4.2", features = ["supports-colors"], optional = true
 serde = { workspace = true, features = ["derive"] }
 time = { workspace = true, features = ["formatting", "local-offset", "macros"] }
 thiserror.workspace = true
-tokio = { workspace = true, features = ["macros", "sync", "time"] }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
 
 [dev-dependencies]
 # `macros` and `rt-multi-threaded` allow the use of the `#[tokio::main]` macro in documentation tests.
