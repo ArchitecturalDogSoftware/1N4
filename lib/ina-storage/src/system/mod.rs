@@ -33,28 +33,10 @@ pub mod memory;
 /// A value that reads and writes generic data.
 pub trait DataSystem: DataReader + DataWriter + 'static {
     /// Returns a reference to the instance of this system.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    fn blocking_get() -> impl Deref<Target = Self>;
-
-    /// Returns a reference to the instance of this system.
-    fn get() -> impl Future<Output = impl Deref<Target = Self>> + Send;
+    fn get() -> impl Deref<Target = Self>;
 
     /// Returns a mutable reference to the instance of this system.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    fn blocking_get_mut() -> impl DerefMut<Target = Self>;
-
-    /// Returns a mutable reference to the instance of this system.
-    fn get_mut() -> impl Future<Output = impl DerefMut<Target = Self>> + Send;
+    fn get_mut() -> impl DerefMut<Target = Self>;
 }
 
 /// A value that reads data bytes.
@@ -64,63 +46,24 @@ pub trait DataReader {
 
     /// Returns whether the path exists within this reader.
     ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
     /// # Errors
     ///
     /// This function will return an error if the path cannot be read.
-    fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error>;
-
-    /// Returns whether the path exists within this reader.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    fn exists(&self, path: &Path) -> impl Future<Output = Result<bool, Self::Error>> + Send;
-
-    /// Returns the size of the data at the given path.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error>;
+    fn exists(&self, path: &Path) -> Result<bool, Self::Error>;
 
     /// Returns the size of the data at the given path.
     ///
     /// # Errors
     ///
     /// This function will return an error if the path cannot be read.
-    fn size(&self, path: &Path) -> impl Future<Output = Result<u64, Self::Error>> + Send;
-
-    /// Reads bytes from the given path.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error>;
+    fn size(&self, path: &Path) -> Result<u64, Self::Error>;
 
     /// Reads bytes from the given path.
     ///
     /// # Errors
     ///
     /// This function will return an error if the path cannot be read.
-    fn read(&self, path: &Path) -> impl Future<Output = Result<Arc<[u8]>, Self::Error>> + Send;
+    fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error>;
 }
 
 /// A value that writes data bytes.
@@ -130,61 +73,22 @@ pub trait DataWriter {
 
     /// Writes bytes into the given path.
     ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
     /// # Errors
     ///
     /// This function will return an error if the path cannot be written to.
-    fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error>;
-
-    /// Writes bytes into the given path.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    fn write(&mut self, path: &Path, bytes: &[u8]) -> impl Future<Output = Result<(), Self::Error>> + Send;
-
-    /// Renames the bytes to be associated with a new path.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error>;
+    fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error>;
 
     /// Renames the bytes to be associated with a new path.
     ///
     /// # Errors
     ///
     /// This function will return an error if the path cannot be written to.
-    fn rename(&mut self, from: &Path, into: &Path) -> impl Future<Output = Result<(), Self::Error>> + Send;
-
-    /// Deletes bytes from the given path.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error>;
+    fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error>;
 
     /// Deletes bytes from the given path.
     ///
     /// # Errors
     ///
     /// This function will return an error if the path cannot be written to.
-    fn delete(&mut self, path: &Path) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    fn delete(&mut self, path: &Path) -> Result<(), Self::Error>;
 }

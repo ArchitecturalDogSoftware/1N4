@@ -115,7 +115,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     }
     .into_boxed_str();
 
-    let selectors = SelectorList::async_api().read((guild_id, user_id)).await;
+    let selectors = SelectorList::storage_api().read((guild_id, user_id)).await;
     let mut selectors = selectors.unwrap_or_else(|_| SelectorList::new(guild_id, user_id));
 
     if selectors.inner.iter().any(|s| &s.id == role_id) {
@@ -134,7 +134,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     }
 
     selectors.inner.push(Selector { id: *role_id, name, icon: icon.into() });
-    selectors.as_async_api().write().await?;
+    selectors.as_storage_api().write().await?;
 
     let text = localize!(async(try in locale) category::UI, "role-selector-added").await?;
 
@@ -168,7 +168,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+    if !SelectorList::storage_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -176,7 +176,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
         return crate::client::event::pass();
     }
 
-    let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+    let Ok(selectors) = SelectorList::storage_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -220,7 +220,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+    if !SelectorList::storage_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -228,7 +228,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
         return crate::client::event::pass();
     }
 
-    let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+    let Ok(selectors) = SelectorList::storage_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -275,7 +275,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+    if !SelectorList::storage_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -283,7 +283,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
         return crate::client::event::pass();
     }
 
-    let Ok(selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+    let Ok(selectors) = SelectorList::storage_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -294,7 +294,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
     let components = selectors.build(entry, component::select::NAME, false)?;
 
     context.api.client.create_message(channel_id).components(&components).await?;
-    selectors.as_async_api().delete().await?;
+    selectors.as_storage_api().delete().await?;
 
     let text = localize!(async(try in locale) category::UI, "role-finished").await?;
 
@@ -380,7 +380,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    if !SelectorList::async_api().exists((guild_id, user_id)).await? {
+    if !SelectorList::storage_api().exists((guild_id, user_id)).await? {
         let title = localize!(async(try in locale) category::UI, "role-load-missing").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -388,7 +388,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
         return crate::client::event::pass();
     }
 
-    let Ok(mut selectors) = SelectorList::async_api().read((guild_id, user_id)).await else {
+    let Ok(mut selectors) = SelectorList::storage_api().read((guild_id, user_id)).await else {
         let title = localize!(async(try in locale) category::UI, "role-load-failed").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -407,13 +407,13 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
     selectors.inner.retain(|e| e.id != role_id);
 
     if selectors.inner.is_empty() {
-        selectors.as_async_api().delete().await?;
+        selectors.as_storage_api().delete().await?;
 
         let title = localize!(async(try in locale) category::UI, "role-remove-emptied").await?;
 
         context.success_message(title, None::<&str>).await?;
     } else {
-        selectors.as_async_api().write().await?;
+        selectors.as_storage_api().write().await?;
 
         let components = selectors.build(entry, component::remove::NAME, false)?;
 

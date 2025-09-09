@@ -37,23 +37,13 @@ pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {
     fn data_path(&self) -> impl AsRef<Path> + Send;
 
     /// Returns an asynchronous API for this stored value type.
-    fn async_api() -> AsyncApi<Self> {
-        AsyncApi(PhantomData)
-    }
-
-    /// Returns a synchronous API for this stored value type.
-    fn sync_api() -> SyncApi<Self> {
-        SyncApi(PhantomData)
+    fn storage_api() -> StorageApi<Self> {
+        StorageApi(PhantomData)
     }
 
     /// Returns an asynchronous API for this stored value type.
-    fn as_async_api(&self) -> AsyncHolderApi<'_, Self> {
-        Self::async_api().with(self)
-    }
-
-    /// Returns a synchronous API for this stored value type.
-    fn as_sync_api(&self) -> SyncHolderApi<'_, Self> {
-        Self::sync_api().with(self)
+    fn as_storage_api(&self) -> RefStorageApi<'_, Self> {
+        Self::storage_api().with(self)
     }
 }
 
@@ -61,12 +51,12 @@ pub trait Stored: Send + Sync + Serialize + for<'de> Deserialize<'de> {
 #[repr(transparent)]
 #[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct AsyncApi<T: Stored>(PhantomData<T>);
+pub struct StorageApi<T: Stored>(PhantomData<T>);
 
-impl<T: Stored> AsyncApi<T> {
+impl<T: Stored> StorageApi<T> {
     /// Creates an asynchronous API that holds the given value.
-    pub const fn with(self, value: &T) -> AsyncHolderApi<'_, T> {
-        AsyncHolderApi(value)
+    pub const fn with(self, value: &T) -> RefStorageApi<'_, T> {
+        RefStorageApi(value)
     }
 
     /// Returns whether data is stored for the value represented by the given path arguments.
@@ -147,9 +137,9 @@ impl<T: Stored> AsyncApi<T> {
 #[repr(transparent)]
 #[must_use = "api values do nothing unless used"]
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct AsyncHolderApi<'sv, T: Stored>(&'sv T);
+pub struct RefStorageApi<'sv, T: Stored>(&'sv T);
 
-impl<T: Stored> AsyncHolderApi<'_, T> {
+impl<T: Stored> RefStorageApi<'_, T> {
     /// Returns whether data is stored for this value.
     ///
     /// # Errors
@@ -221,244 +211,5 @@ impl<T: Stored> AsyncHolderApi<'_, T> {
         let path = self.0.data_path().as_ref().with_extension(format.extension());
 
         crate::thread::delete(path.into_boxed_path()).await
-    }
-}
-
-/// A synchronous API for a stored value type.
-#[repr(transparent)]
-#[must_use = "api values do nothing unless used"]
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct SyncApi<T: Stored>(PhantomData<T>);
-
-impl<T: Stored> SyncApi<T> {
-    /// Creates a synchronous API that holds the given value.
-    pub const fn with(self, value: &T) -> SyncHolderApi<'_, T> {
-        SyncHolderApi(value)
-    }
-
-    /// Returns whether data is stored for the value represented by the given path arguments.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    pub fn exists(self, arguments: T::PathArguments) -> Result<bool> {
-        let format = T::data_format();
-        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_exists(path.into_boxed_path())
-    }
-
-    /// Returns the size of the stored data for the value represented by the given path arguments.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    pub fn size(self, arguments: T::PathArguments) -> Result<u64> {
-        let format = T::data_format();
-        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_size(path.into_boxed_path())
-    }
-
-    /// Returns the stored value represented by the given path arguments.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    pub fn read(self, arguments: T::PathArguments) -> Result<T> {
-        let format = T::data_format();
-        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_read(path.into_boxed_path())
-    }
-
-    /// Writes the given value into the storage system at the path represented by the given path arguments.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    pub fn write(self, arguments: T::PathArguments, value: &T) -> Result<()> {
-        let format = T::data_format();
-        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_write(path.into_boxed_path(), value)
-    }
-
-    /// Renames the value represented by the given path arguments.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    pub fn rename(self, from: T::PathArguments, into: T::PathArguments) -> Result<()> {
-        let format = T::data_format();
-        let from = T::data_path_for(from).as_ref().with_extension(format.extension());
-        let into = T::data_path_for(into).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_rename(from.into_boxed_path(), into.into_boxed_path())
-    }
-
-    /// Deletes the value represented by the given path arguments.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    pub fn delete(self, arguments: T::PathArguments) -> Result<()> {
-        let format = T::data_format();
-        let path = T::data_path_for(arguments).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_delete(path.into_boxed_path())
-    }
-}
-
-/// A synchronous API for a held stored value.
-#[repr(transparent)]
-#[must_use = "api values do nothing unless used"]
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub struct SyncHolderApi<'sv, T: Stored>(&'sv T);
-
-impl<T: Stored> SyncHolderApi<'_, T> {
-    /// Returns whether data is stored for this value.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    pub fn exists(self) -> Result<bool> {
-        let format = T::data_format();
-        let path = self.0.data_path().as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_exists(path.into_boxed_path())
-    }
-
-    /// Returns the size of the stored data for this value.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    pub fn size(self) -> Result<u64> {
-        let format = T::data_format();
-        let path = self.0.data_path().as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_size(path.into_boxed_path())
-    }
-
-    /// Returns the value as saved within the storage system.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be read.
-    pub fn read(self) -> Result<T> {
-        let format = T::data_format();
-        let path = self.0.data_path().as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_read(path.into_boxed_path())
-    }
-
-    /// Writes this value into the storage system.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    pub fn write(self) -> Result<()> {
-        let format = T::data_format();
-        let path = self.0.data_path().as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_write(path.into_boxed_path(), self.0)
-    }
-
-    /// Renames this value.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    pub fn rename(self, into: T::PathArguments) -> Result<()> {
-        let format = T::data_format();
-        let from = self.0.data_path().as_ref().with_extension(format.extension());
-        let into = T::data_path_for(into).as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_rename(from.into_boxed_path(), into.into_boxed_path())
-    }
-
-    /// Deletes this value.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called in an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the path cannot be written to.
-    pub fn delete(self) -> Result<()> {
-        let format = T::data_format();
-        let path = self.0.data_path().as_ref().with_extension(format.extension());
-
-        crate::thread::blocking_delete(path.into_boxed_path())
     }
 }

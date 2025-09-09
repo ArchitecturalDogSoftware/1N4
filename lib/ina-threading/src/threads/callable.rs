@@ -18,6 +18,7 @@
 
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 use tokio::sync::mpsc::Sender as MpscSender;
 use tokio::sync::mpsc::error::SendError as MpscSendError;
@@ -175,6 +176,146 @@ impl<S, R> DerefMut for CallableJoinHandle<S, R> {
 impl<S, R> From<CallableJoinHandle<S, R>> for std::thread::JoinHandle<()> {
     #[inline]
     fn from(value: CallableJoinHandle<S, R>) -> Self {
+        value.into_join_handle()
+    }
+}
+
+/// A thread that can be "invoked" like a function.
+#[derive(Debug)]
+pub struct StatefulCallableJoinHandle<S, R, V> {
+    /// The thread's inner state.
+    state: Arc<V>,
+    /// The inner join handle.
+    handle: CallableJoinHandle<(Arc<V>, S), R>,
+}
+
+impl<S, R, V> StatefulCallableJoinHandle<S, R, V> {
+    /// Creates a new [`StatefulCallableJoinHandle<S, R, V>`] using the given function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// # use std::sync::Arc;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::callable::StatefulCallableJoinHandle;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let state = Arc::new(5);
+    /// let handle = StatefulCallableJoinHandle::spawn(capacity, state, |value: i32| value + state)?;
+    ///
+    /// assert_eq!(handle.invoke(2).await.unwrap(), 7);
+    /// # handle.into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn spawn<F>(capacity: NonZero<usize>, state: Arc<V>, f: F) -> std::io::Result<Self>
+    where
+        S: Send + 'static,
+        R: Send + 'static,
+        V: Send + Sync + 'static,
+        F: Fn((Arc<V>, S)) -> R + Send + 'static,
+    {
+        CallableJoinHandle::spawn(capacity, f).map(|handle| Self { state, handle })
+    }
+
+    /// Invokes the thread like a function, sending the given value and awaiting the thread's response.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's channel was closed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// # use std::sync::Arc;
+    /// #
+    /// # use std::thread::JoinHandle;
+    /// #
+    /// # use ina_threading::threads::callable::StatefulCallableJoinHandle;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let state = Arc::new(5);
+    /// let handle = StatefulCallableJoinHandle::spawn(capacity, state, |value: i32| value + state)?;
+    ///
+    /// assert_eq!(handle.invoke(2).await.unwrap(), 7);
+    /// # JoinHandle::from(handle).join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn invoke(&self, value: S) -> Result<R, Error<(Arc<V>, S), R>>
+    where
+        S: Send,
+        R: Send,
+        V: Send + Sync,
+    {
+        self.handle.invoke((Arc::clone(&self.state), value)).await
+    }
+}
+
+impl<S, R, V> JoinHandleWrapper for StatefulCallableJoinHandle<S, R, V> {
+    type Output = ();
+
+    #[inline]
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<()> {
+        self.handle.as_join_handle()
+    }
+
+    #[inline]
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<()> {
+        self.handle.as_join_handle_mut()
+    }
+
+    #[inline]
+    fn into_join_handle(self) -> std::thread::JoinHandle<()> {
+        self.handle.into_join_handle()
+    }
+}
+
+impl<S, R, V> AsRef<std::thread::JoinHandle<()>> for StatefulCallableJoinHandle<S, R, V> {
+    #[inline]
+    fn as_ref(&self) -> &std::thread::JoinHandle<()> {
+        self.as_join_handle()
+    }
+}
+
+impl<S, R, V> Deref for StatefulCallableJoinHandle<S, R, V> {
+    type Target = std::thread::JoinHandle<()>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_join_handle()
+    }
+}
+
+impl<S, R, V> AsMut<std::thread::JoinHandle<()>> for StatefulCallableJoinHandle<S, R, V> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut std::thread::JoinHandle<()> {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<S, R, V> DerefMut for StatefulCallableJoinHandle<S, R, V> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<S, R, V> From<StatefulCallableJoinHandle<S, R, V>> for std::thread::JoinHandle<()> {
+    #[inline]
+    fn from(value: StatefulCallableJoinHandle<S, R, V>) -> Self {
         value.into_join_handle()
     }
 }

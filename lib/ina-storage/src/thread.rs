@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
+use ina_threading::join::Join;
 use ina_threading::statics::Static;
-use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
-use tokio::sync::RwLock;
+use ina_threading::threads::callable::StatefulCallableJoinHandle;
 
 use crate::format::{DataDecode, DataEncode};
 use crate::settings::Settings;
@@ -27,13 +28,11 @@ use crate::stored::Stored;
 use crate::system::{DataReader, DataWriter};
 use crate::{Result, Storage};
 
-/// The storage thread's handle.
-static THREAD: StorageThread = StorageThread::new();
+/// The storage thread's static handle.
+static HANDLE: Static<JoinHandle> = Static::new();
 
-/// The storage thread's type.
-pub type StorageThread = Static<StorageThreadInner>;
-/// The storage thread's inner type.
-pub type StorageThreadInner = StatefulInvoker<RwLock<Storage>, Request, Response>;
+/// The inner type of the thread's handle.
+pub(crate) type JoinHandle = Join<StatefulCallableJoinHandle<Request, Response, RwLock<Storage>>>;
 
 /// A request sent to the storage thread.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,91 +66,59 @@ pub enum Response {
     Read(Arc<[u8]>),
 }
 
-/// Creates a new localization thread.
-///
-/// # Errors
-///
-/// This function will return an error if the thread fails to spawn.
-fn create(settings: Settings) -> Result<StorageThreadInner> {
-    let capacity = settings.queue_capacity;
-    let storage = RwLock::new(Storage::new(settings));
-
-    Ok(StatefulInvoker::spawn_with_runtime("storage", capacity, storage, self::run)?)
-}
-
 /// Starts the storage thread.
-///
-/// # Panics
-///
-/// Panics if the thread has already been initialized.
 ///
 /// # Errors
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    THREAD.async_api().initialize(self::create(settings)?).await;
+    let capacity = settings.queue_capacity;
+    let state = Arc::new(RwLock::new(Storage::new(settings)));
+    let handle = Join::new(StatefulCallableJoinHandle::spawn(capacity, state, self::run)?);
 
-    Ok(())
-}
-
-/// Starts the storage thread, blocking the current thread until successful.
-///
-/// # Panics
-///
-/// Panics if the thread has already been initialized or if this is called from within an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the thread fails to spawn.
-pub fn blocking_start(settings: Settings) -> Result<()> {
-    THREAD.sync_api().initialize(self::create(settings)?);
-
-    Ok(())
+    HANDLE.initialize(handle).await.map_err(Into::into)
 }
 
 /// Closes the storage thread.
-///
-/// # Panics
-///
-/// Panics if the storage thread is not initialized.
 pub async fn close() {
-    THREAD.async_api().close().await;
-}
-
-/// Closes the storage thread.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the storage thread is not initialized or if this is called in an asynchronous context.
-pub fn blocking_close() {
-    THREAD.sync_api().close();
+    HANDLE.uninitialize().await;
 }
 
 /// Runs the thread's process.
-async fn run(Stateful { state, value }: Stateful<RwLock<Storage>, Request>) -> Response {
-    match &value {
-        Request::Exists(path) => state.read().await.exists(path).await.map_or_else(Response::Error, Response::Exists),
-        Request::Size(path) => state.read().await.size(path).await.map_or_else(Response::Error, Response::Size),
-        Request::Read(path) => state.read().await.read(path).await.map_or_else(Response::Error, Response::Read),
+fn run((state, request): (Arc<RwLock<Storage>>, Request)) -> Response {
+    #[inline]
+    fn read(state: &Arc<RwLock<Storage>>) -> impl Deref<Target = Storage> + '_ {
+        assert!(!state.is_poisoned(), "storage was poisoned, possibly leading to corrupted data");
+
+        state.read().unwrap_or_else(|_| unreachable!("the lock is guaranteed to not be poisoned"))
+    }
+
+    #[inline]
+    fn write(state: &Arc<RwLock<Storage>>) -> impl DerefMut<Target = Storage> + '_ {
+        assert!(!state.is_poisoned(), "storage was poisoned, possibly leading to corrupted data");
+
+        state.write().unwrap_or_else(|_| unreachable!("the lock is guaranteed to not be poisoned"))
+    }
+
+    match &request {
+        Request::Exists(path) => read(&state).exists(path).map_or_else(Response::Error, Response::Exists),
+        Request::Size(path) => read(&state).size(path).map_or_else(Response::Error, Response::Size),
+        Request::Read(path) => read(&state).read(path).map_or_else(Response::Error, Response::Read),
         Request::Write(path, bytes) => {
-            state.write().await.write(path, bytes).await.map_or_else(Response::Error, |()| Response::Acknowledge)
+            write(&state).write(path, bytes).map_or_else(Response::Error, |()| Response::Acknowledge)
         }
         Request::Rename(from, into) => {
-            state.write().await.rename(from, into).await.map_or_else(Response::Error, |()| Response::Acknowledge)
+            write(&state).rename(from, into).map_or_else(Response::Error, |()| Response::Acknowledge)
         }
-        Request::Delete(path) => {
-            state.write().await.delete(path).await.map_or_else(Response::Error, |()| Response::Acknowledge)
-        }
+        Request::Delete(path) => write(&state).delete(path).map_or_else(Response::Error, |()| Response::Acknowledge),
     }
 }
 
-/// Creates a thread invoker function.
+/// Creates a thread invocation function.
 macro_rules! invoke {
     ($(
         $(#[$attribute:meta])*
-        $name:ident, $blocking_name:ident $(($($input:ident: $type:ty),*))? {
+        $name:ident$(($($input:ident: $type:ty),*))? {
             $($request:tt)*
         } -> $return:ty {
             $($response:tt)*
@@ -159,22 +126,7 @@ macro_rules! invoke {
     )*) => {$(
         $(#[$attribute])*
         pub async fn $name($($($input: $type),*)?) -> anyhow::Result<$return> {
-            let response = THREAD.async_api().get_mut().await.call($($request)*).await?;
-
-            match response {
-                $($response)*
-                Response::Error(error) => Err(error),
-                _ => unreachable!("unexpected response: '{response:?}'"),
-            }
-        }
-
-        $(#[$attribute])*
-        ///
-        /// # Panics
-        ///
-        /// Panics if this is called from within a synchronous context.
-        pub fn $blocking_name($($($input: $type),*)?) -> anyhow::Result<$return> {
-            let response = THREAD.sync_api().get_mut().blocking_call($($request)*)?;
+            let response = HANDLE.try_get_mut().await?.invoke($($request)*).await?;
 
             match response {
                 $($response)*
@@ -191,7 +143,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    exists, blocking_exists (path: Box<Path>) {
+    exists(path: Box<Path>) {
         Request::Exists(path)
     } -> bool {
         Response::Exists(exists) => Ok(exists),
@@ -202,7 +154,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    size, blocking_size (path: Box<Path>) {
+    size(path: Box<Path>) {
         Request::Size(path)
     } -> u64 {
         Response::Size(size) => Ok(size),
@@ -213,7 +165,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    rename, blocking_rename (from: Box<Path>, into: Box<Path>) {
+    rename(from: Box<Path>, into: Box<Path>) {
         Request::Rename(from, into)
     } -> () {
         Response::Acknowledge => Ok(()),
@@ -224,7 +176,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    delete, blocking_delete (path: Box<Path>) {
+    delete(path: Box<Path>) {
         Request::Delete(path)
     } -> () {
         Response::Acknowledge => Ok(()),
@@ -237,26 +189,7 @@ invoke! {
 ///
 /// This function will return an error if the message could not be sent.
 pub async fn read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
-    let response = THREAD.async_api().get_mut().await.call(Request::Read(path)).await?;
-
-    match response {
-        Response::Read(bytes) => T::data_format().decode(&bytes).map_err(Into::into),
-        Response::Error(error) => Err(error),
-        _ => unreachable!("unexpected response: '{response:?}'"),
-    }
-}
-
-/// Returns the data at the given path.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-///
-/// # Panics
-///
-/// Panics if this is called from within a synchronous context.
-pub fn blocking_read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
-    let response = THREAD.sync_api().get_mut().blocking_call(Request::Read(path))?;
+    let response = HANDLE.try_get_mut().await?.invoke(Request::Read(path)).await?;
 
     match response {
         Response::Read(bytes) => T::data_format().decode(&bytes).map_err(Into::into),
@@ -272,27 +205,7 @@ pub fn blocking_read<T: Stored>(path: Box<Path>) -> anyhow::Result<T> {
 /// This function will return an error if the message could not be sent.
 pub async fn write<T: Stored>(path: Box<Path>, value: &T) -> anyhow::Result<()> {
     let bytes = T::data_format().encode(value)?;
-    let response = THREAD.async_api().get_mut().await.call(Request::Write(path, bytes)).await?;
-
-    match response {
-        Response::Acknowledge => Ok(()),
-        Response::Error(error) => Err(error),
-        _ => unreachable!("unexpected response: '{response:?}'"),
-    }
-}
-
-/// Writes bytes into the given path.
-///
-/// # Errors
-///
-/// This function will return an error if the message could not be sent.
-///
-/// # Panics
-///
-/// Panics if this is called from within a synchronous context.
-pub fn blocking_write<T: Stored>(path: Box<Path>, value: &T) -> anyhow::Result<()> {
-    let bytes = T::data_format().encode(value)?;
-    let response = THREAD.sync_api().get_mut().blocking_call(Request::Write(path, bytes))?;
+    let response = HANDLE.try_get_mut().await?.invoke(Request::Write(path, bytes)).await?;
 
     match response {
         Response::Acknowledge => Ok(()),

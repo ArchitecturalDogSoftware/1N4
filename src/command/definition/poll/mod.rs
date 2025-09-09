@@ -209,7 +209,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
         state: PollState::Builder { inputs: Vec::new() },
     };
 
-    poll.as_async_api().write().await?;
+    poll.as_storage_api().write().await?;
 
     let (embed, components) = poll.build(entry, locale, user, None).await?;
 
