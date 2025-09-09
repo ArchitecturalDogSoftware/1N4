@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -14,162 +14,145 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroUsize;
+//! Defines exchanger threads.
+
+use std::num::NonZero;
+use std::ops::{Deref, DerefMut};
 
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{Handle, ReceiverHandle, Result, SenderHandle, Thread};
+use crate::{JoinHandle, JoinHandleWrapper};
 
-/// A thread that both consumes and produces values through channels.
+/// A thread that has a linked channel through which data can be sent and received.
 #[derive(Debug)]
-pub struct Exchanger<S, R, T> {
-    /// The inner thread handle.
-    thread: Thread<T>,
-    /// The inner sending channel.
+pub struct ExchangerJoinHandle<S, R, T> {
+    /// The sender-end of the linked channel.
     sender: Sender<S>,
-    /// The inner receiving channel.
+    /// The receiver-end of the linked channel.
     receiver: Receiver<R>,
+    /// The inner join handle.
+    handle: JoinHandle<T>,
 }
 
-impl<S, R, T> Exchanger<S, R, T>
-where
-    S: Send + 'static,
-    R: Send + 'static,
-    T: Send + 'static,
-{
-    /// Spawns a new [`Exchanger<S, R, T>`] with the given name and task.
+impl<S, R, T> ExchangerJoinHandle<S, R, T> {
+    /// Creates a new [`ExchangerJoinHandle<S, R, T>`] using the given function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
-    /// # use ina_threading::{Handle, ReceiverHandle, SenderHandle};
-    /// # use ina_threading::threads::exchanger::Exchanger;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
-    /// let mut thread = Exchanger::spawn("worker", capacity, |s, mut r| {
-    ///     assert_eq!(r.blocking_recv(), Some(123));
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::exchanger::ExchangerJoinHandle;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(2).unwrap();
+    /// let mut handle =
+    ///     ExchangerJoinHandle::<i32, i32, ()>::spawn(capacity, |sender, mut receiver| {
+    ///         let lhs = receiver.blocking_recv().unwrap();
+    ///         let rhs = receiver.blocking_recv().unwrap();
     ///
-    ///     s.blocking_send(456).expect("the channel should not be closed");
-    /// })?;
+    ///         sender.blocking_send(lhs + rhs).unwrap();
+    ///     })?;
     ///
-    /// thread.as_sender().blocking_send(123).expect("the channel should not be closed");
+    /// handle.sender().send(2).await.unwrap();
+    /// handle.sender().send(5).await.unwrap();
     ///
-    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(456));
-    /// assert!(thread.into_join_handle().join().is_ok());
+    /// assert_eq!(7, handle.receiver().recv().await.unwrap());
+    /// # handle.into_join_handle().join().unwrap();
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    #[inline]
+    pub fn spawn<F>(capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
     where
-        N: AsRef<str>,
+        S: Send + 'static,
+        R: Send + 'static,
+        T: Send + 'static,
         F: FnOnce(Sender<R>, Receiver<S>) -> T + Send + 'static,
     {
-        let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(capacity.get());
-        let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(capacity.get());
-        let thread = Thread::spawn(name, move || f(thread_sender, thread_receiver))?;
+        let (s_sender, s_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        let (r_sender, r_receiver) = tokio::sync::mpsc::channel(capacity.get());
 
-        Ok(Self { thread, sender: local_sender, receiver: local_receiver })
+        JoinHandle::spawn(|| f(r_sender, s_receiver)).map(|handle| Self {
+            sender: s_sender,
+            receiver: r_receiver,
+            handle,
+        })
     }
 
-    /// Spawns a new [`Exchanger<S, R, T>`] with the given name and asynchronous task.
-    ///
-    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::num::NonZeroUsize;
-    /// # use ina_threading::{Handle, ReceiverHandle, SenderHandle};
-    /// # use ina_threading::threads::exchanger::Exchanger;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
-    /// let mut thread = Exchanger::spawn_with_runtime("worker", capacity, |s, mut r| async move {
-    ///     assert_eq!(r.recv().await, Some(123));
-    ///
-    ///     s.send(456).await.expect("the channel should not be closed");
-    /// })?;
-    ///
-    /// thread.as_sender().blocking_send(123).expect("the channel should not be closed");
-    ///
-    /// assert_eq!(thread.as_receiver_mut().blocking_recv(), Some(456));
-    /// assert!(thread.into_join_handle().join().is_ok());
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread fails to spawn.
-    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
-    where
-        N: AsRef<str>,
-        F: FnOnce(Sender<R>, Receiver<S>) -> O + Send + 'static,
-        O: Future<Output = T> + Send,
-    {
-        let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(capacity.get());
-        let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(capacity.get());
-        let thread = Thread::spawn_with_runtime(name, || f(thread_sender, thread_receiver))?;
-
-        Ok(Self { thread, sender: local_sender, receiver: local_receiver })
-    }
-}
-
-impl<S, R, T> Handle for Exchanger<S, R, T>
-where
-    T: Send + 'static,
-{
-    type Output = T;
-
-    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
-        self.thread.as_join_handle()
-    }
-
-    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
-        self.thread.as_join_handle_mut()
-    }
-
-    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output> {
-        self.thread.into_join_handle()
-    }
-}
-
-impl<S, R, T> SenderHandle<S> for Exchanger<S, R, T>
-where
-    S: Send + 'static,
-    T: Send + 'static,
-{
-    fn as_sender(&self) -> &Sender<S> {
+    /// Returns a reference to the sender of the linked channel.
+    #[inline]
+    #[must_use]
+    pub const fn sender(&self) -> &Sender<S> {
         &self.sender
     }
 
-    fn as_sender_mut(&mut self) -> &mut Sender<S> {
-        &mut self.sender
-    }
-
-    fn into_sender(self) -> Sender<S> {
-        self.sender
+    /// Returns a reference to the receiver of the linked channel.
+    #[inline]
+    #[must_use]
+    pub const fn receiver(&mut self) -> &mut Receiver<R> {
+        &mut self.receiver
     }
 }
 
-impl<S, R, T> ReceiverHandle<R> for Exchanger<S, R, T>
-where
-    R: Send + 'static,
-    T: Send + 'static,
-{
-    fn as_receiver(&self) -> &Receiver<R> {
-        &self.receiver
+impl<S, R, T> JoinHandleWrapper for ExchangerJoinHandle<S, R, T> {
+    type Output = T;
+
+    #[inline]
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<T> {
+        self.handle.as_join_handle()
     }
 
-    fn as_receiver_mut(&mut self) -> &mut Receiver<R> {
-        &mut self.receiver
+    #[inline]
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
+        self.handle.as_join_handle_mut()
     }
 
-    fn into_receiver(self) -> Receiver<R> {
-        self.receiver
+    #[inline]
+    fn into_join_handle(self) -> std::thread::JoinHandle<T> {
+        self.handle.into_join_handle()
+    }
+}
+
+impl<S, R, T> AsRef<std::thread::JoinHandle<T>> for ExchangerJoinHandle<S, R, T> {
+    #[inline]
+    fn as_ref(&self) -> &std::thread::JoinHandle<T> {
+        self.as_join_handle()
+    }
+}
+
+impl<S, R, T> Deref for ExchangerJoinHandle<S, R, T> {
+    type Target = std::thread::JoinHandle<T>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_join_handle()
+    }
+}
+
+impl<S, R, T> AsMut<std::thread::JoinHandle<T>> for ExchangerJoinHandle<S, R, T> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<S, R, T> DerefMut for ExchangerJoinHandle<S, R, T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<S, R, T> From<ExchangerJoinHandle<S, R, T>> for std::thread::JoinHandle<T> {
+    #[inline]
+    fn from(value: ExchangerJoinHandle<S, R, T>) -> Self {
+        value.into_join_handle()
     }
 }
