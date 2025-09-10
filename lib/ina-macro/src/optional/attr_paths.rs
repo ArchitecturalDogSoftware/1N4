@@ -66,3 +66,16 @@ pub fn option() -> Path {
         },
     }
 }
+
+/// Return a [`Path`] representing the `#[command(...)]` annotation.
+// TO-DO: does this need to be replaced this with a qualified path?
+pub fn command() -> Path {
+    Path {
+        leading_colon: None,
+        segments: {
+            let mut punctuated = Punctuated::new();
+            punctuated.push_value(Ident::new("command", Span::mixed_site()).into());
+            punctuated
+        },
+    }
+}

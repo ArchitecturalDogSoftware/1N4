@@ -70,6 +70,9 @@ fn only_kept_attrs(attrs: &[Attribute], kept_attrs: &[Path], keep_derives: Optio
         .collect()
 }
 
+// TO-DO: document how to actually use this macro.
+//
+// TO-DO: `#[must_use]`, `#[automatically_derived]`, etc. all the things!
 /// Applies the procedural macro.
 ///
 /// Input should be shaped like:

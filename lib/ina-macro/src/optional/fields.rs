@@ -72,20 +72,18 @@ impl FieldsWithDefaults {
         let Self { ident, optional_ident, fields } = self;
 
         let idents = fields.iter().map(|FieldWithDefault { ident, .. }| ident).collect::<Vec<_>>();
-        let assign_unwrap_or_default = fields
-            .iter()
-            .map(|FieldWithDefault { ident, default }| {
-                quote! {
-                    #ident: self.#ident.unwrap_or_else(|| #default)
-                }
-            })
-            .collect::<Vec<_>>();
+        let assign_with_filled_defaults =
+            fields.iter().map(FieldWithDefault::generate_assignment_with_filled_default).collect::<Vec<_>>();
 
         quote! {
             impl ::std::convert::From<#ident> for #optional_ident {
                 fn from(value: #ident) -> Self {
                     Self {
-                        #( #idents: Some(value.#idents) ),*
+                        // Some field of type `Type`, this has two effects. For `Option<Type>`,
+                        // this will be `Option::from(Type)`, which is just `Some(Type)`. For
+                        // `OptionalType`, this will be `OptionalType::from(Type)`, which should be
+                        // calling _this_ method as it was generated for `OptionalType`.
+                        #( #idents: value.#idents.into() ),*
                     }
                 }
             }
@@ -94,11 +92,31 @@ impl FieldsWithDefaults {
                 #[doc = ::std::concat!(
                     "Create a new [`",
                     ::std::stringify!( #ident ),
+                    // TO-DO: this should be updated to reflect the new `OptionalType` form.
                     "`] by filling all [`None`][`::std::option::Option::None`] values with the provided default expression.",
                 )]
+                #[must_use]
                 pub fn fill_defaults(self) -> #ident {
                     #ident {
-                        #( #assign_unwrap_or_default ),*
+                        #( #assign_with_filled_defaults ),*
+                    }
+                }
+
+                /// Apply [`std::option::Option::or`] or [`Self::or`] to each field of [`Self`].
+                #[must_use]
+                pub fn or(self, optb: Self) -> Self {
+                    Self {
+                        // TO-DO: this is unhygienic.
+                        #( #idents: self.#idents.or(optb.#idents) ),*
+                    }
+                }
+
+                /// Apply [`std::option::Option::xor`] or [`Self::xor`] to each field of [`Self`].
+                #[must_use]
+                pub fn xor(self, optb: Self) -> Self {
+                    Self {
+                        // TO-DO: this is unhygienic.
+                        #( #idents: self.#idents.xor(optb.#idents) ),*
                     }
                 }
             }
@@ -107,15 +125,29 @@ impl FieldsWithDefaults {
     }
 }
 
+enum DefaultValueGenerator {
+    /// An expression that generates a default value for a field, can be used in the form
+    /// `optional_field.unwrap_or_else(|| #expr)`.
+    ///
+    /// Comes from [`DefaultEqExpr::expr`].
+    Expr(Expr),
+    /// An indication a default value for a field can be generated from some `optional_field` with
+    /// `optional_field.fill_defaults()`.
+    ///
+    /// Comes from `#[option(flatten)]`.
+    FillDefaults,
+}
+
 /// Represents a [`Field`] and an [`Expr`] that generates a default value for it.
 pub struct FieldWithDefault {
     /// See [`Field::ident`].
     ident: Ident,
-    /// See [`DefaultEqExpr::expr`].
-    default: Expr,
+    default: DefaultValueGenerator,
 }
 
 impl FieldWithDefault {
+    // TO-DO: these error docs are out-of-date, they should mention `#[option(flatten)]` and tuple
+    // structs.
     /// Create a new [`Self`] from an arbitrary [`Field`].
     ///
     /// # Errors
@@ -129,52 +161,75 @@ impl FieldWithDefault {
         };
 
         let Some(ident) = field.ident.clone() else {
-            todo!("implement support for tuple structs");
+            return Err(Error::new(field.span(), "`optional` does not support tuple structs"));
         };
 
-        let default: Expr = match &mut option_attr.meta {
-            // Of the form `#[option(default = EXPRESSION)]`.
-            Meta::NameValue(meta_name_value) => meta_name_value.value.clone(),
-            // Of the form `#[option(default)]`.
-            Meta::List(list)
-                if syn::parse::<Ident>(list.tokens.clone().into()).is_ok_and(|ident| ident == "default") =>
-            {
-                syn::parse(quote! { Default::default() }.into()).unwrap()
-            }
-            // Also of the form `#[option(default = EXPRESSION)]`.
-            //
-            // For some reason, this is what triggers for `#[option(default = self::default_status_file())]`.
+        let default: DefaultValueGenerator = match &mut option_attr.meta {
+            // Of the form `#[option(default = "STRING LITERAL")]`.
+            Meta::NameValue(meta_name_value) => DefaultValueGenerator::Expr(meta_name_value.value.clone()),
             Meta::List(list) => {
-                let DefaultEqExpr { expr, .. } = syn::parse(list.tokens.clone().into()).map_err(|_| {
-                    Error::new(
-                        field.span(),
-                        "expected annotation in the form of `#[option(default)]` or `#[option(default = EXPRESSION)]`",
-                    )
-                })?;
+                match list.tokens.to_string().as_str() {
+                    // Of the form `#[option(default)]`.
+                    //
+                    // TO-DO: this is unhygienic.
+                    "default" => DefaultValueGenerator::Expr(syn::parse_quote! { Default::default() }),
+                    // Of the form `#[option(flatten)]`.
+                    "flatten" => DefaultValueGenerator::FillDefaults,
+                    // Of the form `#[option(default = EXPRESSION)]`.
+                    _ => {
+                        let DefaultEqExpr { expr, .. } = syn::parse(list.tokens.clone().into()).map_err(|_| {
+                            Error::new(
+                                field.span(),
+                                "expected annotation in the form of `#[option(default)]`, `#[option(default = \
+                                 EXPRESSION)]`, or `#[option(flatten)]",
+                            )
+                        })?;
 
-                expr
+                        DefaultValueGenerator::Expr(expr)
+                    }
+                }
             }
             // Of another form.
             other @ Meta::Path(_) => {
                 return Err(Error::new(
                     other.span(),
-                    "expected annotation in the form of `#[option(default)]` or `#[option(default = EXPRESSION)]`",
+                    "expected annotation in the form of `#[option(default)]`, `#[option(default = EXPRESSION)]`, or \
+                     `#[option(flatten)]`",
                 ));
             }
         };
 
         Ok(Self { ident, default })
     }
+
+    fn generate_assignment_with_filled_default(&self) -> proc_macro2::TokenStream {
+        let Self { ident, default } = self;
+        let method = match default {
+            DefaultValueGenerator::Expr(expr) => quote! { unwrap_or_else(|| #expr) },
+            DefaultValueGenerator::FillDefaults => quote! { fill_defaults() },
+        };
+
+        quote! {
+            #ident: self.#ident.#method
+        }
+    }
 }
 
+// TO-DO: should `#[serde(...)]` be kept on `#[option(flatten)]`? When should that be kept?
+//
+// TO-DO: should this return [`FieldsNamed`]? We don't support the other two types anyways, do we?
 /// Transforms the input [`Fields`] for use in the optional struct.
 ///
-/// - Strips all [annotations][`syn::Attribute`]. If `#[option(...)]` was present at all, this adds `#[serde(default,
-///   skip_serializing_if = "::std::option::Option::is_none")]` (fields default to [`None`], the actual default values
-///   are filled later).
+/// - Strips all [annotations][`syn::Attribute`]. If `#[option(default ...)]` was present at all, this adds
+///   `#[serde(default, skip_serializing_if = "::std::option::Option::is_none")]` (fields default to [`None`], the
+///   actual default values are filled later).
 /// - Changes the types from various `T` to `Option<T>`. This is _specifically_ `Option`, and not
 ///   `::std::option::Option`, because Clap finds optional fields by checking for [`Option`] on a strictly textual
 ///   basis.
+///   - If `#[option(flatten)]` was present, this will treat make the field "optional" by instead renaming the
+///     identifier `IDENT` to `OptionalIDENT`, e.g., the optional form of `::my_other_crate::Settings` is assumed to be
+///     `::my_other_crate::OptionalSettings`, and there is assumed to be a method
+///     `::my_other_crate::OptionalSettings::fill_defaults(&self) -> ::my_other_crate::Settings`.
 pub fn fields_to_optional(fields: Fields) -> Fields {
     match fields {
         Fields::Named(FieldsNamed { brace_token, named }) => {
@@ -188,6 +243,10 @@ pub fn fields_to_optional(fields: Fields) -> Fields {
     }
 }
 
+// TO-DO: update docs to account for subcommand flattening support.
+//
+// TO-DO: this doesn't actually strip all annotations, does it? It only strips
+// `#[option(flatten)]`.
 /// Transforms a single input [`Field`] for use in the optional struct.
 ///
 /// - Strips all [annotations][`syn::Attribute`]. If `#[option(...)]` was present at all, this adds `#[serde(default,
@@ -196,26 +255,30 @@ pub fn fields_to_optional(fields: Fields) -> Fields {
 /// - Changes the type from some `T` to `Option<T>`. This is _specifically_ `Option`, and not `::std::option::Option`,
 ///   because Clap finds optional fields by checking for [`Option`] on a strictly textual basis.
 fn field_to_optional(Field { mut attrs, vis, mutability, ident, colon_token, ty }: Field) -> Field {
+    let mut is_flattend_subcommand = false;
+
     let option_attr_path = super::attr_paths::option();
     if let Some(option_attr) = attrs.iter_mut().find(|attr| attr.path() == &option_attr_path) {
-        option_attr.meta = Meta::List(MetaList {
-            path: super::attr_paths::serde(),
-            delimiter: option_attr.meta.require_list().unwrap().delimiter.clone(),
-            tokens: quote! {
-                default, skip_serializing_if = "::std::option::Option::is_none"
-            },
-        });
+        if let Meta::List(ref mut list) = option_attr.meta
+            && list.tokens.to_string() == "flatten"
+        {
+            is_flattend_subcommand = true;
+            list.path = super::attr_paths::command();
+        } else {
+            option_attr.meta = Meta::List(MetaList {
+                path: super::attr_paths::serde(),
+                delimiter: option_attr.meta.require_list().unwrap().delimiter.clone(),
+                tokens: quote! {
+                    default, skip_serializing_if = "::std::option::Option::is_none"
+                },
+            });
+        }
     }
 
-    attrs.retain(|attr| attr.path() != &option_attr_path);
-
-    Field {
-        attrs,
-        vis,
-        mutability,
-        ident,
-        colon_token,
-        ty: Type::Path(
+    let ty = if is_flattend_subcommand {
+        self::rename_to_optional(ty)
+    } else {
+        Type::Path(
             syn::parse(
                 quote! {
                     // This must be `Option<T>`, not `::std::option::Option<T>`, because Clap
@@ -231,6 +294,43 @@ fn field_to_optional(Field { mut attrs, vis, mutability, ident, colon_token, ty 
                 .into(),
             )
             .unwrap(),
-        ),
+        )
+    };
+
+    attrs.retain(|attr| attr.path() != &option_attr_path);
+
+    Field { attrs, vis, mutability, ident, colon_token, ty }
+}
+
+// TO-DO: this will only ever return [`TypePath`]. Maybe we should just... return [`TypePath`]?
+fn rename_to_optional(ty: Type) -> Type {
+    match ty {
+        Type::Path(mut type_path) => {
+            let Some(last) = type_path.path.segments.last_mut() else {
+                unreachable!("type paths must have at least one segment <https://doc.rust-lang.org/reference/paths.html#paths-in-types>");
+            };
+
+            let Ok(prefixed) = syn::parse_str(&format!("Optional{}", last.ident)) else {
+                unreachable!("`Optional` + `MyValidIdent` = `OptionalMyValidIdent` should be valid");
+            };
+            last.ident = prefixed;
+
+            type_path.into()
+        }
+        Type::Group(type_group) => self::rename_to_optional(*type_group.elem),
+        Type::Paren(type_paren) => self::rename_to_optional(*type_paren.elem),
+        Type::Ptr(type_ptr) => self::rename_to_optional(*type_ptr.elem),
+        Type::Reference(type_reference) => self::rename_to_optional(*type_reference.elem),
+        Type::Array(_)
+        | Type::BareFn(_)
+        | Type::ImplTrait(_)
+        | Type::Infer(_)
+        | Type::Macro(_)
+        | Type::Never(_)
+        | Type::Slice(_)
+        | Type::TraitObject(_)
+        | Type::Tuple(_)
+        | Type::Verbatim(_)
+        | _ => unimplemented!(),
     }
 }

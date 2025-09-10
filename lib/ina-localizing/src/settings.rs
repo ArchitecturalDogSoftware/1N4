@@ -30,10 +30,10 @@ use crate::{Error, Result};
 /// The localizer's settings.
 #[non_exhaustive]
 #[optional(
-    keep_derives = [Clone, Debug, PartialEq, Eq, Serialize],
+    keep_derives = [Clone, Debug, Hash, PartialEq, Eq, Serialize],
     keep_annotations = [non_exhaustive, expect],
 )]
-#[derive(Clone, Debug, PartialEq, Eq, Args, Serialize, Deserialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[group(id = "LangSettings")]
 pub struct Settings {

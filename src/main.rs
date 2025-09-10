@@ -23,6 +23,7 @@ use anyhow::Result;
 use clap::Parser;
 use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
 use ina_logging::{error, info};
+use ina_macro::optional;
 use serde::Serialize;
 
 use crate::client::Instance;
@@ -34,41 +35,31 @@ pub mod command;
 /// Provides commonly used definitions.
 pub mod utility;
 
-// Temporarily, we manually implement [`Arguments`] and [`OptionalArguments`], but support from
-// `#[optional(...)]` will come soon.
 /// The application's command-line arguments.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Arguments {
-    /// The bot's settings.
-    pub bot_settings: crate::client::settings::Settings,
-    /// The storage instance's settings.
-    pub data_settings: ina_storage::settings::Settings,
-    /// The localization thread's settings.
-    pub lang_settings: ina_localizing::settings::Settings,
-    /// The logging thread's settings.
-    pub log_settings: ina_logging::settings::Settings,
-}
-
-/// The application's command-line arguments.
+#[non_exhaustive]
+#[optional(
+    keep_derives = [Clone, Debug, Hash, PartialEq, Eq],
+    keep_annotations = [non_exhaustive, expect],
+)]
 #[derive(Clone, Debug, PartialEq, Eq, Parser, Serialize)]
 #[command(about, version)]
-pub struct OptionalArguments {
+pub struct Arguments {
     /// The bot's settings.
-    #[command(flatten)]
+    #[option(flatten)]
     #[serde(rename = "client")]
-    pub bot_settings: crate::client::settings::OptionalSettings,
+    pub bot_settings: crate::client::settings::Settings,
     /// The storage instance's settings.
-    #[command(flatten)]
+    #[option(flatten)]
     #[serde(rename = "storage")]
-    pub data_settings: ina_storage::settings::OptionalSettings,
+    pub data_settings: ina_storage::settings::Settings,
     /// The localization thread's settings.
-    #[command(flatten)]
+    #[option(flatten)]
     #[serde(rename = "localizer")]
-    pub lang_settings: ina_localizing::settings::OptionalSettings,
+    pub lang_settings: ina_localizing::settings::Settings,
     /// The logging thread's settings.
-    #[command(flatten)]
+    #[option(flatten)]
     #[serde(rename = "logger")]
-    pub log_settings: ina_logging::settings::OptionalSettings,
+    pub log_settings: ina_logging::settings::Settings,
 }
 
 /// The application's main entry-point.
@@ -170,16 +161,10 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
 
 /// Resolve command-line arguments.
 ///
-/// This is distinct from just [`Arguments::parse`] because it applies extra changes on top.
+/// This is distinct from just running [`OptionalArguments::fill_defaults`] on [`OptionalArguments::parse`] because it
+/// applies extra changes on top.
 fn get_config() -> Arguments {
-    let OptionalArguments { bot_settings, data_settings, lang_settings, log_settings } = OptionalArguments::parse();
-
-    let mut args = Arguments {
-        bot_settings: bot_settings.fill_defaults(),
-        data_settings: data_settings.fill_defaults(),
-        lang_settings: lang_settings.fill_defaults(),
-        log_settings: log_settings.fill_defaults(),
-    };
+    let mut args = OptionalArguments::parse().fill_defaults();
 
     if args.bot_settings.quiet {
         args.bot_settings.disable_file_logging = true;
