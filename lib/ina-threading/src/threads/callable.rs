@@ -209,7 +209,8 @@ impl<S, R, V> StatefulCallableJoinHandle<S, R, V> {
     /// # async fn main() -> std::io::Result<()> {
     /// let capacity = NonZero::new(1).unwrap();
     /// let state = Arc::new(5);
-    /// let handle = StatefulCallableJoinHandle::spawn(capacity, state, |value: i32| value + state)?;
+    /// let handle =
+    ///     StatefulCallableJoinHandle::spawn(capacity, state, |(state, value)| value + *state)?;
     ///
     /// assert_eq!(handle.invoke(2).await.unwrap(), 7);
     /// # handle.into_join_handle().join().unwrap();
@@ -247,7 +248,8 @@ impl<S, R, V> StatefulCallableJoinHandle<S, R, V> {
     /// # async fn main() -> std::io::Result<()> {
     /// let capacity = NonZero::new(1).unwrap();
     /// let state = Arc::new(5);
-    /// let handle = StatefulCallableJoinHandle::spawn(capacity, state, |value: i32| value + state)?;
+    /// let handle =
+    ///     StatefulCallableJoinHandle::spawn(capacity, state, |(state, value)| value + *state)?;
     ///
     /// assert_eq!(handle.invoke(2).await.unwrap(), 7);
     /// # JoinHandle::from(handle).join().unwrap();
