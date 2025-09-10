@@ -137,6 +137,13 @@ pub fn stored(input: TokenStream) -> TokenStream {
 /// Make the fields of a struct [optional], create a corresponding non-optional struct, and provide
 /// conversions.
 ///
+/// This does not support tuple structs or Clap subcommands. `#[command(flatten)]`, however, _is_
+/// supported, with the syntax `#[option(flatten)]`. In this case, it will treat make the field
+/// "optional" by renaming the identifier `IDENT` to `OptionalIDENT`, e.g., the optional form of
+/// `::my_other_crate::Settings` is assumed to be `::my_other_crate::OptionalSettings`, and there
+/// is assumed to be a method `::my_other_crate::OptionalSettings::fill_defaults(&self) ->
+/// ::my_other_crate::Settings`.
+///
 /// If you define a type called `Option` in scope that's different from [`std::option::Option`],
 /// this will break. Unfortunately, there's not a particularly good way around this, because Clap
 /// currently matches on `Option` (to infer that an argument is optional) on a strictly textual
