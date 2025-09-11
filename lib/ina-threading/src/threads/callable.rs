@@ -20,6 +20,7 @@ use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
+use tokio::runtime::Handle;
 use tokio::sync::mpsc::Sender as MpscSender;
 use tokio::sync::mpsc::error::SendError as MpscSendError;
 use tokio::sync::oneshot::Sender as OneshotSender;
@@ -90,6 +91,52 @@ impl<S, R> CallableJoinHandle<S, R> {
         .map(|handle| Self { sender, handle })
     }
 
+    /// Creates a new [`CallableJoinHandle<S, R>`] using the given runtime handle and asynchronous function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::callable::CallableJoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let handle = CallableJoinHandle::spawn_async(
+    ///     Handle::current(),
+    ///     NonZero::new(1).unwrap(),
+    ///     |(a, b): (i32, i32)| async move { a + b },
+    /// )?;
+    ///
+    /// assert_eq!(handle.invoke((2, 5)).await.unwrap(), 7);
+    /// # handle.into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[expect(clippy::missing_panics_doc, reason = "the assertion will not directly cause a panic")]
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
+    where
+        S: Send + 'static,
+        R: Send + 'static,
+        F: AsyncFn(S) -> R + Send + 'static,
+    {
+        let (sender, mut receiver) = tokio::sync::mpsc::channel::<(S, OneshotSender<R>)>(capacity.get());
+
+        JoinHandle::spawn_async(handle, move || async move {
+            while let Some((value, sender)) = receiver.recv().await {
+                assert!(sender.send(f(value).await).is_ok(), "the oneshot channel was closed prematurely");
+            }
+        })
+        .map(|handle| Self { sender, handle })
+    }
+
     /// Invokes the thread like a function, sending the given value and awaiting the thread's response.
     ///
     /// # Errors
@@ -101,8 +148,7 @@ impl<S, R> CallableJoinHandle<S, R> {
     /// ```
     /// # use std::num::NonZero;
     /// #
-    /// # use std::thread::JoinHandle;
-    /// #
+    /// # use ina_threading::JoinHandleWrapper;
     /// # use ina_threading::threads::callable::CallableJoinHandle;
     /// #
     /// # #[tokio::main]
@@ -111,7 +157,7 @@ impl<S, R> CallableJoinHandle<S, R> {
     /// let handle = CallableJoinHandle::spawn(capacity, |(a, b): (i32, i32)| a + b)?;
     ///
     /// assert_eq!(handle.invoke((2, 5)).await.unwrap(), 7);
-    /// # JoinHandle::from(handle).join().unwrap();
+    /// # handle.into_join_handle().join().unwrap();
     /// # Ok(())
     /// # }
     /// ```
@@ -121,6 +167,40 @@ impl<S, R> CallableJoinHandle<S, R> {
         self.sender.send((value, sender)).await?;
 
         receiver.await.map_err(Into::into)
+    }
+
+    /// Invokes the thread like a function, sending the given value and awaiting the thread's response.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's channel was closed.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::callable::CallableJoinHandle;
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// let handle = CallableJoinHandle::spawn(NonZero::new(1).unwrap(), |(a, b): (i32, i32)| a + b)?;
+    ///
+    /// assert_eq!(handle.blocking_invoke((2, 5)).unwrap(), 7);
+    /// # handle.into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn blocking_invoke(&self, value: S) -> Result<R, Error<S, R>> {
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+
+        self.sender.blocking_send((value, sender))?;
+
+        receiver.blocking_recv().map_err(Into::into)
     }
 }
 
@@ -207,10 +287,11 @@ impl<S, R, V> StatefulCallableJoinHandle<S, R, V> {
     /// #
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
-    /// let capacity = NonZero::new(1).unwrap();
-    /// let state = Arc::new(5);
-    /// let handle =
-    ///     StatefulCallableJoinHandle::spawn(capacity, state, |(state, value)| value + *state)?;
+    /// let handle = StatefulCallableJoinHandle::spawn(
+    ///     NonZero::new(1).unwrap(),
+    ///     Arc::new(5),
+    ///     |(state, value)| value + *state,
+    /// )?;
     ///
     /// assert_eq!(handle.invoke(2).await.unwrap(), 7);
     /// # handle.into_join_handle().join().unwrap();
@@ -226,6 +307,47 @@ impl<S, R, V> StatefulCallableJoinHandle<S, R, V> {
         F: Fn((Arc<V>, S)) -> R + Send + 'static,
     {
         CallableJoinHandle::spawn(capacity, f).map(|handle| Self { state, handle })
+    }
+
+    /// Creates a new [`StatefulCallableJoinHandle<S, R, V>`] using the given runtime handle and asynchronous function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// # use std::sync::Arc;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::callable::StatefulCallableJoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let handle = StatefulCallableJoinHandle::spawn_async(
+    ///     Handle::current(),
+    ///     NonZero::new(1).unwrap(),
+    ///     Arc::new(5),
+    ///     |(state, value): (Arc<i32>, i32)| async move { value + *state },
+    /// )?;
+    ///
+    /// assert_eq!(handle.invoke(2).await.unwrap(), 7);
+    /// # handle.into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, state: Arc<V>, f: F) -> std::io::Result<Self>
+    where
+        S: Send + 'static,
+        R: Send + 'static,
+        V: Send + Sync + 'static,
+        F: AsyncFn((Arc<V>, S)) -> R + Send + 'static,
+    {
+        CallableJoinHandle::spawn_async(handle, capacity, f).map(|handle| Self { state, handle })
     }
 
     /// Invokes the thread like a function, sending the given value and awaiting the thread's response.
@@ -263,6 +385,47 @@ impl<S, R, V> StatefulCallableJoinHandle<S, R, V> {
         V: Send + Sync,
     {
         self.handle.invoke((Arc::clone(&self.state), value)).await
+    }
+
+    /// Invokes the thread like a function, sending the given value and awaiting the thread's response.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the thread's channel was closed.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// # use std::sync::Arc;
+    /// #
+    /// # use std::thread::JoinHandle;
+    /// #
+    /// # use ina_threading::threads::callable::StatefulCallableJoinHandle;
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// let handle = StatefulCallableJoinHandle::spawn(
+    ///     NonZero::new(1).unwrap(),
+    ///     Arc::new(5),
+    ///     |(state, value)| value + *state,
+    /// )?;
+    ///
+    /// assert_eq!(handle.blocking_invoke(2).unwrap(), 7);
+    /// # JoinHandle::from(handle).join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn blocking_invoke(&self, value: S) -> Result<R, Error<(Arc<V>, S), R>>
+    where
+        S: Send,
+        R: Send,
+        V: Send + Sync,
+    {
+        self.handle.blocking_invoke((Arc::clone(&self.state), value))
     }
 }
 

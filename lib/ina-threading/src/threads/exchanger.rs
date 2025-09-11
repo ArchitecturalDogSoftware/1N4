@@ -19,6 +19,7 @@
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 
+use tokio::runtime::Handle;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{JoinHandle, JoinHandleWrapper};
@@ -84,6 +85,54 @@ impl<S, R, T> ExchangerJoinHandle<S, R, T> {
             receiver: r_receiver,
             handle,
         })
+    }
+
+    /// Creates a new [`ExchangerJoinHandle<S, R, T>`] using the given runtime handle and asynchronous function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::exchanger::ExchangerJoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// # use tokio::sync::mpsc::{Receiver, Sender};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let mut handle = ExchangerJoinHandle::spawn_async(
+    ///     Handle::current(),
+    ///     NonZero::new(2).unwrap(),
+    ///     |sender: Sender<i32>, mut receiver: Receiver<i32>| async move {
+    ///         let lhs = receiver.recv().await.unwrap();
+    ///         let rhs = receiver.recv().await.unwrap();
+    ///
+    ///         sender.send(lhs + rhs).await.unwrap();
+    ///     },
+    /// )?;
+    ///
+    /// handle.sender().send(2).await.unwrap();
+    /// handle.sender().send(5).await.unwrap();
+    ///
+    /// assert_eq!(7, handle.receiver().recv().await.unwrap());
+    /// # handle.into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
+    where
+        S: Send + 'static,
+        R: Send + 'static,
+        T: Send + 'static,
+        F: AsyncFnOnce(Sender<R>, Receiver<S>) -> T + Send + 'static,
+    {
+        Self::spawn(capacity, move |sender, receiver| handle.block_on(f(sender, receiver)))
     }
 
     /// Returns a reference to the sender of the linked channel.

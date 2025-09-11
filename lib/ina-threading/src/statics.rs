@@ -87,6 +87,36 @@ impl<H> Static<H> {
         self.handle.read().await.get().is_some()
     }
 
+    /// Returns `true` if the inner thread has been initialized.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::Static;
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.blocking_initialize(JoinHandle::spawn(|| ())?).unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_initialized());
+    /// # HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_is_initialized(&self) -> bool
+    where
+        H: Sync,
+    {
+        self.handle.blocking_read().get().is_some()
+    }
+
     /// Returns `true` if the inner thread is uninitialized.
     ///
     /// # Examples
@@ -108,6 +138,32 @@ impl<H> Static<H> {
         H: Sync,
     {
         self.handle.read().await.get().is_none()
+    }
+
+    /// Returns `true` if the inner thread is uninitialized.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(HANDLE.blocking_is_uninitialized());
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_is_uninitialized(&self) -> bool
+    where
+        H: Sync,
+    {
+        self.handle.blocking_read().get().is_none()
     }
 
     /// Initializes the inner thread handle.
@@ -141,6 +197,40 @@ impl<H> Static<H> {
         self.handle.write().await.set(handle).map_err(Error::Initialized)
     }
 
+    /// Initializes the inner thread handle.
+    ///
+    /// # Errors
+    ///
+    /// This function will return the provided handle if the thread has already been initialized.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.blocking_initialize(JoinHandle::spawn(|| ())?).unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_initialized());
+    /// # HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_initialize(&self, handle: H) -> Result<(), Error<H>>
+    where
+        H: Sync,
+    {
+        self.handle.blocking_write().set(handle).map_err(Error::Initialized)
+    }
+
     /// Uninitializes the inner thread handle, returning it.
     ///
     /// # Examples
@@ -171,6 +261,39 @@ impl<H> Static<H> {
         self.handle.write().await.take()
     }
 
+    /// Uninitializes the inner thread handle, returning it.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.blocking_initialize(JoinHandle::spawn(|| ())?).unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_initialized());
+    ///
+    /// HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_uninitialized());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_uninitialize(&self) -> Option<H>
+    where
+        H: Sync,
+    {
+        self.handle.blocking_write().take()
+    }
+
     /// Returns a reference to the inner thread handle.
     ///
     /// # Errors
@@ -189,7 +312,7 @@ impl<H> Static<H> {
     /// # async fn main() {
     /// static HANDLE: Static<JoinHandle<()>> = Static::new();
     ///
-    /// assert!(HANDLE.try_get_mut().await.is_err_and(|error| matches!(error, Error::Uninitialized)));
+    /// assert!(HANDLE.try_get().await.is_err_and(|error| matches!(error, Error::Uninitialized)));
     /// # }
     /// ```
     ///
@@ -232,6 +355,78 @@ impl<H> Static<H> {
         H: Sync,
     {
         let guard = self.handle.read().await;
+
+        if guard.get().is_some() {
+            // The `.wait` call will never block because the handle is guaranteed to be present.
+            Ok(RwLockReadGuard::map(guard, |lock| lock.wait()))
+        } else {
+            Err(Error::Uninitialized)
+        }
+    }
+
+    /// Returns a reference to the inner thread handle.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the inner thread handle has not been initialized.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// Calling `.blocking_try_get()` on an uninitialized handle will always return an error.
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(HANDLE.blocking_try_get().is_err_and(|error| matches!(error, Error::Uninitialized)));
+    /// # }
+    /// ```
+    ///
+    /// Calling `.blocking_try_get()` on an initialized handle will give you a guard that dereferences into the inner
+    /// handle type.
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<ConsumerJoinHandle<u8, u8>> = Static::new();
+    ///
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let handle = ConsumerJoinHandle::<u8, u8>::spawn(capacity, |mut receiver| {
+    ///     receiver.blocking_recv().unwrap().wrapping_pow(2)
+    /// })?;
+    ///
+    /// HANDLE.blocking_initialize(handle).unwrap();
+    ///
+    /// let read_guard = HANDLE.blocking_try_get().unwrap();
+    ///
+    /// read_guard.sender().blocking_send(8).unwrap();
+    ///
+    /// drop(read_guard);
+    ///
+    /// let result = HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert_eq!(result, 64);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_try_get(&self) -> Result<RwLockReadGuard<'_, H>, Error<H>>
+    where
+        H: Sync,
+    {
+        let guard = self.handle.blocking_read();
 
         if guard.get().is_some() {
             // The `.wait` call will never block because the handle is guaranteed to be present.
@@ -302,6 +497,83 @@ impl<H> Static<H> {
         H: Sync,
     {
         let guard = self.handle.write().await;
+
+        if guard.get().is_some() {
+            Ok(RwLockWriteGuard::map(guard, |lock: &mut OnceLock<H>| {
+                lock.get_mut().unwrap_or_else(|| {
+                    unreachable!("the lock is guaranteed to be initialized at this point");
+                })
+            }))
+        } else {
+            Err(Error::Uninitialized)
+        }
+    }
+
+    /// Returns a reference to the inner thread handle.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the inner thread handle has not been initialized.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// Calling `.blocking_try_get_mut()` on an uninitialized handle will always return an error.
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(
+    ///     HANDLE.blocking_try_get_mut().is_err_and(|error| matches!(error, Error::Uninitialized))
+    /// );
+    /// # }
+    /// ```
+    ///
+    /// Calling `.blocking_try_get_mut()` on an initialized handle will give you a guard that dereferences into the
+    /// inner handle type.
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<ConsumerJoinHandle<u8, u8>> = Static::new();
+    ///
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let handle = ConsumerJoinHandle::<u8, u8>::spawn(capacity, |mut receiver| {
+    ///     receiver.blocking_recv().unwrap().wrapping_pow(2)
+    /// })?;
+    ///
+    /// HANDLE.blocking_initialize(handle).unwrap();
+    ///
+    /// let write_guard = HANDLE.blocking_try_get_mut().unwrap();
+    ///
+    /// write_guard.sender().blocking_send(8).unwrap();
+    ///
+    /// drop(write_guard);
+    ///
+    /// let result = HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert_eq!(result, 64);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_try_get_mut(&self) -> Result<RwLockMappedWriteGuard<'_, H>, Error<H>>
+    where
+        H: Sync,
+    {
+        let guard = self.handle.blocking_write();
 
         if guard.get().is_some() {
             Ok(RwLockWriteGuard::map(guard, |lock: &mut OnceLock<H>| {

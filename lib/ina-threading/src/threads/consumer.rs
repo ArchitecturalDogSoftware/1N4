@@ -19,6 +19,7 @@
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 
+use tokio::runtime::Handle;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{JoinHandle, JoinHandleWrapper};
@@ -74,6 +75,53 @@ impl<S, T> ConsumerJoinHandle<S, T> {
         let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
 
         JoinHandle::spawn(|| f(receiver)).map(|handle| Self { sender, handle })
+    }
+
+    /// Creates a new [`ConsumerJoinHandle<S, T>`] using the given runtime handle and asynchronous function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// # use tokio::sync::mpsc::Receiver;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(2).unwrap();
+    /// let handle = ConsumerJoinHandle::spawn_async(
+    ///     Handle::current(),
+    ///     capacity,
+    ///     |mut receiver: Receiver<i32>| async move {
+    ///         let lhs = receiver.recv().await.unwrap();
+    ///         let rhs = receiver.recv().await.unwrap();
+    ///
+    ///         lhs + rhs
+    ///     },
+    /// )?;
+    ///
+    /// handle.sender().send(2).await.unwrap();
+    /// handle.sender().send(5).await.unwrap();
+    ///
+    /// assert_eq!(7, handle.into_join_handle().join().unwrap());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
+    where
+        S: Send + 'static,
+        T: Send + 'static,
+        F: AsyncFnOnce(Receiver<S>) -> T + Send + 'static,
+    {
+        Self::spawn(capacity, move |receiver| handle.block_on(f(receiver)))
     }
 
     /// Returns a reference to the sender of the linked channel.

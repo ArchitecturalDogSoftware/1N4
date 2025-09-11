@@ -19,6 +19,7 @@
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 
+use tokio::runtime::Handle;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{JoinHandle, JoinHandleWrapper};
@@ -73,6 +74,52 @@ impl<R, T> SupplierJoinHandle<R, T> {
         let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
 
         JoinHandle::spawn(|| f(sender)).map(|handle| Self { receiver, handle })
+    }
+
+    /// Creates a new [`SupplierJoinHandle<R, T>`] using the given runtime handle and asynchronous function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::supplier::SupplierJoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// # use tokio::sync::mpsc::Sender;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(2).unwrap();
+    /// let mut handle = SupplierJoinHandle::spawn_async(
+    ///     Handle::current(),
+    ///     capacity,
+    ///     |sender: Sender<i32>| async move {
+    ///         sender.send(2).await.unwrap();
+    ///         sender.send(5).await.unwrap();
+    ///     },
+    /// )?;
+    ///
+    /// let lhs = handle.receiver().recv().await.unwrap();
+    /// let rhs = handle.receiver().recv().await.unwrap();
+    ///
+    /// assert_eq!(lhs + rhs, 7);
+    /// # handle.into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
+    where
+        R: Send + 'static,
+        T: Send + 'static,
+        F: AsyncFnOnce(Sender<R>) -> T + Send + 'static,
+    {
+        Self::spawn(capacity, move |sender| handle.block_on(f(sender)))
     }
 
     /// Returns a reference to the receiver of the linked channel.

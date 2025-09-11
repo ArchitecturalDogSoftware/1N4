@@ -18,6 +18,8 @@
 
 use std::ops::{Deref, DerefMut};
 
+use tokio::runtime::Handle;
+
 pub mod join;
 pub mod statics;
 
@@ -59,12 +61,11 @@ impl<T> JoinHandle<T> {
     /// # Examples
     ///
     /// ```
+    /// # use std::time::{Duration, Instant};
+    /// #
     /// # use ina_threading::JoinHandle;
     /// #
-    /// # #[tokio::main]
-    /// # async fn main() -> std::io::Result<()> {
-    /// use std::time::{Duration, Instant};
-    ///
+    /// # fn main() -> std::io::Result<()> {
     /// let instant = Instant::now();
     ///
     /// let handle = JoinHandle::spawn(|| {
@@ -84,6 +85,42 @@ impl<T> JoinHandle<T> {
         F: FnOnce() -> T + Send + 'static,
     {
         std::thread::Builder::new().spawn(f).map(Self)
+    }
+
+    /// Creates a new [`JoinHandle<T>`] using the given runtime handle and asynchronous function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// # use tokio::time::{Duration, Instant};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let instant = Instant::now();
+    ///
+    /// let handle = JoinHandle::spawn_async(Handle::current(), || async {
+    ///     tokio::time::sleep(Duration::from_millis(1_000)).await;
+    ///
+    ///     Instant::now()
+    /// })?;
+    ///
+    /// assert!(instant < std::thread::JoinHandle::from(handle).join().unwrap());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, f: F) -> std::io::Result<Self>
+    where
+        T: Send + 'static,
+        F: AsyncFnOnce() -> T + Send + 'static,
+    {
+        Self::spawn(move || handle.block_on(f()))
     }
 }
 
