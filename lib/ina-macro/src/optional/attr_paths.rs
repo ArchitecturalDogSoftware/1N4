@@ -19,6 +19,7 @@ use syn::punctuated::Punctuated;
 use syn::{Ident, Path};
 
 /// Return a [`Path`] representing the `#[doc(...)]` macro.
+#[must_use]
 pub fn doc() -> Path {
     Path {
         leading_colon: None,
@@ -31,6 +32,7 @@ pub fn doc() -> Path {
 }
 
 /// Return a [`Path`] representing the `#[derive(...)]` macro.
+#[must_use]
 pub fn derive() -> Path {
     Path {
         leading_colon: None,
@@ -44,6 +46,7 @@ pub fn derive() -> Path {
 
 /// Return a [`Path`] representing the `#[serde(...)]` annotation.
 // TO-DO: does this need to be replaced this with a qualified path?
+#[must_use]
 pub fn serde() -> Path {
     Path {
         leading_colon: None,
@@ -56,6 +59,7 @@ pub fn serde() -> Path {
 }
 
 /// Return a [`Path`] representing the `#[option(...)]` annotation.
+#[must_use]
 pub fn option() -> Path {
     Path {
         leading_colon: None,
@@ -69,6 +73,7 @@ pub fn option() -> Path {
 
 /// Return a [`Path`] representing the `#[command(...)]` annotation.
 // TO-DO: does this need to be replaced this with a qualified path?
+#[must_use]
 pub fn command() -> Path {
     Path {
         leading_colon: None,

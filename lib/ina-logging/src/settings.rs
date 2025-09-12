@@ -24,8 +24,8 @@ use serde::{Deserialize, Serialize};
 /// The logger's settings.
 #[non_exhaustive]
 #[optional(
-    keep_derives = [Clone, Debug, Hash, PartialEq, Eq, Serialize],
     keep_annotations = [non_exhaustive, expect],
+    apply_derives = [Clone, Debug, Hash, PartialEq, Eq, Serialize],
 )]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

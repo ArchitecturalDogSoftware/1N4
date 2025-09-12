@@ -15,19 +15,19 @@
 // <https://www.gnu.org/licenses/>.
 
 use proc_macro2::{Delimiter, Group, Span, TokenTree};
-use quote::ToTokens;
+use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{Attribute, Error, Expr, ExprArray, Ident, Path, Result, Token, braced};
+use syn::{Attribute, Error, Expr, ExprArray, Field, Ident, Meta, Path, Result, Token, braced, parse_quote};
 
-/// A flexible companion to [`Parse`] for types that can be parsed from [token streams].
+/// A flexible alternative to [`Parse`] for types that can be parsed from [token streams].
 ///
 /// [token streams]: `proc_macro2::TokenStream`
 trait FromStream: Sized {
     /// Parse a [`Self`] from a stream. Does not have to consume the stream fully.
     ///
-    /// "Stream," in this case, referring to an iterator over [`TokenTree`]s, which can be produced
-    /// by a [`proc_macro2::TokenStream`].
+    /// "Stream," in this case, referring to an iterator over [`TokenTree`]s, which can be produced by a
+    /// [`proc_macro2::TokenStream`].
     fn from_stream(input: &mut impl Iterator<Item = TokenTree>, span: Span) -> Result<Self>;
 }
 
@@ -36,8 +36,7 @@ trait FromStream: Sized {
 /// Similar to [`syn::punctuated::Punctuated`].
 #[derive(Debug)]
 struct List<T> {
-    /// The actually list of values and the commas that follow them. Only the last comma may be
-    /// [`None`].
+    /// The actually list of values and the commas that follow them. Only the last comma may be [`None`].
     pairs: Vec<(T, Option<syn::token::Comma>)>,
 }
 
@@ -88,11 +87,10 @@ impl<T: Parse> Parse for List<T> {
     }
 }
 
-/// Represents either an [`Expr`] or a [`Group`]. Used as an intermediate parsing step for things
-/// that are syntactically shaped like one or both of them.
+/// Represents either an [`Expr`] or a [`Group`]. Used as an intermediate parsing step for things that are syntactically
+/// shaped like one or both of them.
 ///
-/// The [`Parse`] implementation attempts to parse a [`Self::Expr`] before it attempts to parse a
-/// [`Self::Group`].
+/// The [`Parse`] implementation attempts to parse a [`Self::Expr`] before it attempts to parse a [`Self::Group`].
 #[derive(Debug)]
 enum ExprOrGroup {
     Expr(Expr),
@@ -101,8 +99,8 @@ enum ExprOrGroup {
 
 impl Parse for ExprOrGroup {
     fn parse(input: ParseStream) -> Result<Self> {
-        // Hold a cursor at the start of the stream so that it can be parsed twice --- it seems as
-        // if [`Expr::parse`] was advancing the stream even if it returned an error.
+        // Hold a cursor at the start of the stream so that it can be parsed twice --- it seems as if [`Expr::parse`]
+        // was advancing the stream even if it returned an error.
         let start = input.cursor();
         // Similarly, get the span _before_ attempting to parse the stream.
         let span = input.span();
@@ -128,8 +126,8 @@ impl ToTokens for ExprOrGroup {
     }
 }
 
-/// Represents the tokens `IDENT = EXPR`, where `IDENT` is any [`Ident`] and `EXPR` is an [`ExprOrGroup`]. This is
-/// essentially a more flexible version of [`syn::MetaNameValue`].
+/// Represents the tokens `IDENT = EXPR`, where `IDENT` is any [`struct@Ident`] and `EXPR` is an [`ExprOrGroup`]. This
+/// is essentially a more flexible version of [`syn::MetaNameValue`].
 #[expect(dead_code, reason = "keeping dead fields in case a refactor needs them")]
 struct ArbitraryNameValue {
     /// The left-hand side of the expression.
@@ -249,16 +247,105 @@ fn parse_paths(bracketed_list: ExprOrGroup) -> Result<Vec<Path>> {
     })
 }
 
-/// Represents the arguments of the [`crate::optional`] procedural macro.
+// Aren't all of these optional? Why are only two actually [`Option`]s?
+/// Represents the arguments of the [`optional`] procedural macro.
 ///
 /// These are implemented though what is effectively a more flexible [`syn::Meta`] parser.
+///
+/// [`optional`]: `macro@crate::optional`
 #[derive(Debug)]
 pub struct OptionalArguments {
-    pub keep_derives: Option<Vec<Path>>,
-    pub keep_annotations: Vec<Path>,
-    pub keep_field_annotations: Vec<Path>,
-    pub apply_annotations: Option<Vec<Attribute>>,
-    pub attr_span: Span,
+    /// The [paths][`Path`] of the [annotations][`Attribute`] that are already present on the optional struct that
+    /// should be kept verbatim on the non-optional struct.
+    keep_annotations: Vec<Path>,
+    /// The [paths][`Path`] of the [annotations][`Attribute`] that are already present on the fields of the optional
+    /// struct that should be kept verbatim on the fields of the non-optional struct.
+    keep_field_annotations: Vec<Path>,
+    /// The [paths][`Path`] of [`derive`] macros that should be applied to the non-optional struct.
+    apply_derives: Option<Vec<Path>>,
+    /// A list of [outer][`syn::AttrStyle::Outer`] [annotations][`Attribute`] that should be applied verbatim to the
+    /// non-optional struct.
+    apply_annotations: Option<Vec<Attribute>>,
+    /// The [`Span`] of the input attributes that were parsed to create this [`Self`].
+    attr_span: Span,
+}
+
+impl OptionalArguments {
+    /// Retain, on this field, only the [annotations] whose [paths] were specified by the user with
+    /// `keep_field_annotations`.
+    ///
+    /// [annotations]: `Attribute`
+    /// [paths]: `Path`
+    pub fn retain_only_kept_field_attrs(&self, field: &mut Field) {
+        field.attrs.retain(|attr| self.keep_field_annotations.contains(attr.path()));
+    }
+
+    /// Retain only the specified [annotations] and derives, and apply the specified extra [annotations].
+    ///
+    /// In order, it:
+    ///
+    /// 1. Retains only the [annotations] whose [paths] were specified by the user with `keep_annotations`.
+    /// 2. If the user specified a list of paths with `apply_derives`, this will replace the list of [paths] in the
+    ///    existing [`derive`] annotation (or append a new one if one was not already present) with it.
+    /// 2. If the user specified a list of [annotations] with `apply_annotations`, this will append the given
+    ///    [annotations] onto the list made by the last two steps.
+    ///
+    /// [annotations]: `Attribute`
+    /// [paths]: `Path`
+    #[must_use]
+    pub fn only_kept_and_applied_attrs(&self, attrs: &[Attribute]) -> Vec<Attribute> {
+        let derive_annotation_path = super::attr_paths::derive();
+
+        let mut applied_derives = false;
+        let mut only_kept = attrs
+            .iter()
+            // Only kept annotations.
+            .filter(|attr| {
+                let path = attr.meta.path();
+
+                // Naive search, because I don't care.
+                self.keep_annotations.iter().any(|kept_path| path == kept_path)
+            })
+            .cloned()
+            // If there is one, replace the list of paths in the [`derive`] annotation with [`Self::apply_derives`].
+            .map(|mut attr| {
+                let Some(apply_derives) = self.apply_derives.as_ref() else {
+                    return attr;
+                };
+                if attr.meta.path() != &derive_annotation_path {
+                    return attr;
+                }
+
+                let Meta::List(list) = &mut attr.meta else {
+                    panic!("`derive` macros should always have lists");
+                };
+                list.tokens = quote! { #( #apply_derives ),* };
+                applied_derives = true;
+
+                attr
+            })
+            .collect::<Vec<Attribute>>();
+
+        // If there was not already a [`derive`] annotation, append an entirely new one, holding
+        // [`Self::apply_derives`].
+        if !applied_derives && let Some(apply_derives) = self.apply_derives.as_ref() {
+            only_kept.push(parse_quote! {
+                #[derive( #(#apply_derives),* )]
+            });
+        }
+
+        if let Some(applied_attrs) = self.apply_annotations.as_ref() {
+            only_kept.extend_from_slice(applied_attrs);
+        }
+
+        only_kept
+    }
+
+    /// Returns the [`Span`] of the input attributes that were parsed to create this [`Self`].
+    #[must_use]
+    pub const fn span(&self) -> Span {
+        self.attr_span
+    }
 }
 
 impl Parse for OptionalArguments {
@@ -272,16 +359,16 @@ impl Parse for OptionalArguments {
         // end. Using a custom approach based on token streams did not have this issue.
         let arguments = List::<ArbitraryNameValue>::try_from(input.parse::<proc_macro2::TokenStream>()?)?;
 
-        let mut keep_derives = None;
+        let mut apply_derives = None;
         let mut keep_annotations = None;
         let mut keep_field_annotations = None;
         let mut apply_annotations = None;
 
         for (ArbitraryNameValue { ident, value, .. }, _) in arguments.pairs {
             match ident.to_string().as_str() {
-                "keep_derives" => keep_derives = Some(parse_paths(value)?),
                 "keep_annotations" => keep_annotations = Some(parse_paths(value)?),
                 "keep_field_annotations" => keep_field_annotations = Some(parse_paths(value)?),
+                "apply_derives" => apply_derives = Some(parse_paths(value)?),
                 "apply_annotations" => {
                     apply_annotations = Some(AttributeList::try_from(value)?.attributes);
                 }
@@ -295,7 +382,7 @@ impl Parse for OptionalArguments {
 
         // Maintain the [`derive`] annotation on the non-optional struct if the consumer specified
         // the some number of the derives should be maintained.
-        if keep_derives.is_some() {
+        if apply_derives.is_some() {
             keep_annotations.push(super::attr_paths::derive());
         }
 
@@ -303,6 +390,6 @@ impl Parse for OptionalArguments {
         let mut keep_field_annotations = keep_field_annotations.unwrap_or_else(|| Vec::with_capacity(1));
         keep_field_annotations.push(super::attr_paths::doc());
 
-        Ok(Self { keep_derives, keep_annotations, keep_field_annotations, apply_annotations, attr_span })
+        Ok(Self { keep_annotations, keep_field_annotations, apply_derives, apply_annotations, attr_span })
     }
 }

@@ -24,112 +24,82 @@
 
 use proc_macro::TokenStream;
 use quote::{ToTokens, format_ident, quote};
-use syn::{Attribute, Data, DataStruct, DeriveInput, Error, Meta, Path, parse_macro_input};
+use syn::spanned::Spanned;
+use syn::{Attribute, Data, DataStruct, DeriveInput, Error, parse_macro_input};
 
 /// Parse item-level annotation arguments.
 mod arguments;
-/// Hardcoded [`Path`]s representing various annotations.
+/// Hardcoded [paths][`syn::Path`] representing various annotations.
 mod attr_paths;
 /// Parse fields and their annotation.
 mod fields;
 
-/// Retain only the specified [annotations] and derives.
-///
-/// - Retains only the [annotations] whose [`Path`] is included in `kept_attrs`.
-/// - If [`derive`] was one of the kept annotations and `keep_derives` is [`Some`], this will replace the list of
-///   derives with the list in `keep_derives`.
-///
-/// [annotations]: `Attribute`
-fn only_kept_attrs(attrs: &[Attribute], kept_attrs: &[Path], keep_derives: Option<&[Path]>) -> Vec<Attribute> {
-    let derive_annotation_path = attr_paths::derive();
+/// Prepends [`macro@Default`] to the first existing [`derive`] [`Attribute`], or appends a new [`derive`] [`Attribute`]
+/// for just [`macro@Default`].
+fn add_derive_default(attributes: &mut Vec<Attribute>) -> syn::Result<()> {
+    let derive_annotation_path = &attr_paths::derive();
 
-    attrs
-        .iter()
-        .filter(|attr| {
-            let path = attr.meta.path();
+    if let Some(derive_attr) = attributes.iter_mut().find(|attr| attr.path() == derive_annotation_path) {
+        let syn::Meta::List(list) = &mut derive_attr.meta else {
+            return Err(Error::new(derive_attr.meta.span(), "received a non-list `derive` macro call"));
+        };
 
-            // Naive search, because I don't care.
-            kept_attrs.iter().any(|kept_path| path == kept_path)
-        })
-        .cloned()
-        .map(|mut attr| {
-            let Some(keep_derives) = keep_derives else {
-                return attr;
-            };
-            if attr.meta.path() != &derive_annotation_path {
-                return attr;
-            }
+        let rest = &list.tokens;
+        list.tokens = quote! {
+            ::std::default::Default, #rest
+        };
+    } else {
+        attributes.push(syn::parse_quote! { #[derive(::std::default::Default)] });
+    }
 
-            let Meta::List(list) = &mut attr.meta else {
-                panic!("`derive` macros should always have lists");
-            };
-            list.tokens = quote! { #( #keep_derives ),* };
-
-            attr
-        })
-        .collect()
+    Ok(())
 }
 
-// TO-DO: document how to actually use this macro.
-//
-// TO-DO: `#[must_use]`, `#[automatically_derived]`, etc. all the things!
-/// Applies the procedural macro.
-///
-/// Input should be shaped like:
-///
-/// ```rust
-/// #[optional(
-///     keep_derives = [Clone, Debug, Hash, PartialEq, Eq, Args],
-///     keep_annotations = [non_exhaustive, expect],
-/// )]
-/// ```
+// TO-DO: `<#field_type>::new()` instead of `#field_type::new()`.
+/// Applies [the procedural macro][`macro@crate::optional`].
+#[must_use]
 pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> TokenStream {
     let arguments = parse_macro_input!(attribute_args as arguments::OptionalArguments);
 
-    let DeriveInput { attrs, ident, generics, vis, data } = parse_macro_input!(item as DeriveInput);
-    let Data::Struct(DataStruct { struct_token, mut fields, semi_token: semicolon_token }) = data else {
-        return Error::new(arguments.attr_span, "`optional` only supports structs")
+    let DeriveInput { attrs: input_attrs, ident: input_ident, generics, vis, data } =
+        parse_macro_input!(item as DeriveInput);
+    let Data::Struct(DataStruct { struct_token, fields: input_fields, semi_token: semicolon_token }) = data else {
+        return Error::new(arguments.span(), "`optional` only supports structs")
             .to_compile_error()
             .to_token_stream()
             .into();
     };
 
-    let optional_ident = format_ident!("Optional{ident}");
+    let optional_ident = format_ident!("Optional{input_ident}");
+    let ident = input_ident;
 
     let mut fields_with_defaults = fields::FieldsWithDefaults {
         ident: ident.clone(),
         optional_ident: optional_ident.clone(),
-        fields: Vec::with_capacity(fields.len()),
+        fields: Vec::with_capacity(input_fields.len()),
     };
 
-    let optional_fields = fields::fields_to_optional(fields.clone());
+    let optional_fields = fields::fields_to_optional(input_fields.clone());
+    let mut fields = input_fields;
 
     for field in &mut fields {
         fields_with_defaults.fields.push(match fields::FieldWithDefault::new(field) {
             Ok(with_default) => with_default,
-            Err(error) => return error.to_compile_error().into_token_stream().into(),
+            Err(error) => return error.to_compile_error().into(),
         });
 
-        field.attrs.retain(|attr| {
-            let path = attr.path();
-
-            // Naive search, because I don't care.
-            arguments.keep_field_annotations.iter().any(|kept_path| path == kept_path)
-        });
+        arguments.retain_only_kept_field_attrs(field);
     }
 
-    let conversions: proc_macro2::TokenStream = fields_with_defaults.generate_conversions().into();
+    let conversions = fields_with_defaults.generate_conversions();
 
-    let optional_attrs = attrs;
-    let mut attrs =
-        self::only_kept_attrs(&optional_attrs, &arguments.keep_annotations, arguments.keep_derives.as_deref());
-    if let Some(mut extra_annotations) = arguments.apply_annotations {
-        attrs.append(&mut extra_annotations);
+    let attrs = arguments.only_kept_and_applied_attrs(&input_attrs);
+    let mut optional_attrs = input_attrs;
+    if let Err(e) = self::add_derive_default(&mut optional_attrs) {
+        return e.to_compile_error().into();
     }
 
     quote! {
-        use ::clap::builder::TypedValueParser;
-
         #( #optional_attrs )*
         #vis #struct_token #optional_ident #generics
         #optional_fields

@@ -25,8 +25,8 @@ use serde::{Deserialize, Serialize};
 /// The bot's settings.
 #[non_exhaustive]
 #[optional(
-    keep_derives = [Clone, Debug, Hash, PartialEq, Eq],
     keep_annotations = [non_exhaustive, expect],
+    apply_derives = [Clone, Debug, Hash, PartialEq, Eq],
     apply_annotations = {
         #[expect(clippy::struct_excessive_bools, reason = "not relevant to CLI arguments")]
     },
