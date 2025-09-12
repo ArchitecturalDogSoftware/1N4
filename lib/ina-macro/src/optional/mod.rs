@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use proc_macro::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::spanned::Spanned;
 use syn::{Attribute, Data, DataStruct, DeriveInput, Error};
 
@@ -29,7 +28,7 @@ mod fields;
 /// Prepends [`macro@Default`] to the first existing [`derive`] [`Attribute`], or appends a new [`derive`] [`Attribute`]
 /// for just [`macro@Default`].
 fn add_derive_default(attributes: &mut Vec<Attribute>) -> syn::Result<()> {
-    let derive_annotation_path = &attr_paths::derive();
+    let derive_annotation_path = &self::attr_paths::derive();
 
     if let Some(derive_attr) = attributes.iter_mut().find(|attr| attr.path() == derive_annotation_path) {
         let syn::Meta::List(list) = &mut derive_attr.meta else {
@@ -48,28 +47,31 @@ fn add_derive_default(attributes: &mut Vec<Attribute>) -> syn::Result<()> {
 }
 
 /// Applies [the procedural macro][`macro@crate::optional`].
-pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> syn::Result<proc_macro2::TokenStream> {
-    let arguments: arguments::OptionalArguments = syn::parse(attribute_args)?;
+pub fn procedure(
+    attribute_args: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let arguments: self::arguments::OptionalArguments = syn::parse(attribute_args)?;
 
     let DeriveInput { attrs: input_attrs, ident: input_ident, generics, vis, data } = syn::parse(item)?;
     let Data::Struct(DataStruct { struct_token, fields: input_fields, semi_token: semicolon_token }) = data else {
         return Err(Error::new(arguments.span(), "`optional` only supports structs"));
     };
 
-    let optional_ident = format_ident!("Optional{input_ident}");
+    let optional_ident = quote::format_ident!("Optional{input_ident}");
     let ident = input_ident;
 
-    let mut fields_with_defaults = fields::FieldsWithDefaults {
+    let mut fields_with_defaults = self::fields::FieldsWithDefaults {
         ident: ident.clone(),
         optional_ident: optional_ident.clone(),
         fields: Vec::with_capacity(input_fields.len()),
     };
 
-    let optional_fields = fields::fields_to_optional(input_fields.clone())?;
+    let optional_fields = self::fields::fields_to_optional(input_fields.clone())?;
     let mut fields = input_fields;
 
     for field in &mut fields {
-        fields_with_defaults.fields.push(fields::FieldWithDefault::new(field)?);
+        fields_with_defaults.fields.push(self::fields::FieldWithDefault::new(field)?);
 
         arguments.retain_only_kept_field_attrs(field);
     }

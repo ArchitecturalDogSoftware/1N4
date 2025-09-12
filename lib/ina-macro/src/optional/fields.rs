@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
@@ -68,8 +68,8 @@ impl FieldsWithDefaults {
     /// `generate_method_call`.
     fn generate_field_comparisons(
         &self,
-        generate_method_call: impl Fn(OptionalKind) -> proc_macro2::TokenStream,
-    ) -> Vec<proc_macro2::TokenStream> {
+        generate_method_call: impl Fn(OptionalKind) -> TokenStream,
+    ) -> Vec<TokenStream> {
         let mut is_first = true;
         self.fields
             .iter()
@@ -82,7 +82,7 @@ impl FieldsWithDefaults {
                 let maybe_ampersand = if is_first {
                     is_first = false;
 
-                    proc_macro2::TokenStream::new()
+                    TokenStream::new()
                 } else {
                     quote! { && }
                 };
@@ -110,7 +110,7 @@ impl FieldsWithDefaults {
     /// - Generates a method called `is_all_none` on [`Self::optional_ident`] calls [`Option::is_none`] on each field
     ///   (or that type's implementation of the method).
     #[must_use]
-    pub fn generate_conversions(&self) -> proc_macro2::TokenStream {
+    pub fn generate_conversions(&self) -> TokenStream {
         let Self { ident, optional_ident, fields } = self;
 
         let idents = fields.iter().map(|FieldWithDefault { ident, .. }| ident).collect::<Vec<_>>();
@@ -286,7 +286,7 @@ impl FieldWithDefault {
     /// Specifically, this generates a
     /// [`StructExprField`](https://doc.rust-lang.org/reference/expressions/struct-expr.html#grammar-StructExprField).
     #[must_use]
-    fn generate_assignment_with_filled_default(&self) -> proc_macro2::TokenStream {
+    fn generate_assignment_with_filled_default(&self) -> TokenStream {
         let Self { ident, default } = self;
         let method = match default {
             DefaultValueGenerator::Expr(expr) => quote! { .unwrap_or_else(|| #expr) },
