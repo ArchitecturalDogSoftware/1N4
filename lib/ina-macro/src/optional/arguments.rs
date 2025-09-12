@@ -14,20 +14,18 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use proc_macro2::{Delimiter, Group, Span, TokenTree};
+use proc_macro2::{Delimiter, Group, Span, TokenStream, TokenTree};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{Attribute, Error, Expr, ExprArray, Field, Ident, Meta, Path, Result, Token, braced, parse_quote};
+use syn::{Attribute, Error, Expr, ExprArray, Field, Ident, Meta, Path, Result, Token};
 
-/// A flexible alternative to [`Parse`] for types that can be parsed from [token streams].
-///
-/// [token streams]: `proc_macro2::TokenStream`
+/// A flexible alternative to [`Parse`] for types that can be parsed from [token streams][`TokenStream`].
 trait FromStream: Sized {
     /// Parse a [`Self`] from a stream. Does not have to consume the stream fully.
     ///
     /// "Stream," in this case, referring to an iterator over [`TokenTree`]s, which can be produced by a
-    /// [`proc_macro2::TokenStream`].
+    /// [`TokenStream`].
     fn from_stream(input: &mut impl Iterator<Item = TokenTree>, span: Span) -> Result<Self>;
 }
 
@@ -40,10 +38,10 @@ struct List<T> {
     pairs: Vec<(T, Option<syn::token::Comma>)>,
 }
 
-impl<T: FromStream> TryFrom<proc_macro2::TokenStream> for List<T> {
+impl<T: FromStream> TryFrom<TokenStream> for List<T> {
     type Error = Error;
 
-    fn try_from(input: proc_macro2::TokenStream) -> std::result::Result<Self, Self::Error> {
+    fn try_from(input: TokenStream) -> std::result::Result<Self, Self::Error> {
         let span = input.span();
         let mut iter = input.into_iter().peekable();
 
@@ -120,7 +118,7 @@ impl Parse for ExprOrGroup {
 }
 
 impl ToTokens for ExprOrGroup {
-    fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
             Self::Expr(expr) => expr.to_tokens(tokens),
             Self::Group(group) => group.to_tokens(tokens),
@@ -225,7 +223,7 @@ impl TryFrom<ExprOrGroup> for AttributeList {
 impl Parse for AttributeList {
     fn parse(input: ParseStream) -> Result<Self> {
         let content;
-        let _ = braced!(content in input);
+        let _ = syn::braced!(content in input);
 
         Attribute::parse_outer(&content).map(|attributes| Self { attributes })
     }
@@ -335,7 +333,7 @@ impl OptionalArguments {
         // [`Self::apply_derives`].
         if !applied_derives {
             let apply_derives = self.apply_derives.as_slice();
-            only_kept.push(parse_quote! {
+            only_kept.push(syn::parse_quote! {
                 #[derive( #(#apply_derives),* )]
             });
         }
@@ -362,7 +360,7 @@ impl Parse for OptionalArguments {
         // pass the comma separating each [`ArbitraryNameValue`] in the list to their parser, which
         // would make [`ParseStream::parse`] mad because it expects the stream to be empty by the
         // end. Using a custom approach based on token streams did not have this issue.
-        let arguments = List::<ArbitraryNameValue>::try_from(input.parse::<proc_macro2::TokenStream>()?)?;
+        let arguments = List::<ArbitraryNameValue>::try_from(input.parse::<TokenStream>()?)?;
 
         let mut keep_annotations = Vec::new();
         let mut keep_field_annotations = Vec::new();
