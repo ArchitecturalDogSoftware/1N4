@@ -93,7 +93,9 @@ impl<T: Parse> Parse for List<T> {
 /// The [`Parse`] implementation attempts to parse a [`Self::Expr`] before it attempts to parse a [`Self::Group`].
 #[derive(Debug)]
 enum ExprOrGroup {
+    /// An [`Expr`]. This should be parsed first.
     Expr(Expr),
+    /// A [`Group`]. This should be parsed second.
     Group(Group),
 }
 
@@ -132,11 +134,12 @@ impl ToTokens for ExprOrGroup {
 struct ArbitraryNameValue {
     /// The left-hand side of the expression.
     ident: Ident,
+    /// The equal sign separating the two values.
     eq_token: Token![=],
     /// The right-hand side of the expression.
     value: ExprOrGroup,
-    /// The span of the original invocation tokens, running all the way from the start of [`Self::ident`] to the end
-    /// of [`Self::value`].
+    /// The span of the original invocation tokens, running all the way from the start of [`Self::ident`] to the end of
+    /// [`Self::value`].
     span: Span,
 }
 
@@ -191,6 +194,7 @@ impl Parse for ArbitraryNameValue {
 /// [annotations]: `Attribute`
 #[derive(Debug)]
 struct AttributeList {
+    /// The actual list of [outer][`syn::AttrStyle::Outer`] [annotations][`Attribute`].
     attributes: Vec<Attribute>,
 }
 
@@ -247,7 +251,6 @@ fn parse_paths(bracketed_list: ExprOrGroup) -> Result<Vec<Path>> {
     })
 }
 
-// Aren't all of these optional? Why are only two actually [`Option`]s?
 /// Represents the arguments of the [`optional`] procedural macro.
 ///
 /// These are implemented though what is effectively a more flexible [`syn::Meta`] parser.
@@ -262,10 +265,10 @@ pub struct OptionalArguments {
     /// struct that should be kept verbatim on the fields of the non-optional struct.
     keep_field_annotations: Vec<Path>,
     /// The [paths][`Path`] of [`derive`] macros that should be applied to the non-optional struct.
-    apply_derives: Option<Vec<Path>>,
+    apply_derives: Vec<Path>,
     /// A list of [outer][`syn::AttrStyle::Outer`] [annotations][`Attribute`] that should be applied verbatim to the
     /// non-optional struct.
-    apply_annotations: Option<Vec<Attribute>>,
+    apply_annotations: Vec<Attribute>,
     /// The [`Span`] of the input attributes that were parsed to create this [`Self`].
     attr_span: Span,
 }
@@ -285,60 +288,62 @@ impl OptionalArguments {
     /// In order, it:
     ///
     /// 1. Retains only the [annotations] whose [paths] were specified by the user with `keep_annotations`.
-    /// 2. If the user specified a list of paths with `apply_derives`, this will replace the list of [paths] in the
+    /// 1. If the user specified a list of paths with `apply_derives`, this will replace the list of [paths] in the
     ///    existing [`derive`] annotation (or append a new one if one was not already present) with it.
-    /// 2. If the user specified a list of [annotations] with `apply_annotations`, this will append the given
+    /// 1. If the user specified a list of [annotations] with `apply_annotations`, this will append the given
     ///    [annotations] onto the list made by the last two steps.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if given a malformed [`derive`] annotation --- specifically, if given one that isn't a
+    /// [`Meta::List`].
     ///
     /// [annotations]: `Attribute`
     /// [paths]: `Path`
-    #[must_use]
-    pub fn only_kept_and_applied_attrs(&self, attrs: &[Attribute]) -> Vec<Attribute> {
+    pub fn only_kept_and_applied_attrs(&self, attrs: &[Attribute]) -> Result<Vec<Attribute>> {
         let derive_annotation_path = super::attr_paths::derive();
 
         let mut applied_derives = false;
         let mut only_kept = attrs
             .iter()
             // Only kept annotations.
-            .filter(|attr| {
-                let path = attr.meta.path();
-
-                // Naive search, because I don't care.
-                self.keep_annotations.iter().any(|kept_path| path == kept_path)
-            })
+            .filter(|attr| self.keep_annotations.contains(attr.meta.path()))
             .cloned()
             // If there is one, replace the list of paths in the [`derive`] annotation with [`Self::apply_derives`].
             .map(|mut attr| {
-                let Some(apply_derives) = self.apply_derives.as_ref() else {
-                    return attr;
+                let apply_derives = if self.apply_derives.is_empty() {
+                    return Ok(attr);
+                } else {
+                    self.apply_derives.as_slice()
                 };
                 if attr.meta.path() != &derive_annotation_path {
-                    return attr;
+                    return Ok(attr);
                 }
 
                 let Meta::List(list) = &mut attr.meta else {
-                    panic!("`derive` macros should always have lists");
+                    return Err(Error::new(attr.meta.span(), "`derive` macros should always have lists \
+                            <https://doc.rust-lang.org/reference/attributes/derive.html#r-attributes.derive.syntax>"));
                 };
                 list.tokens = quote! { #( #apply_derives ),* };
                 applied_derives = true;
 
-                attr
+                Ok(attr)
             })
-            .collect::<Vec<Attribute>>();
+            .collect::<Result<Vec<Attribute>>>()?;
 
         // If there was not already a [`derive`] annotation, append an entirely new one, holding
         // [`Self::apply_derives`].
-        if !applied_derives && let Some(apply_derives) = self.apply_derives.as_ref() {
+        if !applied_derives {
+            let apply_derives = self.apply_derives.as_slice();
             only_kept.push(parse_quote! {
                 #[derive( #(#apply_derives),* )]
             });
         }
 
-        if let Some(applied_attrs) = self.apply_annotations.as_ref() {
-            only_kept.extend_from_slice(applied_attrs);
-        }
+        // And finally, apply the specified extra annotations.
+        only_kept.extend_from_slice(&self.apply_annotations);
 
-        only_kept
+        Ok(only_kept)
     }
 
     /// Returns the [`Span`] of the input attributes that were parsed to create this [`Self`].
@@ -359,36 +364,31 @@ impl Parse for OptionalArguments {
         // end. Using a custom approach based on token streams did not have this issue.
         let arguments = List::<ArbitraryNameValue>::try_from(input.parse::<proc_macro2::TokenStream>()?)?;
 
-        let mut apply_derives = None;
-        let mut keep_annotations = None;
-        let mut keep_field_annotations = None;
-        let mut apply_annotations = None;
+        let mut keep_annotations = Vec::new();
+        let mut keep_field_annotations = Vec::new();
+        let mut apply_derives = Vec::new();
+        let mut apply_annotations = Vec::new();
 
         for (ArbitraryNameValue { ident, value, .. }, _) in arguments.pairs {
             match ident.to_string().as_str() {
-                "keep_annotations" => keep_annotations = Some(parse_paths(value)?),
-                "keep_field_annotations" => keep_field_annotations = Some(parse_paths(value)?),
-                "apply_derives" => apply_derives = Some(parse_paths(value)?),
-                "apply_annotations" => {
-                    apply_annotations = Some(AttributeList::try_from(value)?.attributes);
-                }
+                "keep_annotations" => keep_annotations.append(&mut parse_paths(value)?),
+                "keep_field_annotations" => keep_field_annotations.append(&mut parse_paths(value)?),
+                "apply_derives" => apply_derives.append(&mut parse_paths(value)?),
+                "apply_annotations" => apply_annotations.append(&mut AttributeList::try_from(value)?.attributes),
+
                 _ => return Err(Error::new(ident.span(), "unknown argument")),
             }
         }
 
-        // Always maintain documentation comments on both structs.
-        let mut keep_annotations: Vec<Path> = keep_annotations.unwrap_or_else(|| Vec::with_capacity(1));
+        // Always maintain documentation comments on both structs and their fields.
         keep_annotations.push(super::attr_paths::doc());
+        keep_field_annotations.push(super::attr_paths::doc());
 
-        // Maintain the [`derive`] annotation on the non-optional struct if the consumer specified
-        // the some number of the derives should be maintained.
-        if apply_derives.is_some() {
+        // Maintain the [`derive`] annotation on the non-optional struct if the caller specified that some number of the
+        // derives should be maintained.
+        if !apply_derives.is_empty() {
             keep_annotations.push(super::attr_paths::derive());
         }
-
-        // Always maintain documentation comments on both structs' fields.
-        let mut keep_field_annotations = keep_field_annotations.unwrap_or_else(|| Vec::with_capacity(1));
-        keep_field_annotations.push(super::attr_paths::doc());
 
         Ok(Self { keep_annotations, keep_field_annotations, apply_derives, apply_annotations, attr_span })
     }
