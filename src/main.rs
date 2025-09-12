@@ -38,8 +38,8 @@ pub mod utility;
 /// The application's command-line arguments.
 #[non_exhaustive]
 #[optional(
-    keep_derives = [Clone, Debug, Hash, PartialEq, Eq],
     keep_annotations = [non_exhaustive, expect],
+    apply_derives = [Clone, Debug, Hash, PartialEq, Eq],
 )]
 #[derive(Clone, Debug, PartialEq, Eq, Parser, Serialize)]
 #[command(about, version)]
