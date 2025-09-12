@@ -36,33 +36,46 @@ use serde::{Deserialize, Serialize};
 #[group(id = "BotSettings")]
 pub struct Settings {
     /// The location of the file that determines the bot's status.
+    ///
+    /// Default: `./res/status.toml`
     #[arg(long = "status-file")]
     #[option(default = self::default_status_file())]
     pub status_file: PathBuf,
     /// The interval at which to refresh the bot's status in minutes.
+    ///
+    /// Default: `30`
     #[arg(short = 'S', long = "status-interval")]
     #[option(default = self::default_status_interval())]
     pub status_interval: NonZeroU64,
 
     /// The location of the directory holding attachment overrides for the `/help` command.
     ///
-    /// Some of the buttons on the `/help` response trigger messages with attachments. These
-    /// attachments are embedded into the bot, but it will look for files of the same name in this
-    /// directory before defaulting to the embedded copy.
+    /// Some of the buttons on the `/help` response trigger messages with attachments. These attachments are embedded
+    /// into the bot, but it will look for files of the same name in this directory before defaulting to the embedded
+    /// copy.
+    ///
+    /// Default: `./res/attachments`
     #[arg(long = "help-attachments-directory")]
     #[option(default = self::default_help_attachments_directory())]
     pub help_attachments_directory: PathBuf,
 
     /// The number of shards to spawn.
+    ///
+    /// Default: the Discord API's recommendation (see
+    /// <https://discord.com/developers/docs/events/gateway#get-gateway-bot>)
     #[arg(short = 's', long = "shards")]
     #[option(default)]
     pub shards: Option<NonZeroU32>,
     /// The interval at which to reshard in hours.
+    ///
+    /// Default: `8`
     #[arg(short = 'r', long = "reshard-interval")]
     #[option(default = self::default_reshard_interval())]
     pub reshard_interval: NonZeroU64,
 
     /// Whether to skip command patching on bot startup.
+    ///
+    /// Default: `false`
     #[arg(long = "skip-command-patching")]
     #[option(default)]
     pub skip_command_patch: bool,
@@ -70,14 +83,20 @@ pub struct Settings {
     /// Disables all logger output.
     ///
     /// Equivalent to `--disable-file-logging` and `--disable-console-logging`.
+    ///
+    /// Default: `true` if `--disable-file-logging` and `--disable-console-logging` are `true`, `false` otherwise
     #[arg(short = 'q', long = "quiet")]
     #[option(default)]
     pub quiet: bool,
     /// Stops the logger from writing to files.
+    ///
+    /// Default: the value of `--quiet` (default `false`)
     #[arg(long = "disable-file-logging")]
     #[option(default)]
     pub disable_file_logging: bool,
     /// Stops the logger from writing to `STDOUT` and `STDERR`.
+    ///
+    /// Default: the value of `--quiet` (default `false`)
     #[arg(long = "disable-console-logging")]
     #[option(default)]
     pub disable_console_logging: bool,

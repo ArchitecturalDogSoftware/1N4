@@ -34,15 +34,21 @@ use crate::System;
 #[group(id = "DataSettings")]
 pub struct Settings {
     /// The storage system to use to read and write data.
+    #[cfg_attr(feature = "system-file", doc = "\nDefault: `file`")]
+    #[cfg_attr(not(feature = "system-file"), doc = "\nDefault: `memory`")]
     #[arg(long = "data-system")]
     #[option(default)]
     pub system: System,
     /// The directory within which to manage data files.
+    ///
+    /// Default: `./res/data`
     #[arg(id = "DATA_DIRECTORY", long = "data-directory")]
     #[option(default = self::default_directory())]
     pub directory: PathBuf,
 
-    /// The storage thread's output queue capacity. If set to '1', no buffering will be done.
+    /// The storage thread's output queue capacity. If set to `1`, no buffering will be done.
+    ///
+    /// Default: `8`
     #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity")]
     #[option(default = self::default_queue_capacity())]
     pub queue_capacity: NonZeroUsize,

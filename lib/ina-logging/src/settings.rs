@@ -32,16 +32,22 @@ use serde::{Deserialize, Serialize};
 #[group(id = "LogSettings")]
 pub struct Settings {
     /// The logger's file output directory.
+    ///
+    /// Default: `./log`
     #[cfg(feature = "file")]
     #[arg(id = "LOG_DIR", long = "log-directory")]
     #[option(default = self::default_directory())]
     pub directory: PathBuf,
 
-    /// The capacity of the logger's queue. If set to '1', no buffering will occur.
+    /// The capacity of the logger's queue. If set to `1`, no buffering will occur.
+    ///
+    /// Default: `8`
     #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity")]
     #[option(default = self::default_queue_capacity())]
     pub queue_capacity: NonZeroUsize,
     /// The duration in milliseconds that the logger's queue should retain entries for before flushing.
+    ///
+    /// Default: `10`
     #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration")]
     #[option(default = self::default_queue_duration())]
     pub queue_duration: NonZeroU64,
