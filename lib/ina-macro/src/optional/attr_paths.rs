@@ -45,7 +45,6 @@ pub fn derive() -> Path {
 }
 
 /// Return a [`Path`] representing the `#[serde(...)]` annotation.
-// TO-DO: does this need to be replaced this with a qualified path?
 #[must_use]
 pub fn serde() -> Path {
     Path {
@@ -72,7 +71,6 @@ pub fn option() -> Path {
 }
 
 /// Return a [`Path`] representing the `#[command(...)]` annotation.
-// TO-DO: does this need to be replaced this with a qualified path?
 #[must_use]
 pub fn command() -> Path {
     Path {

@@ -173,7 +173,7 @@ pub fn stored(input: TokenStream) -> TokenStream {
 ///   - For every field annotated with `#[option(flatten)]`, the type name will be prefixed with `Optional` (assuming
 ///     that it, too, had this macro applied to it) and annotated with a similarly. For example, given some field of
 ///     type `::my_other_crate::Settings`, it will be given the type `::my_other_crate::OptionalSettings` and annotated
-///     with `#[serde(default, skip_serializing_if = "::my_other_crate::OptionalSettings::is_all_none")]`.
+///     with `#[serde(default, skip_serializing_if = "<::my_other_crate::OptionalSettings>::is_all_none")]`.
 /// - [`From<IDENT>`] will be implemented for `OptionalIDENT`, which just calls `.into()` on every field, which
 ///   effectively just wraps the value in [`Some`].
 /// - On `OptionalIDENT`, five methods will be generated:

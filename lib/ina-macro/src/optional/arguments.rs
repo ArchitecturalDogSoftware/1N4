@@ -150,12 +150,12 @@ impl FromStream for ArbitraryNameValue {
 
         let ident = match unexpected_end!(input.next()) {
             TokenTree::Ident(ident) => ident,
-            other => return Err(Error::new(other.span(), format!("expect an identifier, received {other}"))),
+            other => return Err(Error::new(other.span(), "expected an identifier")),
         };
         let eq_token = match unexpected_end!(input.next()) {
             TokenTree::Punct(punct) if punct.as_char() == '=' => syn::token::Eq { spans: [punct.span()] },
             other => {
-                return Err(Error::new(other.span(), format!("expect an equal sign (=), received {other}")));
+                return Err(Error::new(other.span(), "expected an equal sign (=)"));
             }
         };
         let value = match unexpected_end!(input.next()) {
@@ -372,7 +372,7 @@ impl Parse for OptionalArguments {
                 "apply_annotations" => {
                     apply_annotations = Some(AttributeList::try_from(value)?.attributes);
                 }
-                other => return Err(Error::new(ident.span(), format!("unknown argument: {other}"))),
+                _ => return Err(Error::new(ident.span(), "unknown argument")),
             }
         }
 
