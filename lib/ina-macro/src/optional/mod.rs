@@ -55,7 +55,6 @@ fn add_derive_default(attributes: &mut Vec<Attribute>) -> syn::Result<()> {
     Ok(())
 }
 
-// TO-DO: `<#field_type>::new()` instead of `#field_type::new()`.
 /// Applies [the procedural macro][`macro@crate::optional`].
 #[must_use]
 pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> TokenStream {
