@@ -38,26 +38,36 @@ use crate::{Error, Result};
 #[group(id = "LangSettings")]
 pub struct Settings {
     /// The localizer's default locale.
+    ///
+    /// Default: `en-US`
     #[arg(short = 'l', long = "default-locale")]
     #[option(default)]
     pub default_locale: Locale,
 
     /// The directory within which to read language files.
+    ///
+    /// Default: `./res/lang`
     #[arg(id = "LANG_DIRECTORY", long = "lang-directory")]
     #[option(default = self::default_directory())]
     pub directory: PathBuf,
 
     /// The behavior that the localizer will exhibit when it fails to translate a key.
+    #[cfg_attr(not(debug_assertions), doc = "\nDefault: `return`")]
+    #[cfg_attr(debug_assertions, doc = "\nDefault: `error`")]
     #[arg(long = "lang-miss-behavior")]
     #[option(default)]
     pub miss_behavior: MissingBehavior,
 
-    /// The localizing thread's output queue capacity. If set to '1', no buffering will be done.
+    /// The localizing thread's output queue capacity. If set to `1`, no buffering will be done.
+    ///
+    /// Default: `8`
     #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity")]
     #[option(default = self::default_queue_capacity())]
     pub queue_capacity: NonZeroUsize,
 
     /// The amount of depth at which to search for a translation key in language files with inherited translations.
+    ///
+    /// Default: `2`
     #[arg(id = "LANG_SEARCH_DEPTH", long = "lang-search-depth")]
     #[option(default = self::default_search_depth())]
     pub search_depth: usize,
