@@ -18,9 +18,7 @@ use proc_macro2::Span;
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{
-    Error, Expr, Field, Fields, FieldsNamed, FieldsUnnamed, Ident, Meta, MetaList, Result, Token, Type, TypePath,
-};
+use syn::{Error, Expr, Field, Fields, FieldsNamed, Ident, Meta, Result, Token, Type, TypePath};
 
 /// Represents the tokens `default = EXPR`, where `EXPR` may be any [`Expr`]. This is used to generate an expression to
 /// generate the default value of a struct field.
@@ -28,6 +26,7 @@ use syn::{
 struct DefaultEqExpr {
     /// The `default` token. Not actually an identifier, but it's good enough.
     default: Ident,
+    /// The equal sign separating the two values.
     eq: Token![=],
     /// The expression that generates a default value.
     expr: Expr,
@@ -59,6 +58,7 @@ pub struct FieldsWithDefaults {
     ///
     /// [optional]: `Option`
     pub optional_ident: Ident,
+    /// The actual list of the struct's fields' identifiers and default value expressions.
     pub fields: Vec<FieldWithDefault>,
 }
 
@@ -194,6 +194,7 @@ impl FieldsWithDefaults {
     }
 }
 
+/// The particular manner in which a field is "optional."
 enum OptionalKind {
     /// A field that is "optional" by being [`Option`].
     StdOption,
@@ -201,11 +202,12 @@ enum OptionalKind {
     GeneratedOptional,
 }
 
+/// Represents the two ways a value call have its default value filled.
 enum DefaultValueGenerator {
     /// An expression that generates a default value for a field, can be used in the form
     /// `optional_field.unwrap_or_else(|| #expr)`.
     ///
-    /// Comes from [`DefaultEqExpr::expr`].
+    /// Is either [`Default::default`] or a caller-provided expression (see [`DefaultEqExpr::expr`]).
     Expr(Expr),
     /// An indication a default value for a field can be generated from some `optional_field` with
     /// `optional_field.fill_defaults()`.
@@ -214,10 +216,11 @@ enum DefaultValueGenerator {
     FillDefaults,
 }
 
-/// Represents a [`Field`] and an [`Expr`] that generates a default value for it.
+/// Represents a [`Field`] and an expression that generates a default value for it.
 pub struct FieldWithDefault {
     /// See [`Field::ident`].
     ident: Ident,
+    /// The expression that actually generates a default value.
     default: DefaultValueGenerator,
 }
 
@@ -247,7 +250,7 @@ impl FieldWithDefault {
             Meta::List(list) => {
                 match list.tokens.to_string().as_str() {
                     // Of the form `#[option(default)]`.
-                    "default" => DefaultValueGenerator::Expr(syn::parse_quote! { std::default::Default::default() }),
+                    "default" => DefaultValueGenerator::Expr(syn::parse_quote! { ::std::default::Default::default() }),
                     // Of the form `#[option(flatten)]`.
                     "flatten" => DefaultValueGenerator::FillDefaults,
                     // Of the form `#[option(default = EXPRESSION)]`.
@@ -277,6 +280,11 @@ impl FieldWithDefault {
         Ok(Self { ident, default })
     }
 
+    /// Generate the actual assignment of this field in the struct instantiation using the provided default value. This
+    /// does not include a trailing comma.
+    ///
+    /// Specifically, this generates a
+    /// [`StructExprField`](https://doc.rust-lang.org/reference/expressions/struct-expr.html#grammar-StructExprField).
     #[must_use]
     fn generate_assignment_with_filled_default(&self) -> proc_macro2::TokenStream {
         let Self { ident, default } = self;
@@ -303,17 +311,21 @@ impl FieldWithDefault {
 ///     identifier `IDENT` to `OptionalIDENT`, e.g., the optional form of `::my_other_crate::Settings` is assumed to be
 ///     `::my_other_crate::OptionalSettings`, and there is assumed to be a method
 ///     `::my_other_crate::OptionalSettings::fill_defaults(&self) -> ::my_other_crate::Settings`.
-#[must_use]
-pub fn fields_to_optional(fields: Fields) -> Fields {
+///
+/// # Errors
+///
+/// Returns an error if:
+///
+/// - The struct is a unit or tuple struct (i.e., if it is not a [`Fields::Named`]).
+/// - If a field annotated with `#[option(flatten)]` has a [`Type`] that is not a [`Type::Path`] or a [`Type::Group`],
+///   [`Type::Paren`], [`Type::Ptr`], or [`Type::Reference`] that contains a [`Type::Path`].
+pub fn fields_to_optional(fields: Fields) -> Result<FieldsNamed> {
     match fields {
         Fields::Named(FieldsNamed { brace_token, named }) => {
-            Fields::Named(FieldsNamed { brace_token, named: named.into_iter().map(field_to_optional).collect() })
+            Ok(FieldsNamed { brace_token, named: named.into_iter().map(field_to_optional).collect::<Result<_>>()? })
         }
-        Fields::Unnamed(FieldsUnnamed { paren_token, unnamed }) => Fields::Unnamed(FieldsUnnamed {
-            paren_token,
-            unnamed: unnamed.into_iter().map(field_to_optional).collect(),
-        }),
-        Fields::Unit => Fields::Unit,
+        Fields::Unnamed(_) => Err(Error::new(fields.span(), "`#[optional]` does not support tuple structs")),
+        Fields::Unit => Err(Error::new(fields.span(), "`#[optional]` does not support unit structs")),
     }
 }
 
@@ -332,9 +344,15 @@ pub fn fields_to_optional(fields: Fields) -> Fields {
 ///
 /// In both cases, the field's value default to the equivalent of [`None`] when deserializing.
 ///
+/// # Errors
+///
+/// Returns an error if a field annotated with `#[option(flatten)]` has a [`Type`] that is not a [`Type::Path`] or a
+/// [`Type::Group`], [`Type::Paren`], [`Type::Ptr`], or [`Type::Reference`] that contains a [`Type::Path`].
+///
 /// [annotation]: `syn::Attribute`
-#[must_use]
-fn field_to_optional(Field { mut attrs, vis, mutability, ident, colon_token, ty: input_ty }: Field) -> Field {
+fn field_to_optional(
+    Field { mut attrs, vis, mutability, ident, colon_token, ty: mut input_ty }: Field,
+) -> Result<Field> {
     let mut is_flattened_subcommand = false;
 
     let option_attr_path = super::attr_paths::option();
@@ -345,25 +363,21 @@ fn field_to_optional(Field { mut attrs, vis, mutability, ident, colon_token, ty:
             is_flattened_subcommand = true;
             list.path = super::attr_paths::command();
         } else {
-            option_attr.meta = Meta::List(MetaList {
-                path: super::attr_paths::serde(),
-                delimiter: option_attr.meta.require_list().unwrap().delimiter.clone(),
-                tokens: quote! {
-                    default, skip_serializing_if = "::std::option::Option::is_none"
-                },
-            });
+            *option_attr = syn::parse_quote! {
+                #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+            };
         }
     }
 
     let ty = if is_flattened_subcommand {
-        let type_path = self::rename_to_optional(input_ty);
+        self::rename_to_optional(&mut input_ty)?;
 
-        let is_all_none = format!("<{}>::is_all_none", type_path.to_token_stream());
+        let is_all_none = format!("<{}>::is_all_none", input_ty.to_token_stream());
         attrs.push(syn::parse_quote! {
             #[serde(default, skip_serializing_if = #is_all_none)]
         });
 
-        Type::Path(type_path)
+        input_ty
     } else {
         Type::Path(syn::parse_quote! {
             // This must be `Option<T>`, not `::std::option::Option<T>`, because Clap currently matches on `Option` (to
@@ -378,28 +392,36 @@ fn field_to_optional(Field { mut attrs, vis, mutability, ident, colon_token, ty:
         })
     };
 
-    Field { attrs, vis, mutability, ident, colon_token, ty }
+    Ok(Field { attrs, vis, mutability, ident, colon_token, ty })
 }
 
-#[must_use]
-fn rename_to_optional(ty: Type) -> TypePath {
+/// Attempts to resolve the [`TypePath`] in `ty` and prepend `Optional` to the last segment.
+///
+/// E.g., `::path::to::Type` becomes `::path::to::OptionalType`.
+///
+/// # Errors
+///
+/// Will edit the [`TypePath`] that is internal to a [`Type::Path`], [`Type::Group`], [`Type::Paren`], [`Type::Ptr`], or
+/// [`Type::Reference`]. An error will be returned if the type is of any other kind, including if it is any of the
+/// latter four but does not contain a [`TypePath`]
+fn rename_to_optional(ty: &mut Type) -> Result<()> {
+    fn rename_path_to_optional(type_path: &mut TypePath) {
+        let Some(last) = type_path.path.segments.last_mut() else {
+            unreachable!("type paths must have at least one segment <https://doc.rust-lang.org/reference/paths.html#paths-in-types>");
+        };
+
+        let Ok(prefixed) = syn::parse_str(&format!("Optional{}", last.ident)) else {
+            unreachable!("`Optional` + `MyValidIdent` = `OptionalMyValidIdent` should be valid");
+        };
+        last.ident = prefixed;
+    }
+
     match ty {
-        Type::Path(mut type_path) => {
-            let Some(last) = type_path.path.segments.last_mut() else {
-                unreachable!("type paths must have at least one segment <https://doc.rust-lang.org/reference/paths.html#paths-in-types>");
-            };
-
-            let Ok(prefixed) = syn::parse_str(&format!("Optional{}", last.ident)) else {
-                unreachable!("`Optional` + `MyValidIdent` = `OptionalMyValidIdent` should be valid");
-            };
-            last.ident = prefixed;
-
-            type_path
-        }
-        Type::Group(type_group) => self::rename_to_optional(*type_group.elem),
-        Type::Paren(type_paren) => self::rename_to_optional(*type_paren.elem),
-        Type::Ptr(type_ptr) => self::rename_to_optional(*type_ptr.elem),
-        Type::Reference(type_reference) => self::rename_to_optional(*type_reference.elem),
+        Type::Path(type_path) => rename_path_to_optional(type_path),
+        Type::Group(type_group) => self::rename_to_optional(type_group.elem.as_mut())?,
+        Type::Paren(type_paren) => self::rename_to_optional(type_paren.elem.as_mut())?,
+        Type::Ptr(type_ptr) => self::rename_to_optional(type_ptr.elem.as_mut())?,
+        Type::Reference(type_reference) => self::rename_to_optional(type_reference.elem.as_mut())?,
         Type::Array(_)
         | Type::BareFn(_)
         | Type::ImplTrait(_)
@@ -410,6 +432,14 @@ fn rename_to_optional(ty: Type) -> TypePath {
         | Type::TraitObject(_)
         | Type::Tuple(_)
         | Type::Verbatim(_)
-        | _ => unimplemented!(),
+        | _ => {
+            return Err(Error::new(
+                ty.span(),
+                "`#[option(flatten)]` can only flatten type paths or type groups, parenthesized types, pointers, or \
+                 references that contain type paths",
+            ));
+        }
     }
+
+    Ok(())
 }

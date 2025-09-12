@@ -14,18 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-#![allow(
-    // dead_code,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::missing_docs_in_private_items,
-    reason = "still experimenting"
-)]
-
 use proc_macro::TokenStream;
-use quote::{ToTokens, format_ident, quote};
+use quote::{format_ident, quote};
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DataStruct, DeriveInput, Error, parse_macro_input};
+use syn::{Attribute, Data, DataStruct, DeriveInput, Error};
 
 /// Parse item-level annotation arguments.
 mod arguments;
@@ -56,17 +48,12 @@ fn add_derive_default(attributes: &mut Vec<Attribute>) -> syn::Result<()> {
 }
 
 /// Applies [the procedural macro][`macro@crate::optional`].
-#[must_use]
-pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> TokenStream {
-    let arguments = parse_macro_input!(attribute_args as arguments::OptionalArguments);
+pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> syn::Result<proc_macro2::TokenStream> {
+    let arguments: arguments::OptionalArguments = syn::parse(attribute_args)?;
 
-    let DeriveInput { attrs: input_attrs, ident: input_ident, generics, vis, data } =
-        parse_macro_input!(item as DeriveInput);
+    let DeriveInput { attrs: input_attrs, ident: input_ident, generics, vis, data } = syn::parse(item)?;
     let Data::Struct(DataStruct { struct_token, fields: input_fields, semi_token: semicolon_token }) = data else {
-        return Error::new(arguments.span(), "`optional` only supports structs")
-            .to_compile_error()
-            .to_token_stream()
-            .into();
+        return Err(Error::new(arguments.span(), "`optional` only supports structs"));
     };
 
     let optional_ident = format_ident!("Optional{input_ident}");
@@ -78,27 +65,22 @@ pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> TokenStream 
         fields: Vec::with_capacity(input_fields.len()),
     };
 
-    let optional_fields = fields::fields_to_optional(input_fields.clone());
+    let optional_fields = fields::fields_to_optional(input_fields.clone())?;
     let mut fields = input_fields;
 
     for field in &mut fields {
-        fields_with_defaults.fields.push(match fields::FieldWithDefault::new(field) {
-            Ok(with_default) => with_default,
-            Err(error) => return error.to_compile_error().into(),
-        });
+        fields_with_defaults.fields.push(fields::FieldWithDefault::new(field)?);
 
         arguments.retain_only_kept_field_attrs(field);
     }
 
     let conversions = fields_with_defaults.generate_conversions();
 
-    let attrs = arguments.only_kept_and_applied_attrs(&input_attrs);
+    let attrs = arguments.only_kept_and_applied_attrs(&input_attrs)?;
     let mut optional_attrs = input_attrs;
-    if let Err(e) = self::add_derive_default(&mut optional_attrs) {
-        return e.to_compile_error().into();
-    }
+    self::add_derive_default(&mut optional_attrs)?;
 
-    quote! {
+    Ok(quote! {
         #( #optional_attrs )*
         #vis #struct_token #optional_ident #generics
         #optional_fields
@@ -110,6 +92,5 @@ pub fn procedure(attribute_args: TokenStream, item: TokenStream) -> TokenStream 
         #semicolon_token
 
         #conversions
-    }
-    .into()
+    })
 }

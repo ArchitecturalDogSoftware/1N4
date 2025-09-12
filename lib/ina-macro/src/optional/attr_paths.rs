@@ -44,19 +44,6 @@ pub fn derive() -> Path {
     }
 }
 
-/// Return a [`Path`] representing the `#[serde(...)]` annotation.
-#[must_use]
-pub fn serde() -> Path {
-    Path {
-        leading_colon: None,
-        segments: {
-            let mut punctuated = Punctuated::new();
-            punctuated.push_value(Ident::new("serde", Span::mixed_site()).into());
-            punctuated
-        },
-    }
-}
-
 /// Return a [`Path`] representing the `#[option(...)]` annotation.
 #[must_use]
 pub fn option() -> Path {

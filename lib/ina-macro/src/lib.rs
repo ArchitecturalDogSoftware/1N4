@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Copyright © 2024 Jaxydog
+// Copyright © 2025 RemasteredArch
 //
 // This file is part of 1N4.
 //
@@ -266,5 +267,9 @@ pub fn stored(input: TokenStream) -> TokenStream {
 ///   adding the complexity. If you want to use them, let me (`@RemasteredArch`) know and I can add support.
 #[proc_macro_attribute]
 pub fn optional(attribute: TokenStream, item: TokenStream) -> TokenStream {
-    crate::optional::procedure(attribute, item)
+    match crate::optional::procedure(attribute, item) {
+        Ok(token_stream) => token_stream,
+        Err(error) => error.to_compile_error(),
+    }
+    .into()
 }
