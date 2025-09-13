@@ -20,7 +20,7 @@ use std::sync::Arc;
 use ina_threading::join::Join;
 use ina_threading::statics::Static;
 use ina_threading::threads::consumer::ConsumerJoinHandle;
-use tokio::runtime::{Builder as RuntimeBuilder, Handle};
+use tokio::runtime::Handle;
 use tokio::sync::RwLock;
 use tokio::sync::mpsc::Receiver;
 
@@ -57,8 +57,8 @@ pub enum Request {
 /// This function will return an error if the thread could not be initialized.
 #[expect(clippy::missing_panics_doc, reason = "this function does not cause the panic")]
 pub async fn start(settings: Settings) -> Result<()> {
-    let handle = Join::new(ConsumerJoinHandle::spawn(settings.queue_capacity, |receiver| {
-        RuntimeBuilder::new_current_thread().enable_all().build()?.block_on(self::run(settings, receiver))
+    let handle = Join::new(ConsumerJoinHandle::spawn_async(Handle::current(), settings.queue_capacity, |receiver| {
+        self::run(settings, receiver)
     })?)
     .first(|handle| {
         tokio::task::block_in_place(|| {
