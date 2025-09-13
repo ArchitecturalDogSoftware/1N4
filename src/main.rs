@@ -38,10 +38,10 @@ pub mod utility;
 /// The application's command-line arguments.
 #[non_exhaustive]
 #[optional(
-    keep_annotations = [non_exhaustive, expect],
+    keep_annotations = [non_exhaustive],
     apply_derives = [Clone, Debug, Hash, PartialEq, Eq],
 )]
-#[derive(Clone, Debug, PartialEq, Eq, Parser, Serialize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Parser, Serialize)]
 #[command(about, version)]
 pub struct Arguments {
     /// The bot's settings.

@@ -26,7 +26,7 @@ use crate::System;
 /// The storage instance's settings.
 #[non_exhaustive]
 #[optional(
-    keep_annotations = [non_exhaustive, expect],
+    keep_annotations = [non_exhaustive],
     apply_derives = [Clone, Debug, Hash, PartialEq, Eq, Serialize],
 )]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Args, Serialize, Deserialize)]

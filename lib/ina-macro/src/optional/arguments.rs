@@ -34,7 +34,7 @@ trait FromStream: Sized {
 /// Similar to [`syn::punctuated::Punctuated`].
 #[derive(Debug)]
 struct List<T> {
-    /// The actually list of values and the commas that follow them. Only the last comma may be [`None`].
+    /// The actual list of values and the commas that follow them. Only the last comma may be [`None`].
     pairs: Vec<(T, Option<syn::token::Comma>)>,
 }
 
@@ -128,17 +128,11 @@ impl ToTokens for ExprOrGroup {
 
 /// Represents the tokens `IDENT = EXPR`, where `IDENT` is any [`struct@Ident`] and `EXPR` is an [`ExprOrGroup`]. This
 /// is essentially a more flexible version of [`syn::MetaNameValue`].
-#[expect(dead_code, reason = "keeping dead fields in case a refactor needs them")]
 struct ArbitraryNameValue {
     /// The left-hand side of the expression.
     ident: Ident,
-    /// The equal sign separating the two values.
-    eq_token: Token![=],
     /// The right-hand side of the expression.
     value: ExprOrGroup,
-    /// The span of the original invocation tokens, running all the way from the start of [`Self::ident`] to the end of
-    /// [`Self::value`].
-    span: Span,
 }
 
 impl FromStream for ArbitraryNameValue {
@@ -153,7 +147,7 @@ impl FromStream for ArbitraryNameValue {
             TokenTree::Ident(ident) => ident,
             other => return Err(Error::new(other.span(), "expected an identifier")),
         };
-        let eq_token = match unexpected_end!(input.next()) {
+        let _: Token![=] = match unexpected_end!(input.next()) {
             TokenTree::Punct(punct) if punct.as_char() == '=' => syn::token::Eq { spans: [punct.span()] },
             other => {
                 return Err(Error::new(other.span(), "expected an equal sign (=)"));
@@ -161,25 +155,20 @@ impl FromStream for ArbitraryNameValue {
         };
         let value = match unexpected_end!(input.next()) {
             TokenTree::Group(group) => ExprOrGroup::Group(group),
-            other => {
-                let expr: Expr = syn::parse(other.to_token_stream().into())?;
-                ExprOrGroup::Expr(expr)
-            }
+            other => ExprOrGroup::Expr(syn::parse(other.to_token_stream().into())?),
         };
-        let span = ident
-            .span()
-            .join(eq_token.span())
-            .and_then(|span| span.join(value.span()))
-            .ok_or_else(|| Error::new(span, "received a token stream that crosses between files"))?;
 
-        Ok(Self { ident, eq_token, value, span })
+        Ok(Self { ident, value })
     }
 }
 
 impl Parse for ArbitraryNameValue {
     fn parse(input: ParseStream) -> Result<Self> {
-        let span = input.span();
-        Ok(Self { ident: input.parse()?, eq_token: input.parse()?, value: input.parse()?, span })
+        let ident = input.parse()?;
+        let _: Token![=] = input.parse()?;
+        let value = input.parse()?;
+
+        Ok(Self { ident, value })
     }
 }
 

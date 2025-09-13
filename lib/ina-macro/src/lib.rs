@@ -172,9 +172,10 @@ pub fn stored(input: TokenStream) -> TokenStream {
 ///   - For every field not annotated with `#[option(flatten)]`, the type will be wrapped in [`Option`] and annotated
 ///     with `#[serde(default, skip_serializing_if = "::std::option::Option::is_none")]`.
 ///   - For every field annotated with `#[option(flatten)]`, the type name will be prefixed with `Optional` (assuming
-///     that it, too, had this macro applied to it) and annotated with a similarly. For example, given some field of
-///     type `::my_other_crate::Settings`, it will be given the type `::my_other_crate::OptionalSettings` and annotated
-///     with `#[serde(default, skip_serializing_if = "<::my_other_crate::OptionalSettings>::is_all_none")]`.
+///     that it, too, had this macro applied to it) and annotated with `#[command(flatten)]` a similar Serde annotation.
+///     For example, given some field of type `::my_other_crate::Settings`, it will be given the type
+///     `::my_other_crate::OptionalSettings` and annotated with `#[serde(default, skip_serializing_if =
+///     "<::my_other_crate::OptionalSettings>::is_all_none")]`.
 /// - [`From<IDENT>`] will be implemented for `OptionalIDENT`, which just calls `.into()` on every field, which
 ///   effectively just wraps the value in [`Some`].
 /// - On `OptionalIDENT`, five methods will be generated:
@@ -188,7 +189,7 @@ pub fn stored(input: TokenStream) -> TokenStream {
 ///     probably be removed eventually.
 ///   - `pub fn is_all_some(self) -> bool`, which calls [`Option::is_some`] (or this same generated method on fields
 ///     annotated with `#[option(flatten)]`) on each field.
-///   - `pub fn is_all_nome(self) -> bool`, which calls [`Option::is_none`] (or this same generated method on fields
+///   - `pub fn is_all_none(self) -> bool`, which calls [`Option::is_none`] (or this same generated method on fields
 ///     annotated with `#[option(flatten)]`) on each field.
 ///
 /// # Notes
@@ -212,10 +213,10 @@ pub fn stored(input: TokenStream) -> TokenStream {
 /// /// The application's command-line arguments.
 /// #[non_exhaustive]
 /// #[optional(
-///     keep_annotations = [non_exhaustive, expect],
+///     keep_annotations = [non_exhaustive],
 ///     apply_derives = [Clone, Debug, Hash, PartialEq, Eq],
 /// )]
-/// #[derive(Clone, Debug, PartialEq, Eq, Parser, Serialize)]
+/// #[derive(Clone, Debug, Hash, PartialEq, Eq, Parser, Serialize)]
 /// #[command(about, version)]
 /// pub struct Arguments {
 ///     /// The bot's settings.
@@ -227,7 +228,7 @@ pub fn stored(input: TokenStream) -> TokenStream {
 /// /// The bot's settings.
 /// #[non_exhaustive]
 /// #[optional(
-///     keep_annotations = [non_exhaustive, expect],
+///     keep_annotations = [non_exhaustive],
 ///     apply_derives = [Clone, Debug, Hash, PartialEq, Eq],
 ///     apply_annotations = {
 ///         #[expect(clippy::struct_excessive_bools, reason = "not relevant to CLI arguments")]
