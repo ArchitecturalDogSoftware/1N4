@@ -125,11 +125,11 @@ impl FieldsWithDefaults {
             impl ::std::convert::From<#ident> for #optional_ident {
                 fn from(value: #ident) -> Self {
                     Self {
-                        // Some field of type `Type`, this has two effects. For `Option<Type>`,
-                        // this will be `Option::from(Type)`, which is just `Some(Type)`. For
-                        // `OptionalType`, this will be `OptionalType::from(Type)`, which should be
-                        // calling _this_ method as it was generated for `OptionalType`.
-                        #( #idents: value.#idents.into() ),*
+                        // Some field of type `Type`, this has two effects. For `Option<Type>`, this will be
+                        // `Option::from(Type)`, which is just `Some(Type)`. For `OptionalType`, this will be
+                        // `OptionalType::from(Type)`, which should be calling _this_ method as it was generated for
+                        // `OptionalType`.
+                        #( #idents: ::std::convert::Into::into(value.#idents) ),*
                     }
                 }
             }
