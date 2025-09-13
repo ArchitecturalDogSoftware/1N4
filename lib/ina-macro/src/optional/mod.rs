@@ -54,7 +54,8 @@ pub fn procedure(
     let arguments: self::arguments::OptionalArguments = syn::parse(attribute_args)?;
 
     let DeriveInput { attrs: input_attrs, ident: input_ident, generics, vis, data } = syn::parse(item)?;
-    let Data::Struct(DataStruct { struct_token, fields: input_fields, semi_token: semicolon_token }) = data else {
+    // Ignore the semicolon because it should only ever appear for unit and tuple structs, which we don't support.
+    let Data::Struct(DataStruct { struct_token, fields: input_fields, semi_token: _ }) = data else {
         return Err(Error::new(arguments.span(), "`optional` only supports structs"));
     };
 
@@ -86,12 +87,10 @@ pub fn procedure(
         #( #optional_attrs )*
         #vis #struct_token #optional_ident #generics
         #optional_fields
-        #semicolon_token
 
         #( #attrs )*
         #vis #struct_token #ident #generics
         #fields
-        #semicolon_token
 
         #conversions
     })
