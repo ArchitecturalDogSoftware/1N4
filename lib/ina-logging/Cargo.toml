@@ -23,6 +23,7 @@ terminal = ["dep:owo-colors", "tokio/io-std", "tokio/io-util"]
 [dependencies]
 async-trait.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
+ina-macro.workspace = true
 ina-threading.workspace = true
 owo-colors = { version = "~4.2", features = ["supports-colors"], optional = true }
 serde = { workspace = true, features = ["derive"] }

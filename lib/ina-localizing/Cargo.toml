@@ -21,6 +21,7 @@ default = []
 [dependencies]
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
 ina-logging.workspace = true
+ina-macro.workspace = true
 ina-threading.workspace = true
 serde = { workspace = true, features = ["derive", "rc"] }
 thiserror.workspace = true
