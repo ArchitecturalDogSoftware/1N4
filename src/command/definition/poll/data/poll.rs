@@ -138,7 +138,7 @@ impl Poll {
             bail!("expected poll state to be variant `PollState::Builder`");
         };
 
-        let header = localize!(async(try in locale) category::UI, "poll-builder-header").await?;
+        let header = localize!((try in locale) category::UI, "poll-builder-header").await?;
         let mut embed = EmbedBuilder::new().author(EmbedAuthorBuilder::new(header)).title(&(*self.title));
 
         if let Some(about) = self.about.as_deref() {
@@ -156,13 +156,13 @@ impl Poll {
         }
 
         let type_field = EmbedFieldBuilder::new(
-            localize!(async(try in locale) category::UI, "poll-builder-type").await?,
+            localize!((try in locale) category::UI, "poll-builder-type").await?,
             format!("{} {}", self.kind.emoji(), self.kind.as_translation(locale).await?),
         )
         .inline();
 
         let duration_field = EmbedFieldBuilder::new(
-            localize!(async(try in locale) category::UI, "poll-builder-duration").await?,
+            localize!((try in locale) category::UI, "poll-builder-duration").await?,
             (Duration::MINUTE * self.minutes.get()).to_string(),
         )
         .inline();
@@ -182,10 +182,8 @@ impl Poll {
             inputs_text += ELLIPSIS;
         }
 
-        let inputs_field = EmbedFieldBuilder::new(
-            localize!(async(try in locale) category::UI, "poll-builder-inputs").await?,
-            inputs_text,
-        );
+        let inputs_field =
+            EmbedFieldBuilder::new(localize!((try in locale) category::UI, "poll-builder-inputs").await?, inputs_text);
 
         embed = embed.field(type_field).field(duration_field).field(inputs_field);
 
@@ -239,7 +237,7 @@ impl Poll {
             locale: Option<Locale>,
         ) -> Result<Component> {
             let key = format!("{}-builder-{name}", entry.name);
-            let label = localize!(async(try in locale) category::UI_BUTTON, key).await?;
+            let label = localize!((try in locale) category::UI_BUTTON, key).await?;
             let id = entry.id(name)?.with_str(this.guild_id.to_string())?.with_str(this.user_id.to_string())?;
 
             Ok(ButtonBuilder::new(style).label(label)?.emoji(emoji)?.custom_id(id)?.disabled(disabled).build().into())

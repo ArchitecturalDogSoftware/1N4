@@ -75,7 +75,7 @@ async fn on_command<'ap: 'ev, 'ev>(
 
     context.api.client.create_message(channel.id).content(&message.join(" ")).await?;
 
-    let done = localize!(async(try in locale) category::UI, "echo-done").await?;
+    let done = localize!((try in locale) category::UI, "echo-done").await?;
 
     context.text(done, Visibility::Ephemeral).await?;
 

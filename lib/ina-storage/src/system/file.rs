@@ -16,69 +16,48 @@
 
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::sync::Arc;
-
-use tokio::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use super::{DataReader, DataSystem, DataWriter};
 
 /// The global instance of the file system.
-static INSTANCE: RwLock<FileSystem> = RwLock::const_new(FileSystem);
+static INSTANCE: RwLock<FileSystem> = RwLock::new(FileSystem);
 
 /// A file-based data storage system.
 #[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSystem;
 
+#[expect(clippy::expect_used, reason = "a lock being poisoned means that there is potentially invalid state")]
 impl DataSystem for FileSystem {
-    fn blocking_get() -> impl Deref<Target = Self> {
-        INSTANCE.blocking_read()
+    fn get() -> impl Deref<Target = Self> {
+        INSTANCE.read().expect("the lock has been poisoned")
     }
 
-    async fn get() -> impl Deref<Target = Self> {
-        INSTANCE.read().await
-    }
-
-    fn blocking_get_mut() -> impl DerefMut<Target = Self> {
-        INSTANCE.blocking_write()
-    }
-
-    async fn get_mut() -> impl DerefMut<Target = Self> {
-        INSTANCE.write().await
+    fn get_mut() -> impl DerefMut<Target = Self> {
+        INSTANCE.write().expect("the lock has been poisoned")
     }
 }
 
 impl DataReader for FileSystem {
     type Error = std::io::Error;
 
-    fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
+    fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
         std::fs::exists(path)
     }
 
-    async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        tokio::fs::try_exists(path).await
-    }
-
-    fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
+    fn size(&self, path: &Path) -> Result<u64, Self::Error> {
         Ok(std::fs::metadata(path)?.len())
     }
 
-    async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
-        Ok(tokio::fs::metadata(path).await?.len())
-    }
-
-    fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
+    fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         Ok(std::fs::read(path)?.into())
-    }
-
-    async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        Ok(tokio::fs::read(path).await?.into())
     }
 }
 
 impl DataWriter for FileSystem {
     type Error = std::io::Error;
 
-    fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         if let Some(path) = path.parent() {
             std::fs::create_dir_all(path)?;
         }
@@ -86,15 +65,7 @@ impl DataWriter for FileSystem {
         std::fs::write(path, bytes)
     }
 
-    async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        if let Some(path) = path.parent() {
-            tokio::fs::create_dir_all(path).await?;
-        }
-
-        tokio::fs::write(path, bytes).await
-    }
-
-    fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
+    fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         if let Some(path) = into.parent() {
             std::fs::create_dir_all(path)?;
         }
@@ -102,23 +73,7 @@ impl DataWriter for FileSystem {
         std::fs::rename(from, into)
     }
 
-    async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        if let Some(path) = into.parent() {
-            tokio::fs::create_dir_all(path).await?;
-        }
-
-        tokio::fs::rename(from, into).await
-    }
-
-    fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
+    fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         if std::fs::metadata(path)?.is_dir() { std::fs::remove_dir_all(path) } else { std::fs::remove_file(path) }
-    }
-
-    async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        if tokio::fs::metadata(path).await?.is_dir() {
-            tokio::fs::remove_dir_all(path).await
-        } else {
-            tokio::fs::remove_file(path).await
-        }
     }
 }

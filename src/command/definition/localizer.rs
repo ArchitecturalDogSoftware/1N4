@@ -82,17 +82,17 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    info!(async "reloading localization thread").await?;
+    info!("reloading localization thread").await?;
 
     // Do we want to clear here? It may cause concurrent commands to fail to localize.
     ina_localizing::thread::clear(None::<[_; 0]>).await?;
 
     let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
 
-    info!(async "loaded {loaded_locales} localization locales").await?;
+    info!("loaded {loaded_locales} localization locales").await?;
 
-    let title = localize!(async(try in locale) category::UI, "localizer-reloaded").await?;
-    let locales = localize!(async(try in locale) category::UI, "localizer-locales").await?;
+    let title = localize!((try in locale) category::UI, "localizer-reloaded").await?;
+    let locales = localize!((try in locale) category::UI, "localizer-locales").await?;
 
     let list = ina_localizing::thread::list().await?;
     let list = list.iter().map(|l| format!("`{l}`"));
@@ -126,16 +126,16 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
 
     let translated = if let Ok(locale_str) = resolver.string("locale") {
         let Ok(locale) = locale_str.parse::<Locale>() else {
-            let title = localize!(async(try in locale) category::UI, "localize-unknown").await?;
+            let title = localize!((try in locale) category::UI, "localize-unknown").await?;
 
             context.failure_message(title, Some(format!("`{locale_str}`"))).await?;
 
             return crate::client::event::pass();
         };
 
-        localize!(async(in locale) category, key).await?
+        localize!((in locale) category, key).await?
     } else {
-        localize!(async(try in locale) category, key).await?
+        localize!((try in locale) category, key).await?
     };
 
     context.text(format!("`{category}::{key}`\n\n{translated}"), Visibility::Ephemeral).await?;
@@ -168,7 +168,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
             self::on_key_autocomplete(locale, category, current).await
         }
         option => {
-            warn!(async "unknown option '{option}'").await?;
+            warn!("unknown option '{option}'").await?;
 
             Ok(Box::new([]))
         }

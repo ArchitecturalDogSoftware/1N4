@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -14,570 +14,575 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+//! Allows join handles to be easily stored as static variables.
+
+use std::sync::OnceLock;
+
 use tokio::sync::{RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::Handle;
-use crate::joining::Joining;
+/// An error that may be returned when interacting with static thread handles.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum Error<H> {
+    /// The thread has been initialized.
+    #[error("the thread handle has been initialized")]
+    Initialized(H),
+    /// The thread has not been initialized.
+    #[error("the thread handle has not been initialized")]
+    Uninitialized,
+}
 
-/// A thread handle that can be stored within a static variable.
+/// A thread handle that can be stored as a static variable.
 #[derive(Debug, Default)]
 pub struct Static<H> {
     /// The inner thread handle.
-    inner: RwLock<Option<H>>,
+    handle: RwLock<OnceLock<H>>,
 }
 
 impl<H> Static<H> {
-    /// Creates a new [`Static<H>`].
+    /// Creates a new uninitialized static thread handle.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use ina_threading::{Handle, Thread};
+    /// # use ina_threading::JoinHandle;
     /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<u8>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Thread::spawn("worker", || 2 + 2)?);
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    ///
-    /// let thread = THREAD.sync_api().take().unwrap().into_join_handle();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
-    /// assert_eq!(thread.join().unwrap(), 4);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub const fn new() -> Self {
-        Self { inner: RwLock::const_new(None) }
-    }
-
-    /// Creates a new [`Static<H>`] containing the given handle.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::{Handle, Thread};
-    /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let thread = Static::wrap(Thread::spawn("worker", || 2 + 2)?);
-    ///
-    /// assert!(thread.sync_api().is_initialized());
-    ///
-    /// let actual_thread = thread.sync_api().take().unwrap();
-    ///
-    /// assert!(!thread.sync_api().is_initialized());
-    ///
-    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
-    /// assert_eq!(actual_thread.into_join_handle().join().unwrap(), 4);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub const fn wrap(handle: H) -> Self {
-        Self { inner: RwLock::const_new(Some(handle)) }
-    }
-
-    /// Returns an asynchronous API for this [`Static<H>`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
+    /// #
     /// # #[tokio::main]
     /// # async fn main() {
-    /// static THREAD: Static<Thread<u8>> = Static::new();
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
     ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// assert!(HANDLE.is_uninitialized().await);
     /// # }
     /// ```
-    pub const fn async_api(&self) -> AsyncStaticApi<'_, H>
-    where
-        H: Send + Sync,
-    {
-        AsyncStaticApi { inner: &self.inner }
-    }
-
-    /// Returns a synchronous API for this [`Static<H>`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// static THREAD: Static<Thread<u8>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    /// ```
-    pub const fn sync_api(&self) -> SyncStaticApi<'_, H> {
-        SyncStaticApi { inner: &self.inner }
-    }
-}
-
-/// A joining thread handle that can be stored within a static variable.
-#[derive(Default)]
-pub struct StaticJoining<H>
-where
-    H: Handle,
-{
-    /// The inner thread handle.
-    inner: RwLock<Option<Joining<H>>>,
-}
-
-impl<H> StaticJoining<H>
-where
-    H: Handle,
-{
-    /// Creates a new [`StaticJoining<H>`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::{Handle, Thread};
-    /// # use ina_threading::joining::Joining;
-    /// # use ina_threading::statics::StaticJoining;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: StaticJoining<Thread<()>> = StaticJoining::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Joining::new(Thread::spawn("worker", || {})?));
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().close();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    /// # Ok(())
-    /// # }
-    /// ```
+    #[inline]
+    #[must_use]
     pub const fn new() -> Self {
-        Self { inner: RwLock::const_new(None) }
+        Self { handle: RwLock::const_new(OnceLock::new()) }
     }
 
-    /// Creates a new [`StaticJoining<H>`] containing the given handle.
+    /// Returns `true` if the inner thread has been initialized.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use ina_threading::{Handle, Thread};
-    /// # use ina_threading::joining::Joining;
-    /// # use ina_threading::statics::StaticJoining;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let joining = Joining::new(Thread::spawn("worker", || {})?);
-    /// let thread = StaticJoining::wrap(joining);
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::Static;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
     ///
-    /// assert!(thread.sync_api().is_initialized());
+    /// HANDLE.initialize(JoinHandle::spawn(|| ())?).await.unwrap();
     ///
-    /// thread.sync_api().close();
-    ///
-    /// assert!(!thread.sync_api().is_initialized());
+    /// assert!(HANDLE.is_initialized().await);
+    /// # HANDLE.uninitialize().await.unwrap().into_join_handle().join().unwrap();
     /// # Ok(())
     /// # }
     /// ```
-    pub const fn wrap(handle: Joining<H>) -> Self {
-        Self { inner: RwLock::const_new(Some(handle)) }
-    }
-
-    /// Returns an asynchronous API for this [`StaticJoining<H>`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::StaticJoining;
-    /// # #[tokio::main]
-    /// # async fn main() {
-    /// static THREAD: StaticJoining<Thread<u8>> = StaticJoining::new();
-    ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
-    /// # }
-    /// ```
-    pub const fn async_api(&self) -> AsyncStaticApi<'_, Joining<H>>
+    #[inline]
+    pub async fn is_initialized(&self) -> bool
     where
-        H: Send + Sync,
+        H: Sync,
     {
-        AsyncStaticApi { inner: &self.inner }
+        self.handle.read().await.get().is_some()
     }
 
-    /// Returns a synchronous API for this [`StaticJoining<H>`].
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::StaticJoining;
-    /// static THREAD: StaticJoining<Thread<u8>> = StaticJoining::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    /// ```
-    pub const fn sync_api(&self) -> SyncStaticApi<'_, Joining<H>> {
-        SyncStaticApi { inner: &self.inner }
-    }
-}
-
-/// An API for a static thread that provides its functionality through asynchronous calls.
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug)]
-pub struct AsyncStaticApi<'sth, H>
-where
-    H: Send + Sync,
-{
-    /// The inner lock.
-    inner: &'sth RwLock<Option<H>>,
-}
-
-#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
-impl<H> AsyncStaticApi<'_, H>
-where
-    H: Send + Sync,
-{
-    /// Returns whether the inner thread handle has been initialized.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # #[tokio::main]
-    /// # async fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn is_initialized(&self) -> bool {
-        self.inner.read().await.is_some()
-    }
-
-    /// Initializes the thread.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # #[tokio::main]
-    /// # async fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
-    ///
-    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
-    ///
-    /// assert!(THREAD.async_api().is_initialized().await);
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// Returns `true` if the inner thread has been initialized.
     ///
     /// # Panics
     ///
-    /// Panics if the thread is already initialized.
-    pub async fn initialize(&self, handle: H) {
-        assert!(!self.is_initialized().await, "the thread is already initialized");
-
-        *self.inner.write().await = Some(handle);
-    }
-
-    /// Closes the thread.
+    /// This function will panic if called from within an asynchronous context.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use ina_threading::Thread;
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
     /// # use ina_threading::statics::Static;
-    /// # #[tokio::main]
-    /// # async fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
     ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// HANDLE.blocking_initialize(JoinHandle::spawn(|| ())?).unwrap();
     ///
-    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
-    ///
-    /// assert!(THREAD.async_api().is_initialized().await);
-    ///
-    /// THREAD.async_api().close().await;
-    ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// assert!(HANDLE.blocking_is_initialized());
+    /// # HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
     /// # Ok(())
     /// # }
     /// ```
+    #[inline]
+    pub fn blocking_is_initialized(&self) -> bool
+    where
+        H: Sync,
+    {
+        self.handle.blocking_read().get().is_some()
+    }
+
+    /// Returns `true` if the inner thread is uninitialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(HANDLE.is_uninitialized().await);
+    /// # }
+    /// ```
+    #[inline]
+    pub async fn is_uninitialized(&self) -> bool
+    where
+        H: Sync,
+    {
+        self.handle.read().await.get().is_none()
+    }
+
+    /// Returns `true` if the inner thread is uninitialized.
     ///
     /// # Panics
     ///
-    /// Panics if the thread has not been initialized.
-    pub async fn close(&self) {
-        self.inner.write().await.take().expect("the thread has not been initialized");
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(HANDLE.blocking_is_uninitialized());
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_is_uninitialized(&self) -> bool
+    where
+        H: Sync,
+    {
+        self.handle.blocking_read().get().is_none()
+    }
+
+    /// Initializes the inner thread handle.
+    ///
+    /// # Errors
+    ///
+    /// This function will return the provided handle if the thread has already been initialized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.initialize(JoinHandle::spawn(|| ())?).await.unwrap();
+    ///
+    /// assert!(HANDLE.is_initialized().await);
+    /// # HANDLE.uninitialize().await.unwrap().into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub async fn initialize(&self, handle: H) -> Result<(), Error<H>>
+    where
+        H: Sync,
+    {
+        self.handle.write().await.set(handle).map_err(Error::Initialized)
+    }
+
+    /// Initializes the inner thread handle.
+    ///
+    /// # Errors
+    ///
+    /// This function will return the provided handle if the thread has already been initialized.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.blocking_initialize(JoinHandle::spawn(|| ())?).unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_initialized());
+    /// # HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_initialize(&self, handle: H) -> Result<(), Error<H>>
+    where
+        H: Sync,
+    {
+        self.handle.blocking_write().set(handle).map_err(Error::Initialized)
+    }
+
+    /// Uninitializes the inner thread handle, returning it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.initialize(JoinHandle::spawn(|| ())?).await.unwrap();
+    ///
+    /// assert!(HANDLE.is_initialized().await);
+    ///
+    /// HANDLE.uninitialize().await.unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert!(HANDLE.is_uninitialized().await);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub async fn uninitialize(&self) -> Option<H>
+    where
+        H: Sync,
+    {
+        self.handle.write().await.take()
+    }
+
+    /// Uninitializes the inner thread handle, returning it.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use ina_threading::{JoinHandle, JoinHandleWrapper};
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// HANDLE.blocking_initialize(JoinHandle::spawn(|| ())?).unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_initialized());
+    ///
+    /// HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert!(HANDLE.blocking_is_uninitialized());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_uninitialize(&self) -> Option<H>
+    where
+        H: Sync,
+    {
+        self.handle.blocking_write().take()
     }
 
     /// Returns a reference to the inner thread handle.
     ///
+    /// # Errors
+    ///
+    /// This function will return an error if the inner thread handle has not been initialized.
+    ///
     /// # Examples
     ///
+    /// Calling `.try_get()` on an uninitialized handle will always return an error.
+    ///
     /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
     /// # #[tokio::main]
-    /// # async fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
+    /// # async fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
     ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
-    ///
-    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
-    ///
-    /// assert!(THREAD.async_api().is_initialized().await);
-    ///
-    /// THREAD.async_api().get().await;
-    ///
-    /// assert!(THREAD.async_api().is_initialized().await);
-    /// # Ok(())
+    /// assert!(HANDLE.try_get().await.is_err_and(|error| matches!(error, Error::Uninitialized)));
     /// # }
     /// ```
     ///
-    /// # Panics
-    ///
-    /// Panics if the thread has not been initialized.
-    pub async fn get(&self) -> RwLockReadGuard<'_, H> {
-        RwLockReadGuard::map(self.inner.read().await, |v| v.as_ref().expect("the thread has not been initialized"))
-    }
-
-    /// Returns a mutable reference to the inner thread handle.
-    ///
-    /// # Examples
+    /// Calling `.try_get()` on an initialized handle will give you a guard that dereferences into the inner handle
+    /// type.
     ///
     /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
     /// # #[tokio::main]
-    /// # async fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
+    /// # async fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<ConsumerJoinHandle<u8, u8>> = Static::new();
     ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let handle = ConsumerJoinHandle::<u8, u8>::spawn(capacity, |mut receiver| {
+    ///     receiver.blocking_recv().unwrap().wrapping_pow(2)
+    /// })?;
     ///
-    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
+    /// HANDLE.initialize(handle).await.unwrap();
     ///
-    /// assert!(THREAD.async_api().is_initialized().await);
+    /// let read_guard = HANDLE.try_get().await.unwrap();
     ///
-    /// THREAD.async_api().get_mut().await;
+    /// read_guard.sender().send(8).await.unwrap();
     ///
-    /// assert!(THREAD.async_api().is_initialized().await);
+    /// drop(read_guard);
+    ///
+    /// let result = HANDLE.uninitialize().await.unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert_eq!(result, 64);
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if the thread has not been initialized.
-    pub async fn get_mut(&self) -> RwLockMappedWriteGuard<'_, H> {
-        RwLockWriteGuard::map(self.inner.write().await, |v| v.as_mut().expect("the thread has not been initialized"))
-    }
+    #[inline]
+    pub async fn try_get(&self) -> Result<RwLockReadGuard<'_, H>, Error<H>>
+    where
+        H: Sync,
+    {
+        let guard = self.handle.read().await;
 
-    /// Returns the inner thread handle, if it has been initialized.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # #[tokio::main]
-    /// # async fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
-    ///
-    /// THREAD.async_api().initialize(Thread::spawn("worker", || {})?).await;
-    ///
-    /// assert!(THREAD.async_api().is_initialized().await);
-    ///
-    /// let _thread = THREAD.async_api().take().await.unwrap();
-    ///
-    /// assert!(!THREAD.async_api().is_initialized().await);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn take(&self) -> Option<H> {
-        self.inner.write().await.take()
-    }
-}
-
-/// An API for a static thread that provides its functionality through synchronous calls.
-#[repr(transparent)]
-#[derive(Clone, Copy, Debug)]
-pub struct SyncStaticApi<'sth, H> {
-    /// The inner lock.
-    inner: &'sth RwLock<Option<H>>,
-}
-
-#[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
-impl<H> SyncStaticApi<'_, H> {
-    /// Returns whether the inner thread handle has been initialized.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    /// ```
-    #[must_use]
-    pub fn is_initialized(&self) -> bool {
-        self.inner.blocking_read().is_some()
-    }
-
-    /// Initializes the thread.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if the thread is already initialized or this is called from within an asynchronous context.
-    pub fn initialize(&self, handle: H) {
-        assert!(!self.is_initialized(), "the thread is already initialized");
-
-        *self.inner.blocking_write() = Some(handle);
-    }
-
-    /// Closes the thread.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().close();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    /// # Ok(())
-    /// # }
-    /// ```
-    ///
-    /// # Panics
-    ///
-    /// Panics if the thread has not been initialized.
-    pub fn close(&self) {
-        self.inner.blocking_write().take().expect("the thread has not been initialized");
+        if guard.get().is_some() {
+            // The `.wait` call will never block because the handle is guaranteed to be present.
+            Ok(RwLockReadGuard::map(guard, |lock| lock.wait()))
+        } else {
+            Err(Error::Uninitialized)
+        }
     }
 
     /// Returns a reference to the inner thread handle.
     ///
-    /// # Examples
+    /// # Errors
     ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().get();
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// This function will return an error if the inner thread handle has not been initialized.
     ///
     /// # Panics
     ///
-    /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
-    pub fn get(&self) -> RwLockReadGuard<'_, H> {
-        RwLockReadGuard::map(self.inner.blocking_read(), |v| v.as_ref().expect("the thread has not been initialized"))
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// Calling `.blocking_try_get()` on an uninitialized handle will always return an error.
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(HANDLE.blocking_try_get().is_err_and(|error| matches!(error, Error::Uninitialized)));
+    /// # }
+    /// ```
+    ///
+    /// Calling `.blocking_try_get()` on an initialized handle will give you a guard that dereferences into the inner
+    /// handle type.
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<ConsumerJoinHandle<u8, u8>> = Static::new();
+    ///
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let handle = ConsumerJoinHandle::<u8, u8>::spawn(capacity, |mut receiver| {
+    ///     receiver.blocking_recv().unwrap().wrapping_pow(2)
+    /// })?;
+    ///
+    /// HANDLE.blocking_initialize(handle).unwrap();
+    ///
+    /// let read_guard = HANDLE.blocking_try_get().unwrap();
+    ///
+    /// read_guard.sender().blocking_send(8).unwrap();
+    ///
+    /// drop(read_guard);
+    ///
+    /// let result = HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert_eq!(result, 64);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_try_get(&self) -> Result<RwLockReadGuard<'_, H>, Error<H>>
+    where
+        H: Sync,
+    {
+        let guard = self.handle.blocking_read();
+
+        if guard.get().is_some() {
+            // The `.wait` call will never block because the handle is guaranteed to be present.
+            Ok(RwLockReadGuard::map(guard, |lock| lock.wait()))
+        } else {
+            Err(Error::Uninitialized)
+        }
     }
 
-    /// Returns a mutable reference to the inner thread handle.
+    /// Returns a reference to the inner thread handle.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the inner thread handle has not been initialized.
     ///
     /// # Examples
     ///
+    /// Calling `.try_get_mut()` on an uninitialized handle will always return an error.
+    ///
     /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
     ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().get_mut();
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    /// # Ok(())
+    /// assert!(HANDLE.try_get_mut().await.is_err_and(|error| matches!(error, Error::Uninitialized)));
     /// # }
     /// ```
     ///
-    /// # Panics
+    /// Calling `.try_get_mut()` on an initialized handle will give you a guard that dereferences into the inner handle
+    /// type.
     ///
-    /// Panics if the thread has not been initialized or this is called from within an asynchronous context.
-    #[must_use]
-    pub fn get_mut(&self) -> RwLockMappedWriteGuard<'_, H> {
-        RwLockWriteGuard::map(self.inner.blocking_write(), |v| v.as_mut().expect("the thread has not been initialized"))
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<ConsumerJoinHandle<u8, u8>> = Static::new();
+    ///
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let handle = ConsumerJoinHandle::<u8, u8>::spawn(capacity, |mut receiver| {
+    ///     receiver.blocking_recv().unwrap().wrapping_pow(2)
+    /// })?;
+    ///
+    /// HANDLE.initialize(handle).await.unwrap();
+    ///
+    /// let write_guard = HANDLE.try_get_mut().await.unwrap();
+    ///
+    /// write_guard.sender().send(8).await.unwrap();
+    ///
+    /// drop(write_guard);
+    ///
+    /// let result = HANDLE.uninitialize().await.unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert_eq!(result, 64);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub async fn try_get_mut(&self) -> Result<RwLockMappedWriteGuard<'_, H>, Error<H>>
+    where
+        H: Sync,
+    {
+        let guard = self.handle.write().await;
+
+        if guard.get().is_some() {
+            Ok(RwLockWriteGuard::map(guard, |lock: &mut OnceLock<H>| {
+                lock.get_mut().unwrap_or_else(|| {
+                    unreachable!("the lock is guaranteed to be initialized at this point");
+                })
+            }))
+        } else {
+            Err(Error::Uninitialized)
+        }
     }
 
-    /// Returns the inner thread handle, if it has been initialized.
+    /// Returns a reference to the inner thread handle.
     ///
-    /// # Examples
+    /// # Errors
     ///
-    /// ```
-    /// # use ina_threading::Thread;
-    /// # use ina_threading::statics::Static;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// static THREAD: Static<Thread<()>> = Static::new();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    ///
-    /// THREAD.sync_api().initialize(Thread::spawn("worker", || {})?);
-    ///
-    /// assert!(THREAD.sync_api().is_initialized());
-    ///
-    /// let _thread = THREAD.sync_api().take().unwrap();
-    ///
-    /// assert!(!THREAD.sync_api().is_initialized());
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// This function will return an error if the inner thread handle has not been initialized.
     ///
     /// # Panics
     ///
-    /// Panics if this is called from within an asynchronous context.
-    #[must_use]
-    pub fn take(&self) -> Option<H> {
-        self.inner.blocking_write().take()
+    /// This function will panic if called from within an asynchronous context.
+    ///
+    /// # Examples
+    ///
+    /// Calling `.blocking_try_get_mut()` on an uninitialized handle will always return an error.
+    ///
+    /// ```
+    /// # use ina_threading::JoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() {
+    /// static HANDLE: Static<JoinHandle<()>> = Static::new();
+    ///
+    /// assert!(
+    ///     HANDLE.blocking_try_get_mut().is_err_and(|error| matches!(error, Error::Uninitialized))
+    /// );
+    /// # }
+    /// ```
+    ///
+    /// Calling `.blocking_try_get_mut()` on an initialized handle will give you a guard that dereferences into the
+    /// inner handle type.
+    ///
+    /// ```
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use ina_threading::statics::{Error, Static};
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// static HANDLE: Static<ConsumerJoinHandle<u8, u8>> = Static::new();
+    ///
+    /// let capacity = NonZero::new(1).unwrap();
+    /// let handle = ConsumerJoinHandle::<u8, u8>::spawn(capacity, |mut receiver| {
+    ///     receiver.blocking_recv().unwrap().wrapping_pow(2)
+    /// })?;
+    ///
+    /// HANDLE.blocking_initialize(handle).unwrap();
+    ///
+    /// let write_guard = HANDLE.blocking_try_get_mut().unwrap();
+    ///
+    /// write_guard.sender().blocking_send(8).unwrap();
+    ///
+    /// drop(write_guard);
+    ///
+    /// let result = HANDLE.blocking_uninitialize().unwrap().into_join_handle().join().unwrap();
+    ///
+    /// assert_eq!(result, 64);
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[inline]
+    pub fn blocking_try_get_mut(&self) -> Result<RwLockMappedWriteGuard<'_, H>, Error<H>>
+    where
+        H: Sync,
+    {
+        let guard = self.handle.blocking_write();
+
+        if guard.get().is_some() {
+            Ok(RwLockWriteGuard::map(guard, |lock: &mut OnceLock<H>| {
+                lock.get_mut().unwrap_or_else(|| {
+                    unreachable!("the lock is guaranteed to be initialized at this point");
+                })
+            }))
+        } else {
+            Err(Error::Uninitialized)
+        }
     }
 }

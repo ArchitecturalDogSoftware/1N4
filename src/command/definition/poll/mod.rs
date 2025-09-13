@@ -110,13 +110,13 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     let mut modal = ModalDataBuilder::new(
         entry.id("create")?.with_str(kind.to_string())?.with_str(duration.to_string())?,
-        localize!(async(try in locale) category::UI, "poll-create-title").await?,
+        localize!((try in locale) category::UI, "poll-create-title").await?,
     )?;
 
     modal.input(
         TextInputBuilder::new(
             entry.id("title")?,
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-title").await?,
+            localize!((try in locale) category::UI_INPUT, "poll-create-title").await?,
             TextInputStyle::Short,
         )?
         .min_length(1)?
@@ -127,7 +127,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     modal.input(
         TextInputBuilder::new(
             entry.id("image_url")?,
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-image").await?,
+            localize!((try in locale) category::UI_INPUT, "poll-create-image").await?,
             TextInputStyle::Short,
         )?
         .required(false),
@@ -136,7 +136,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     modal.input(
         TextInputBuilder::new(
             entry.id("description")?,
-            localize!(async(try in locale) category::UI_INPUT, "poll-create-description").await?,
+            localize!((try in locale) category::UI_INPUT, "poll-create-description").await?,
             TextInputStyle::Paragraph,
         )?
         .max_length(u16::try_from(DESCRIPTION_LENGTH / 2)?)?
@@ -191,7 +191,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
     };
 
     if let Some(Err(error)) = image_url.map(ImageSource::url) {
-        let error_title = localize!(async(try in locale) category::UI, "poll-invalid-url").await?;
+        let error_title = localize!((try in locale) category::UI, "poll-invalid-url").await?;
 
         context.failure_message(error_title, Some(format!("> {error}"))).await?;
 
@@ -209,7 +209,7 @@ async fn on_create_modal<'ap: 'ev, 'ev>(
         state: PollState::Builder { inputs: Vec::new() },
     };
 
-    poll.as_async_api().write().await?;
+    poll.as_storage_api().write().await?;
 
     let (embed, components) = poll.build(entry, locale, user, None).await?;
 

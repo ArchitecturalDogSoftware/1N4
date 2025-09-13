@@ -189,7 +189,7 @@ pub async fn initialize() -> Result<()> {
 
     drop(registry);
 
-    info!(async "initialized command registry").await.map_err(Into::into)
+    info!("initialized command registry").await.map_err(Into::into)
 }
 
 /// Creates a module that contains command definitions.
@@ -292,7 +292,7 @@ macro_rules! define_entry {
                 let localizer_name_key = ::std::format!("{}-name", entry.name);
                 let localizer_description_key = ::std::format!("{}-description", entry.name);
 
-                let localized_name = ::ina_localizing::localize!(async $crate::utility::category::COMMAND, &(*localizer_description_key)).await?;
+                let localized_name = ::ina_localizing::localize!($crate::utility::category::COMMAND, &(*localizer_description_key)).await?;
                 let mut builder = ::twilight_util::builder::command::CommandBuilder::new(entry.name, localized_name, $type);
 
                 $(builder = builder.contexts($contexts);)?
@@ -308,8 +308,8 @@ macro_rules! define_entry {
                 let mut localized_descriptions = ::std::vec::Vec::with_capacity(locales.len());
 
                 for locale in &locales {
-                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) $crate::utility::category::COMMAND, &(*localizer_name_key)).await?);
-                    let description = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) $crate::utility::category::COMMAND, &(*localizer_description_key)).await?);
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) $crate::utility::category::COMMAND, &(*localizer_name_key)).await?);
+                    let description = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) $crate::utility::category::COMMAND, &(*localizer_description_key)).await?);
 
                     localized_names.push((<_ as ::std::string::ToString>::to_string(locale), name));
                     localized_descriptions.push((<_ as ::std::string::ToString>::to_string(locale), description));
@@ -436,8 +436,8 @@ macro_rules! define_entry {
         let mut localized_descriptions = ::std::vec::Vec::with_capacity($locales.len());
 
         for locale in $locales {
-            let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) $crate::utility::category::COMMAND_OPTION, &(*localizer_name_key)).await?);
-            let description = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) $crate::utility::category::COMMAND_OPTION, &(*localizer_description_key)).await?);
+            let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) $crate::utility::category::COMMAND_OPTION, &(*localizer_name_key)).await?);
+            let description = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) $crate::utility::category::COMMAND_OPTION, &(*localizer_description_key)).await?);
 
             localized_names.push((<_ as ::std::string::ToString>::to_string(locale), name));
             localized_descriptions.push((<_ as ::std::string::ToString>::to_string(locale), description));
@@ -453,7 +453,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::AttachmentBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -462,7 +462,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::BooleanBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -472,7 +472,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::ChannelBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.channel_types($channel_types))?
@@ -486,7 +486,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::IntegerBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.autocomplete($autocomplete))?
@@ -499,7 +499,7 @@ macro_rules! define_entry {
                 let mut localized = ::std::vec::Vec::with_capacity($locales.len());
 
                 for locale in $locales {
-                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) $crate::utility::category::COMMAND_CHOICE, &(*localizer_key)).await?);
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) $crate::utility::category::COMMAND_CHOICE, &(*localizer_key)).await?);
 
                     localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
                 }
@@ -513,7 +513,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::MentionableBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -526,7 +526,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::NumberBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.autocomplete($autocomplete))?
@@ -539,7 +539,7 @@ macro_rules! define_entry {
                 let mut localized = ::std::vec::Vec::with_capacity($locales.len());
 
                 for locale in $locales {
-                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) "choice", &(*localizer_key)).await?);
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) "choice", &(*localizer_key)).await?);
 
                     localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
                 }
@@ -553,7 +553,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::RoleBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};
@@ -566,7 +566,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::StringBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
         $(.autocomplete($autocomplete))?
@@ -579,7 +579,7 @@ macro_rules! define_entry {
                 let mut localized = ::std::vec::Vec::with_capacity($locales.len());
 
                 for locale in $locales {
-                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!(async(in *locale) "choice", &(*localizer_key)).await?);
+                    let name = <_ as ::std::string::ToString>::to_string(&::ina_localizing::localize!((in *locale) "choice", &(*localizer_key)).await?);
 
                     localized.push((<_ as ::std::string::ToString>::to_string(locale), name));
                 }
@@ -593,7 +593,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::SubCommandBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.option($crate::define_entry!(@option($entry, $option_name, $option_kind, $locales, { $($body)* }))))*
     }};
@@ -602,7 +602,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::SubCommandGroupBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         .subcommands([$($crate::define_entry!(@option($entry, $option_name, $option_kind, $locales, { $($body)* }))),*])
     }};
@@ -611,7 +611,7 @@ macro_rules! define_entry {
     })) => {{
         ::twilight_util::builder::command::UserBuilder::new(
             $name,
-            ::ina_localizing::localize!(async $crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
+            ::ina_localizing::localize!($crate::utility::category::COMMAND_OPTION, $name_key.as_str()).await?
         )
         $(.required($required))?
     }};

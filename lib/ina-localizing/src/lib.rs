@@ -22,17 +22,16 @@ use std::collections::hash_map::Keys;
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use ina_logging::warn;
-use ina_threading::threads::invoker::{CallError, Stateful};
 use serde::{Deserialize, Serialize};
 use text::Text;
-use thread::{Request, Response};
-use tokio::sync::RwLock;
+use tokio::runtime::Handle;
 
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
+use crate::thread::{JoinHandle, Request, Response};
 
 /// Defines the format for locales.
 pub mod locale;
@@ -74,12 +73,12 @@ pub enum Error {
     /// A TOML deserialization error.
     #[error(transparent)]
     Toml(#[from] toml::de::Error),
-    /// An error from spawning the thread.
+    /// An error related to the static thread handle.
     #[error(transparent)]
-    ThreadSpawn(#[from] ina_threading::Error),
-    /// An error from calling a function on the thread.
+    Thread(#[from] ina_threading::statics::Error<JoinHandle>),
+    /// An error from invoking a thread function.
     #[error(transparent)]
-    ThreadCall(#[from] CallError<Stateful<RwLock<Localizer>, Request>, Response>),
+    ThreadInvoke(#[from] ina_threading::threads::callable::Error<(Arc<RwLock<Localizer>>, Request), Response>),
     /// An error from interacting with the logging system.
     #[error(transparent)]
     Logging(#[from] ina_logging::Error),
@@ -132,14 +131,14 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if the file does not exist or the operation fails.
-    pub async fn load_locale(&mut self, locale: Locale) -> Result<()> {
+    pub fn load_locale(&mut self, locale: Locale) -> Result<()> {
         let path = self.settings.directory.join(locale.to_string()).with_extension("toml");
 
-        if !tokio::fs::try_exists(&path).await? {
+        if !std::fs::exists(&path)? {
             return Err(Error::MissingFile(locale));
         }
 
-        let text = tokio::fs::read_to_string(path).await?;
+        let text = std::fs::read_to_string(path)?;
         let language = toml::from_str(&text)?;
 
         self.languages.insert(locale, language);
@@ -152,7 +151,7 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if a file does not exist or any of the operations fail.
-    pub async fn load_locales<I>(&mut self, locales: I) -> Result<usize>
+    pub fn load_locales<I>(&mut self, locales: I) -> Result<usize>
     where
         I: IntoIterator<Item = Locale> + Send,
         I::IntoIter: Send,
@@ -160,7 +159,7 @@ impl Localizer {
         let mut count = 0;
 
         for locale in locales {
-            self.load_locale(locale).await?;
+            self.load_locale(locale)?;
 
             count += 1;
         }
@@ -173,18 +172,18 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if the directory is missing or any of the operations fail.
-    pub async fn load_directory(&mut self) -> Result<usize> {
+    pub fn load_directory(&mut self, runtime_handle: &Handle) -> Result<usize> {
         let path = &(*self.settings.directory);
 
-        if !tokio::fs::try_exists(path).await? {
+        if !std::fs::exists(path)? {
             return Err(Error::MissingDir(path.into()));
         }
 
-        let mut iterator = tokio::fs::read_dir(path).await?;
+        let mut iterator = std::fs::read_dir(path)?;
         let mut locales = Vec::new();
 
-        while let Some(entry) = iterator.next_entry().await? {
-            let metadata = entry.metadata().await?;
+        while let Some(entry) = iterator.next().transpose()? {
+            let metadata = entry.metadata()?;
 
             if !metadata.is_file() {
                 continue;
@@ -199,11 +198,11 @@ impl Localizer {
             if let Some(locale) = name.to_str().and_then(|v| v.parse().ok()) {
                 locales.push(locale);
             } else {
-                warn!(async "invalid locale file name: {}", path.to_string_lossy()).await?;
+                runtime_handle.block_on(warn!("invalid locale file name: {}", path.to_string_lossy()))?;
             }
         }
 
-        self.load_locales(locales).await
+        self.load_locales(locales)
     }
 
     /// Returns an iterator over the keys within a specified locale's category.
@@ -332,25 +331,7 @@ where
             let category = self.localizer_category().into();
             let key = self.localizer_key().into();
 
-            Ok(localize!(async(try in locale) category, key).await?.cast_inner())
+            Ok(localize!((try in locale) category, key).await?.cast_inner())
         }
-    }
-
-    /// Fallibly localizes this value.
-    ///
-    /// This blocks the current thread.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called from within an asynchronous context.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value could not be localized.
-    fn blocking_as_translation(&self, locale: Option<Locale>) -> Result<Text<I>, Self::Error> {
-        let category = self.localizer_category().into();
-        let key = self.localizer_key().into();
-
-        Ok(localize!((try in locale) category, key)?.cast_inner())
     }
 }

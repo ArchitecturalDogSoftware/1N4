@@ -78,37 +78,37 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
         Event::Ready(event) => self::on_ready(api, *event, shard_id).await,
         Event::InteractionCreate(event) => self::on_interaction(api, *event, shard_id).await,
         Event::Resumed => {
-            debug!(async "shard #{id} successfully resumed").await?;
+            debug!("shard #{id} successfully resumed").await?;
 
             self::pass()
         }
         Event::GatewayHeartbeat(event) => {
-            debug!(async "shard #{id} received heartbeat (seq. {event})").await?;
+            debug!("shard #{id} received heartbeat (seq. {event})").await?;
 
             self::pass()
         }
         Event::GatewayHeartbeatAck => {
-            debug!(async "shard #{id} received heartbeat acknowledgement").await?;
+            debug!("shard #{id} received heartbeat acknowledgement").await?;
 
             self::pass()
         }
         Event::GatewayHello(event) => {
-            debug!(async "shard #{id} connecting to gateway ({}ms)", event.heartbeat_interval).await?;
+            debug!("shard #{id} connecting to gateway ({}ms)", event.heartbeat_interval).await?;
 
             self::pass()
         }
         Event::GatewayClose(None) => {
-            debug!(async "shard #{id} disconnected from gateway").await?;
+            debug!("shard #{id} disconnected from gateway").await?;
 
             self::pass()
         }
         Event::GatewayClose(Some(frame)) => {
-            warn!(async "shard #{id} disconnected from gateway: {}", frame.reason).await?;
+            warn!("shard #{id} disconnected from gateway: {}", frame.reason).await?;
 
             self::pass()
         }
         Event::GatewayReconnect => {
-            debug!(async "shard #{id} reconnecting to gateway").await?;
+            debug!("shard #{id} reconnecting to gateway").await?;
 
             self::pass()
         }
@@ -118,7 +118,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
     match result {
         // Capture and log errors.
         Err(error) => {
-            warn!(async "failed to handle event: {error}").await?;
+            warn!("failed to handle event: {error}").await?;
 
             self::pass()
         }
@@ -132,7 +132,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
 ///
 /// This function will return an error if the event could not be handled.
 pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult {
-    info!(async "shard #{} connected to gateway", shard_id.number()).await?;
+    info!("shard #{} connected to gateway", shard_id.number()).await?;
 
     // Only shard 0 should handle command registration.
     if shard_id.number() != 0 {
@@ -142,7 +142,7 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
     crate::command::registry::initialize().await?;
 
     if api.settings.skip_command_patch {
-        info!(async "skipping command patching").await?;
+        info!("skipping command patching").await?;
 
         return self::pass();
     }
@@ -153,14 +153,14 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
         let list = registry().await.build_and_collect::<Box<[_]>>(Some(guild_id)).await?;
         let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
 
-        info!(async "patched {} server commands", list.len()).await?;
+        info!("patched {} server commands", list.len()).await?;
     }
 
     if cfg!(not(debug_assertions)) {
         let list = registry().await.build_and_collect::<Box<[_]>>(None).await?;
         let list = client.set_global_commands(&list).await?.model().await?;
 
-        info!(async "patched {} global commands", list.len()).await?;
+        info!("patched {} global commands", list.len()).await?;
     }
 
     self::pass()
@@ -174,7 +174,7 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
 pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardId) -> EventResult {
     const TIME_WARN_THRESHOLD: Duration = Duration::seconds(1);
 
-    info!(async "shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
+    info!("shard #{} received interaction {}", shard_id.number(), event.display_label()).await?;
 
     let start_time = OffsetDateTime::now_utc();
 
@@ -189,18 +189,18 @@ pub async fn on_interaction(api: Api, event: InteractionCreate, shard_id: ShardI
     let elapsed_time = OffsetDateTime::now_utc() - start_time;
 
     if elapsed_time >= TIME_WARN_THRESHOLD {
-        warn!(async "shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
+        warn!("shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
     } else {
-        debug!(async "shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
+        debug!("shard #{} interaction took {elapsed_time}", shard_id.number()).await?;
     }
 
     // Capture errors here to prevent duplicate logging.
     if let Err(ref error) = result {
-        warn!(async "shard #{} failed interaction {} - {error}", shard_id.number(), event.display_label()).await?;
+        warn!("shard #{} failed interaction {} - {error}", shard_id.number(), event.display_label()).await?;
 
         self::on_error(api.as_ref(), &event, error).await
     } else {
-        info!(async "shard #{} succeeded interaction {}", shard_id.number(), event.display_label()).await?;
+        info!("shard #{} succeeded interaction {}", shard_id.number(), event.display_label()).await?;
 
         result
     }
@@ -323,11 +323,11 @@ pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResul
 /// This function will return an error if the logger fails to output an error log.
 pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
     if let Err(error) = self::on_error_notify_channel(api, event, error).await {
-        error!(async "failed to output error to channel: {error}").await?;
+        error!("failed to output error to channel: {error}").await?;
     }
 
     if let Err(error) = self::on_error_inform_user(api, event).await {
-        error!(async "failed to inform interaction user of error: {error}").await?;
+        error!("failed to inform interaction user of error: {error}").await?;
     }
 
     self::pass()
@@ -346,12 +346,12 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
     const MAX_DESCRIPTION_LENGTH: usize = DESCRIPTION_LENGTH - PREFIX.len() - SUFFIX.len();
 
     let Ok(channel_id) = crate::utility::secret::development_channel_id() else {
-        warn!(async "skipping channel error notification as no channel has been configured").await?;
+        warn!("skipping channel error notification as no channel has been configured").await?;
 
         return self::pass();
     };
 
-    let titles = localize!(async category::UI, "error-titles").await?.to_string();
+    let titles = localize!(category::UI, "error-titles").await?.to_string();
     let titles = titles.lines().collect::<Box<[_]>>();
     let index = rng().random_range(0 .. titles.len());
 
@@ -404,13 +404,13 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 /// This function will return an error if the author could not be notified.
 pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(user) = event.author() else {
-        info!(async "skipping user error notification as no author is present").await?;
+        info!("skipping user error notification as no author is present").await?;
 
         return self::pass();
     };
 
     if matches!(event.kind, InteractionType::ApplicationCommandAutocomplete) {
-        info!(async "skipping user error notification for autocompletion event").await?;
+        info!("skipping user error notification for autocompletion event").await?;
 
         return self::pass();
     }
@@ -421,8 +421,8 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
         Err(error) => return Err(error.into()),
     };
 
-    let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
-    let description = localize!(async(try in locale) category::UI, "error-inform-description").await?;
+    let title = localize!((try in locale) category::UI, "error-inform-title").await?;
+    let description = localize!((try in locale) category::UI, "error-inform-description").await?;
     let description = format!("{description}: `{}`", event.display_label());
     let embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(title).description(description);
 

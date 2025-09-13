@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -16,182 +16,166 @@
 
 //! Provides concurrency solutions for 1N4.
 
-use std::thread::{Builder, JoinHandle};
+use std::ops::{Deref, DerefMut};
 
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::runtime::Handle;
 
-/// Defines wrappers for join-on-drop threads.
-pub mod joining;
-/// Defines wrappers for threads that are stored statically.
+pub mod join;
 pub mod statics;
 
-/// Defines specialized thread implementations.
+/// Defines default implementations for common threading use-cases.
 pub mod threads {
-    /// Defines threads that can receive values.
+    pub mod callable;
     pub mod consumer;
-    /// Defines threads that can send and receive values.
     pub mod exchanger;
-    /// Defines threads that can be called like functions.
-    pub mod invoker;
-    /// Defines threads that can send values.
-    pub mod producer;
+    pub mod supplier;
 }
 
-/// A result alias with a defaulted error type.
-pub type Result<T, E = Error> = std::result::Result<T, E>;
+/// Represents a type that wraps a thread join handle.
+pub trait JoinHandleWrapper {
+    /// The value being returned by the handle.
+    type Output;
 
-/// An error that may occur when using this library.
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// An IO error.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    /// Returns an immutable reference to the inner join handle.
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output>;
+
+    /// Returns a mutable reference to the inner join handle.
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output>;
+
+    /// Unwraps this value into the inner join handle.
+    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output>;
 }
 
-/// A type that contains a [`JoinHandle`] that represents a possibly running thread.
-pub trait Handle {
-    /// The type that is returned when the thread is closed.
-    type Output: Send + 'static;
-
-    /// Returns a reference to the contained [`JoinHandle`].
-    fn as_join_handle(&self) -> &JoinHandle<Self::Output>;
-
-    /// Returns a mutable reference to the contained [`JoinHandle`].
-    fn as_join_handle_mut(&mut self) -> &mut JoinHandle<Self::Output>;
-
-    /// Returns the contained [`JoinHandle`], dropping this value.
-    fn into_join_handle(self) -> JoinHandle<Self::Output>;
-}
-
-/// A [`Handle`] type where the running thread may receive values through a [`Sender<T>`].
-pub trait SenderHandle<T>
-where
-    Self: Handle,
-    T: Send + 'static,
-{
-    /// Returns a reference to the contained [`Sender<T>`].
-    fn as_sender(&self) -> &Sender<T>;
-
-    /// Returns a mutable reference to the contained [`Sender<T>`].
-    fn as_sender_mut(&mut self) -> &mut Sender<T>;
-
-    /// Returns the contained [`Sender<T>`], dropping this value.
-    fn into_sender(self) -> Sender<T>;
-}
-
-/// A [`Handle`] type where the running thread may send values through a [`Receiver<T>`].
-pub trait ReceiverHandle<T>
-where
-    Self: Handle,
-    T: Send + 'static,
-{
-    /// Returns a reference to the contained [`Receiver<T>`].
-    fn as_receiver(&self) -> &Receiver<T>;
-
-    /// Returns a mutable reference to the contained [`Receiver<T>`].
-    fn as_receiver_mut(&mut self) -> &mut Receiver<T>;
-
-    /// Returns the contained [`Receiver<T>`], dropping this value.
-    fn into_receiver(self) -> Receiver<T>;
-}
-
-/// A simple thread with an associated handle.
+/// A wrapper around the standard library's thread join handle type.
 #[repr(transparent)]
 #[derive(Debug)]
-pub struct Thread<T> {
-    /// The inner [`JoinHandle<T>`].
-    inner: JoinHandle<T>,
-}
+pub struct JoinHandle<T>(std::thread::JoinHandle<T>);
 
-impl<T> Thread<T>
-where
-    T: Send + 'static,
-{
-    /// Spawns a new [`Thread`] with the given name and task.
+impl<T> JoinHandle<T> {
+    /// Creates a new [`JoinHandle<T>`] using the given function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use ina_threading::{Handle, Thread};
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let thread = Thread::spawn("worker", || 2 + 2)?;
-    /// let result = thread.into_join_handle().join().unwrap();
+    /// # use std::time::{Duration, Instant};
+    /// #
+    /// # use ina_threading::JoinHandle;
+    /// #
+    /// # fn main() -> std::io::Result<()> {
+    /// let instant = Instant::now();
     ///
-    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
-    /// assert_eq!(4, result);
+    /// let handle = JoinHandle::spawn(|| {
+    ///     std::thread::sleep(Duration::from_millis(1_000));
+    ///
+    ///     Instant::now()
+    /// })?;
+    ///
+    /// assert!(instant < std::thread::JoinHandle::from(handle).join().unwrap());
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, f: F) -> Result<Self>
+    #[inline]
+    pub fn spawn<F>(f: F) -> std::io::Result<Self>
     where
-        N: AsRef<str>,
+        T: Send + 'static,
         F: FnOnce() -> T + Send + 'static,
     {
-        let name = name.as_ref().replace('\0', r"\0");
-        let inner = Builder::new().name(name).spawn(f)?;
-
-        Ok(Self { inner })
+        std::thread::Builder::new().spawn(f).map(Self)
     }
 
-    /// Spawns a new [`Thread`] with the given name and asynchronous task.
+    /// Creates a new [`JoinHandle<T>`] using the given runtime handle and asynchronous function.
     ///
-    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use ina_threading::{Handle, Thread};
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let thread = Thread::spawn_with_runtime("worker", || async { 2 + 2 })?;
-    /// let result = thread.into_join_handle().join().unwrap();
+    /// # use ina_threading::JoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// # use tokio::time::{Duration, Instant};
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let instant = Instant::now();
     ///
-    /// // Unfortunately, Rust is incorrect and thinks that `2 + 2 != 5`.
-    /// assert_eq!(4, result);
+    /// let handle = JoinHandle::spawn_async(Handle::current(), || async {
+    ///     tokio::time::sleep(Duration::from_millis(1_000)).await;
+    ///
+    ///     Instant::now()
+    /// })?;
+    ///
+    /// assert!(instant < std::thread::JoinHandle::from(handle).join().unwrap());
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread fails to spawn.
-    #[expect(clippy::expect_used, reason = "if the runtime fails to spawn, we can't run the thread body")]
-    #[expect(clippy::missing_panics_doc, reason = "the panic does not cause a crash, only stops the thread")]
-    pub fn spawn_with_runtime<N, F, O>(name: N, f: F) -> Result<Self>
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, f: F) -> std::io::Result<Self>
     where
-        N: AsRef<str>,
-        F: FnOnce() -> O + Send + 'static,
-        O: Future<Output = T>,
+        T: Send + 'static,
+        F: AsyncFnOnce() -> T + Send + 'static,
     {
-        Self::spawn(name, || {
-            use tokio::runtime::Builder;
-
-            let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
-
-            runtime.block_on(f())
-        })
+        Self::spawn(move || handle.block_on(f()))
     }
 }
 
-impl<T> Handle for Thread<T>
-where
-    T: Send + 'static,
-{
+impl<T> JoinHandleWrapper for JoinHandle<T> {
     type Output = T;
 
-    fn as_join_handle(&self) -> &JoinHandle<Self::Output> {
-        &self.inner
+    #[inline]
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<T> {
+        &self.0
     }
 
-    fn as_join_handle_mut(&mut self) -> &mut JoinHandle<Self::Output> {
-        &mut self.inner
+    #[inline]
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
+        &mut self.0
     }
 
-    fn into_join_handle(self) -> JoinHandle<Self::Output> {
-        self.inner
+    #[inline]
+    fn into_join_handle(self) -> std::thread::JoinHandle<T> {
+        self.0
+    }
+}
+
+impl<T> AsRef<std::thread::JoinHandle<T>> for JoinHandle<T> {
+    #[inline]
+    fn as_ref(&self) -> &std::thread::JoinHandle<T> {
+        self.as_join_handle()
+    }
+}
+
+impl<T> Deref for JoinHandle<T> {
+    type Target = std::thread::JoinHandle<T>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_join_handle()
+    }
+}
+
+impl<T> AsMut<std::thread::JoinHandle<T>> for JoinHandle<T> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<T> DerefMut for JoinHandle<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<T> From<JoinHandle<T>> for std::thread::JoinHandle<T> {
+    #[inline]
+    fn from(value: JoinHandle<T>) -> Self {
+        value.into_join_handle()
     }
 }

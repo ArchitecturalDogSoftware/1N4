@@ -83,24 +83,24 @@ async fn on_command<'ap: 'ev, 'ev>(
 
     let mut buffer = String::new();
 
-    writeln!(&mut buffer, "{}", localize!(async(try in locale) category::UI, "help-header").await?)?;
+    writeln!(&mut buffer, "{}", localize!((try in locale) category::UI, "help-header").await?)?;
 
-    writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-global").await?)?;
+    writeln!(&mut buffer, "### {}:\n", localize!((try in locale) category::UI, "help-global").await?)?;
 
     let commands = context.client().global_commands().await?.model().await?;
 
     self::write_command_section(&context, locale, commands, &mut buffer).await?;
 
     if let Some(guild_id) = context.interaction.guild_id {
-        writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-guild").await?)?;
+        writeln!(&mut buffer, "### {}:\n", localize!((try in locale) category::UI, "help-guild").await?)?;
 
         let commands = context.client().guild_commands(guild_id).await?.model().await?;
 
         self::write_command_section(&context, locale, commands, &mut buffer).await?;
     }
 
-    let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
-    let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
+    let title = localize!((try in locale) category::UI, "help-title").await?.to_string();
+    let footer = localize!((try in locale) category::UI, "help-footer").await?.to_string();
     let footer = EmbedFooterBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).build();
     let color = color::BRANDING.rgb();
     let author = if let Some(user) = context.api.cache.current_user() {
@@ -116,13 +116,13 @@ async fn on_command<'ap: 'ev, 'ev>(
     let command_name = command_entry.name;
 
     let build_information_button = ButtonBuilder::new(ButtonStyle::Secondary)
-        .label(localize!(async(try in locale) category::UI, "help-button-build-information").await?.to_string())?
+        .label(localize!((try in locale) category::UI, "help-button-build-information").await?.to_string())?
         .emoji(EmojiReactionType::Unicode { name: "ℹ️".to_string() })?
         .custom_id(CustomId::new(command_name, "build_information")?)?
         .build();
     let source_code_button = ButtonBuilder::new(ButtonStyle::Link)
         .url(env!("CARGO_PKG_REPOSITORY"))?
-        .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())?
+        .label(localize!((try in locale) category::UI, "help-button-source-code").await?.to_string())?
         .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })?
         .build();
     let licenses_button = self::attachment_button::licenses::button(locale, command_name).await?;
@@ -177,7 +177,7 @@ async fn on_build_information_component<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    let title = localize!(async(try in locale) category::UI, "help-embed-build-information-header").await?.to_string();
+    let title = localize!((try in locale) category::UI, "help-embed-build-information-header").await?.to_string();
     let color = color::BRANDING.rgb();
     let author = if let Some(user) = context.api.cache.current_user() {
         user.as_embed_author()?
@@ -210,7 +210,7 @@ where
     self::clean_commands(context, &mut commands);
 
     if commands.is_empty() {
-        writeln!(f, "> *{}*", localize!(async(try in locale) category::UI, "help-missing").await?)?;
+        writeln!(f, "> *{}*", localize!((try in locale) category::UI, "help-missing").await?)?;
 
         return Ok(());
     }
@@ -245,8 +245,8 @@ where
     let localized_name_key = format!("{name}-name");
     let localized_description_key = format!("{name}-description");
 
-    let localized_name = localize!(async(try in locale) category::COMMAND, localized_name_key).await?;
-    let localized_description = localize!(async(try in locale) category::COMMAND, localized_description_key).await?;
+    let localized_name = localize!((try in locale) category::COMMAND, localized_name_key).await?;
+    let localized_description = localize!((try in locale) category::COMMAND, localized_description_key).await?;
     let has_subcommands = options.iter().any(|option| {
         //
         matches!(option.kind, CommandOptionType::SubCommand | CommandOptionType::SubCommandGroup)
@@ -257,13 +257,13 @@ where
     let mut flags = Vec::with_capacity(3);
 
     if has_subcommands {
-        flags.push(localize!(async(try in locale) category::UI, "help-tag-subcommands").await?);
+        flags.push(localize!((try in locale) category::UI, "help-tag-subcommands").await?);
     }
     if contexts.is_some_and(|v| v.contains(&InteractionContextType::BotDm)) {
-        flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?);
+        flags.push(localize!((try in locale) category::UI, "help-tag-dms").await?);
     }
     if nsfw.unwrap_or(false) {
-        flags.push(localize!(async(try in locale) category::UI, "help-tag-nsfw").await?);
+        flags.push(localize!((try in locale) category::UI, "help-tag-nsfw").await?);
     }
 
     if !flags.is_empty() {

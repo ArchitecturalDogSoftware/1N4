@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-//! Defines exchanger threads.
+//! Defines supplier threads.
 
 use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
@@ -24,19 +24,17 @@ use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::{JoinHandle, JoinHandleWrapper};
 
-/// A thread that has a linked channel through which data can be sent and received.
+/// A thread that has a linked channel through which data can be received.
 #[derive(Debug)]
-pub struct ExchangerJoinHandle<S, R, T> {
-    /// The sender-end of the linked channel.
-    sender: Sender<S>,
+pub struct SupplierJoinHandle<R, T> {
     /// The receiver-end of the linked channel.
     receiver: Receiver<R>,
     /// The inner join handle.
     handle: JoinHandle<T>,
 }
 
-impl<S, R, T> ExchangerJoinHandle<S, R, T> {
-    /// Creates a new [`ExchangerJoinHandle<S, R, T>`] using the given function.
+impl<R, T> SupplierJoinHandle<R, T> {
+    /// Creates a new [`SupplierJoinHandle<S, T>`] using the given function.
     ///
     /// # Errors
     ///
@@ -48,23 +46,20 @@ impl<S, R, T> ExchangerJoinHandle<S, R, T> {
     /// # use std::num::NonZero;
     /// #
     /// # use ina_threading::JoinHandleWrapper;
-    /// # use ina_threading::threads::exchanger::ExchangerJoinHandle;
+    /// # use ina_threading::threads::supplier::SupplierJoinHandle;
     /// #
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
     /// let capacity = NonZero::new(2).unwrap();
-    /// let mut handle =
-    ///     ExchangerJoinHandle::<i32, i32, ()>::spawn(capacity, |sender, mut receiver| {
-    ///         let lhs = receiver.blocking_recv().unwrap();
-    ///         let rhs = receiver.blocking_recv().unwrap();
+    /// let mut handle = SupplierJoinHandle::<i32, ()>::spawn(capacity, |sender| {
+    ///     sender.blocking_send(2).unwrap();
+    ///     sender.blocking_send(5).unwrap();
+    /// })?;
     ///
-    ///         sender.blocking_send(lhs + rhs).unwrap();
-    ///     })?;
+    /// let lhs = handle.receiver().recv().await.unwrap();
+    /// let rhs = handle.receiver().recv().await.unwrap();
     ///
-    /// handle.sender().send(2).await.unwrap();
-    /// handle.sender().send(5).await.unwrap();
-    ///
-    /// assert_eq!(7, handle.receiver().recv().await.unwrap());
+    /// assert_eq!(lhs + rhs, 7);
     /// # handle.into_join_handle().join().unwrap();
     /// # Ok(())
     /// # }
@@ -72,22 +67,16 @@ impl<S, R, T> ExchangerJoinHandle<S, R, T> {
     #[inline]
     pub fn spawn<F>(capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
     where
-        S: Send + 'static,
         R: Send + 'static,
         T: Send + 'static,
-        F: FnOnce(Sender<R>, Receiver<S>) -> T + Send + 'static,
+        F: FnOnce(Sender<R>) -> T + Send + 'static,
     {
-        let (s_sender, s_receiver) = tokio::sync::mpsc::channel(capacity.get());
-        let (r_sender, r_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
 
-        JoinHandle::spawn(|| f(r_sender, s_receiver)).map(|handle| Self {
-            sender: s_sender,
-            receiver: r_receiver,
-            handle,
-        })
+        JoinHandle::spawn(|| f(sender)).map(|handle| Self { receiver, handle })
     }
 
-    /// Creates a new [`ExchangerJoinHandle<S, R, T>`] using the given runtime handle and asynchronous function.
+    /// Creates a new [`SupplierJoinHandle<R, T>`] using the given runtime handle and asynchronous function.
     ///
     /// # Errors
     ///
@@ -99,27 +88,26 @@ impl<S, R, T> ExchangerJoinHandle<S, R, T> {
     /// # use std::num::NonZero;
     /// #
     /// # use ina_threading::JoinHandleWrapper;
-    /// # use ina_threading::threads::exchanger::ExchangerJoinHandle;
+    /// # use ina_threading::threads::supplier::SupplierJoinHandle;
     /// # use tokio::runtime::Handle;
-    /// # use tokio::sync::mpsc::{Receiver, Sender};
+    /// # use tokio::sync::mpsc::Sender;
     /// #
     /// # #[tokio::main]
     /// # async fn main() -> std::io::Result<()> {
-    /// let mut handle = ExchangerJoinHandle::spawn_async(
+    /// let capacity = NonZero::new(2).unwrap();
+    /// let mut handle = SupplierJoinHandle::spawn_async(
     ///     Handle::current(),
-    ///     NonZero::new(2).unwrap(),
-    ///     |sender: Sender<i32>, mut receiver: Receiver<i32>| async move {
-    ///         let lhs = receiver.recv().await.unwrap();
-    ///         let rhs = receiver.recv().await.unwrap();
-    ///
-    ///         sender.send(lhs + rhs).await.unwrap();
+    ///     capacity,
+    ///     |sender: Sender<i32>| async move {
+    ///         sender.send(2).await.unwrap();
+    ///         sender.send(5).await.unwrap();
     ///     },
     /// )?;
     ///
-    /// handle.sender().send(2).await.unwrap();
-    /// handle.sender().send(5).await.unwrap();
+    /// let lhs = handle.receiver().recv().await.unwrap();
+    /// let rhs = handle.receiver().recv().await.unwrap();
     ///
-    /// assert_eq!(7, handle.receiver().recv().await.unwrap());
+    /// assert_eq!(lhs + rhs, 7);
     /// # handle.into_join_handle().join().unwrap();
     /// # Ok(())
     /// # }
@@ -127,19 +115,11 @@ impl<S, R, T> ExchangerJoinHandle<S, R, T> {
     #[inline]
     pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
     where
-        S: Send + 'static,
         R: Send + 'static,
         T: Send + 'static,
-        F: AsyncFnOnce(Sender<R>, Receiver<S>) -> T + Send + 'static,
+        F: AsyncFnOnce(Sender<R>) -> T + Send + 'static,
     {
-        Self::spawn(capacity, move |sender, receiver| handle.block_on(f(sender, receiver)))
-    }
-
-    /// Returns a reference to the sender of the linked channel.
-    #[inline]
-    #[must_use]
-    pub const fn sender(&self) -> &Sender<S> {
-        &self.sender
+        Self::spawn(capacity, move |sender| handle.block_on(f(sender)))
     }
 
     /// Returns a reference to the receiver of the linked channel.
@@ -150,7 +130,7 @@ impl<S, R, T> ExchangerJoinHandle<S, R, T> {
     }
 }
 
-impl<S, R, T> JoinHandleWrapper for ExchangerJoinHandle<S, R, T> {
+impl<R, T> JoinHandleWrapper for SupplierJoinHandle<R, T> {
     type Output = T;
 
     #[inline]
@@ -169,14 +149,14 @@ impl<S, R, T> JoinHandleWrapper for ExchangerJoinHandle<S, R, T> {
     }
 }
 
-impl<S, R, T> AsRef<std::thread::JoinHandle<T>> for ExchangerJoinHandle<S, R, T> {
+impl<R, T> AsRef<std::thread::JoinHandle<T>> for SupplierJoinHandle<R, T> {
     #[inline]
     fn as_ref(&self) -> &std::thread::JoinHandle<T> {
         self.as_join_handle()
     }
 }
 
-impl<S, R, T> Deref for ExchangerJoinHandle<S, R, T> {
+impl<R, T> Deref for SupplierJoinHandle<R, T> {
     type Target = std::thread::JoinHandle<T>;
 
     #[inline]
@@ -185,23 +165,23 @@ impl<S, R, T> Deref for ExchangerJoinHandle<S, R, T> {
     }
 }
 
-impl<S, R, T> AsMut<std::thread::JoinHandle<T>> for ExchangerJoinHandle<S, R, T> {
+impl<R, T> AsMut<std::thread::JoinHandle<T>> for SupplierJoinHandle<R, T> {
     #[inline]
     fn as_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
         self.as_join_handle_mut()
     }
 }
 
-impl<S, R, T> DerefMut for ExchangerJoinHandle<S, R, T> {
+impl<R, T> DerefMut for SupplierJoinHandle<R, T> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_join_handle_mut()
     }
 }
 
-impl<S, R, T> From<ExchangerJoinHandle<S, R, T>> for std::thread::JoinHandle<T> {
+impl<R, T> From<SupplierJoinHandle<R, T>> for std::thread::JoinHandle<T> {
     #[inline]
-    fn from(value: ExchangerJoinHandle<S, R, T>) -> Self {
+    fn from(value: SupplierJoinHandle<R, T>) -> Self {
         value.into_join_handle()
     }
 }

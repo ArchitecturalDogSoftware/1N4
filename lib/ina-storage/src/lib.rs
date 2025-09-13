@@ -20,16 +20,19 @@
 #[cfg(feature = "caching")]
 use std::collections::HashMap;
 use std::fmt::Display;
+#[cfg(feature = "caching")]
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::sync::Arc;
+#[cfg(feature = "caching")]
+use std::sync::RwLock;
 
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "caching")]
-use tokio::sync::RwLock;
 
 use crate::settings::Settings;
 use crate::system::{DataReader, DataSystem, DataWriter};
+use crate::thread::JoinHandle;
 
 #[cfg(all(not(feature = "system-file"), not(feature = "system-memory")))]
 compile_error!("at least one storage system feature must be enabled");
@@ -55,9 +58,9 @@ pub enum Error {
     /// An IO error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    /// An error from spawning the storage thread.
+    /// An error related to the static thread handle.
     #[error(transparent)]
-    ThreadSpawn(#[from] ina_threading::Error),
+    Thread(#[from] ina_threading::statics::Error<JoinHandle>),
 }
 
 /// A storage instance.
@@ -72,6 +75,13 @@ pub struct Storage {
 
 impl Storage {
     /// Creates a new [`Storage`].
+    #[cfg_attr(
+        not(feature = "caching"),
+        expect(
+            clippy::missing_const_for_fn,
+            reason = "this function cannot be const with the `caching` feature enabled"
+        )
+    )]
     #[must_use]
     pub fn new(settings: Settings) -> Self {
         #[cfg(feature = "caching")]
@@ -81,6 +91,33 @@ impl Storage {
         #[cfg(not(feature = "caching"))]
         {
             Self { settings }
+        }
+    }
+
+    /// Returns an immutable reference to the storage cache.
+    #[cfg(feature = "caching")]
+    pub(crate) fn cache_read(&self) -> impl Deref<Target = HashMap<Box<Path>, Arc<[u8]>>> {
+        if self.cache.is_poisoned() {
+            // If the cache is poisoned, we have to assume that it contains potentially faulty data.
+            self.cache.clear_poison();
+            self.cache.write().unwrap_or_else(|_| unreachable!("we just cleared the poison")).clear();
+        }
+
+        self.cache.read().unwrap_or_else(|_| unreachable!("the poison is guaranteed to be cleared at this point"))
+    }
+
+    /// Returns an immutable reference to the storage cache.
+    #[cfg(feature = "caching")]
+    pub(crate) fn cache_write(&self) -> impl DerefMut<Target = HashMap<Box<Path>, Arc<[u8]>>> {
+        if self.cache.is_poisoned() {
+            // If the cache is poisoned, we have to assume that it contains potentially faulty data.
+            self.cache.clear_poison();
+
+            let mut lock = self.cache.write().unwrap_or_else(|_| unreachable!("we just cleared the poison"));
+            lock.clear();
+            lock
+        } else {
+            self.cache.write().unwrap_or_else(|_| unreachable!("the lock cannot be poisoned"))
         }
     }
 }
@@ -117,77 +154,45 @@ macro_rules! system_call {
             System::Memory => system_call!($($header)* $crate::system::MemorySystem => $($call)*),
         }
     };
-    (async ref $type:ty => $($call:tt)*) => {
-        <$type>::get().await$($call)*.await.map_err(Into::into)
-    };
-    (async mut $type:ty => $($call:tt)*) => {
-        <$type>::get_mut().await$($call)*.await.map_err(Into::into)
-    };
     (ref $type:ty => $($call:tt)*) => {
-        <$type>::blocking_get()$($call)*.map_err(Into::into)
+        <$type>::get()$($call)*.map_err(Into::into)
     };
     (mut $type:ty => $($call:tt)*) => {
-        <$type>::blocking_get_mut()$($call)*.map_err(Into::into)
+        <$type>::get_mut()$($call)*.map_err(Into::into)
     };
 }
 
 impl DataReader for Storage {
     type Error = anyhow::Error;
 
-    fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
+    fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
         let path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
-        if self.cache.blocking_read().contains_key(&(*path)) {
+        if self.cache_read().contains_key(&(*path)) {
             return Ok(true);
         }
 
-        system_call!(match self.settings.system, ref => .blocking_exists(&path))
+        system_call!(match self.settings.system, ref => .exists(&path))
     }
 
-    async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
+    fn size(&self, path: &Path) -> Result<u64, Self::Error> {
         let path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
-        if self.cache.read().await.contains_key(&(*path)) {
-            return Ok(true);
-        }
-
-        system_call!(match self.settings.system, async ref => .exists(&path))
-    }
-
-    fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
-        let path = self.settings.directory.join(path);
-
-        #[cfg(feature = "caching")]
-        if let Some(bytes) = self.cache.blocking_read().get(&(*path)) {
+        if let Some(bytes) = self.cache_read().get(&(*path)) {
             return Ok(bytes.len() as u64);
         }
 
-        system_call!(match self.settings.system, ref => .blocking_size(&path))
+        system_call!(match self.settings.system, ref => .size(&path))
     }
 
-    async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
+    fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         let path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            let cache = self.cache.read().await;
-
-            if let Some(bytes) = cache.get(&(*path)) {
-                return Ok(bytes.len() as u64);
-            }
-        }
-
-        system_call!(match self.settings.system, async ref => .size(&path))
-    }
-
-    fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        let path = self.settings.directory.join(path);
-
-        #[cfg(feature = "caching")]
-        {
-            let cache = self.cache.blocking_read();
+            let cache = self.cache_read();
 
             if let Some(bytes) = cache.get(&(*path)).cloned() {
                 return Ok(bytes);
@@ -195,40 +200,13 @@ impl DataReader for Storage {
 
             drop(cache);
 
-            system_call!(match self.settings.system, ref => .blocking_read(&path)).inspect(|bytes| {
-                self.cache.blocking_write().insert(path.into_boxed_path(), Arc::clone(bytes));
+            system_call!(match self.settings.system, ref => .read(&path)).inspect(|bytes| {
+                self.cache_write().insert(path.into_boxed_path(), Arc::clone(bytes));
             })
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, ref => .blocking_read(&path))
-        }
-    }
-
-    async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        let path = self.settings.directory.join(path);
-
-        #[cfg(feature = "caching")]
-        {
-            let cache = self.cache.read().await;
-
-            if let Some(bytes) = cache.get(&(*path)).cloned() {
-                return Ok(bytes);
-            }
-
-            drop(cache);
-
-            let result = system_call!(match self.settings.system, async ref => .read(&path));
-
-            if let Ok(bytes) = result.as_ref().cloned() {
-                self.cache.write().await.insert(path.into_boxed_path(), bytes);
-            }
-
-            result
-        }
-        #[cfg(not(feature = "caching"))]
-        {
-            system_call!(match self.settings.system, async ref => .read(&path))
+            system_call!(match self.settings.system, ref => .read(&path))
         }
     }
 }
@@ -236,48 +214,29 @@ impl DataReader for Storage {
 impl DataWriter for Storage {
     type Error = anyhow::Error;
 
-    fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         let path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            system_call!(match self.settings.system, mut => .blocking_write(&path, bytes)).inspect(|&()| {
-                self.cache.blocking_write().insert(path.into_boxed_path(), Arc::from(bytes));
+            system_call!(match self.settings.system, mut => .write(&path, bytes)).inspect(|&()| {
+                self.cache_write().insert(path.into_boxed_path(), Arc::from(bytes));
             })
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, mut => .blocking_write(&path, bytes))
+            system_call!(match self.settings.system, mut => .write(&path, bytes))
         }
     }
 
-    async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        let path = self.settings.directory.join(path);
-
-        #[cfg(feature = "caching")]
-        {
-            let result = system_call!(match self.settings.system, async mut => .write(&path, bytes));
-
-            if result.is_ok() {
-                self.cache.write().await.insert(path.into_boxed_path(), Arc::from(bytes));
-            }
-
-            result
-        }
-        #[cfg(not(feature = "caching"))]
-        {
-            system_call!(match self.settings.system, async mut => .write(&path, bytes))
-        }
-    }
-
-    fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
+    fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         let from = self.settings.directory.join(from);
         let into = self.settings.directory.join(into);
 
         #[cfg(feature = "caching")]
         {
-            system_call!(match self.settings.system, mut => .blocking_rename(&from, &into)).inspect(|&()| {
-                let mut cache = self.cache.blocking_write();
+            system_call!(match self.settings.system, mut => .rename(&from, &into)).inspect(|&()| {
+                let mut cache = self.cache_write();
                 let Some(value) = cache.remove(&(*from)) else { return };
 
                 cache.insert(into.into_boxed_path(), value);
@@ -285,64 +244,22 @@ impl DataWriter for Storage {
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, mut => .blocking_rename(&from, &into))
+            system_call!(match self.settings.system, mut => .rename(&from, &into))
         }
     }
 
-    async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        let from = self.settings.directory.join(from);
-        let into = self.settings.directory.join(into);
-
-        #[cfg(feature = "caching")]
-        {
-            let result = system_call!(match self.settings.system, async mut => .rename(&from, &into));
-
-            if result.is_ok() {
-                let mut cache = self.cache.write().await;
-                let Some(value) = cache.remove(&(*from)) else { return result };
-
-                cache.insert(into.into_boxed_path(), value);
-            }
-
-            result
-        }
-        #[cfg(not(feature = "caching"))]
-        {
-            system_call!(match self.settings.system, async mut => .rename(&from, &into))
-        }
-    }
-
-    fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
+    fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         let path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            system_call!(match self.settings.system, mut => .blocking_delete(&path)).inspect(|&()| {
-                self.cache.blocking_write().remove(&(*path));
+            system_call!(match self.settings.system, mut => .delete(&path)).inspect(|&()| {
+                self.cache_write().remove(&(*path));
             })
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, mut => .blocking_delete(&path))
-        }
-    }
-
-    async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        let path = self.settings.directory.join(path);
-
-        #[cfg(feature = "caching")]
-        {
-            let result = system_call!(match self.settings.system, async mut => .delete(&path));
-
-            if result.is_ok() {
-                self.cache.write().await.remove(&(*path));
-            }
-
-            result
-        }
-        #[cfg(not(feature = "caching"))]
-        {
-            system_call!(match self.settings.system, async mut => .delete(&path))
+            system_call!(match self.settings.system, mut => .delete(&path))
         }
     }
 }

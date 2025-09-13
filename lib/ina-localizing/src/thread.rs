@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::ops::{Deref, DerefMut};
+use std::sync::{Arc, RwLock};
 
 use ina_threading::statics::Static;
-use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
-use tokio::sync::RwLock;
+use ina_threading::threads::callable::StatefulCallableJoinHandle;
+use tokio::runtime::Handle;
 
 use crate::locale::Locale;
 use crate::settings::Settings;
@@ -26,15 +27,13 @@ use crate::text::Text;
 use crate::{Localizer, Result};
 
 /// The localization thread's handle.
-static THREAD: LocalizationThread = LocalizationThread::new();
+static HANDLE: Static<JoinHandle> = Static::new();
 
-/// The localization thread's type.
-pub type LocalizationThread = Static<LocalizationThreadInner>;
-/// The localization thread's inner type.
-pub type LocalizationThreadInner = StatefulInvoker<RwLock<Localizer>, Request, Response>;
+/// The inner type of the thread's handle.
+pub(crate) type JoinHandle = StatefulCallableJoinHandle<Request, Response, RwLock<Localizer>>;
 
 /// A request sent to the localization thread.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum Request {
     /// Lists all loaded locales.
     List,
@@ -43,9 +42,9 @@ pub enum Request {
     /// Clears the loaded locales, or the given locales if [`Some`] is contained within this variant.
     Clear(Option<Box<[Locale]>>),
     /// Loads the given locales, or the configured directory if [`None`] is contained within this variant.
-    Load(Option<Box<[Locale]>>),
+    Load(Handle, Option<Box<[Locale]>>),
     /// Translates the given categorized key.
-    Get(Option<Locale>, Box<str>, Box<str>),
+    Get(Handle, Option<Locale>, Box<str>, Box<str>),
     /// Returns a list of valid keys in the specified category.
     Keys(Option<Locale>, Box<str>),
 }
@@ -69,85 +68,55 @@ pub enum Response {
     Keys(Box<[Arc<str>]>),
 }
 
-/// Creates a new localization thread.
-///
-/// # Errors
-///
-/// This function will return an error if the thread fails to spawn.
-fn create(settings: Settings) -> Result<LocalizationThreadInner> {
-    let capacity = settings.queue_capacity;
-    let localizer = RwLock::new(Localizer::new(settings));
-
-    Ok(StatefulInvoker::spawn_with_runtime("localizing", capacity, localizer, self::run)?)
-}
-
 /// Starts the localization thread.
-///
-/// # Panics
-///
-/// Panics if the thread has already been initialized.
 ///
 /// # Errors
 ///
 /// This function will return an error if the thread fails to spawn.
 pub async fn start(settings: Settings) -> Result<()> {
-    THREAD.async_api().initialize(self::create(settings)?).await;
+    let capacity = settings.queue_capacity;
+    let state = Arc::new(RwLock::new(Localizer::new(settings)));
+    let handle = StatefulCallableJoinHandle::spawn(capacity, state, self::run)?;
 
-    Ok(())
-}
-
-/// Starts the localization thread, blocking the current thread until successful.
-///
-/// # Panics
-///
-/// Panics if the thread has already been initialized or if this is called from within an asynchronous context.
-///
-/// # Errors
-///
-/// This function will return an error if the thread fails to spawn.
-pub fn blocking_start(settings: Settings) -> Result<()> {
-    THREAD.sync_api().initialize(self::create(settings)?);
-
-    Ok(())
+    HANDLE.initialize(handle).await.map_err(Into::into)
 }
 
 /// Closes the localization thread.
-///
-/// # Panics
-///
-/// Panics if the localization thread is not initialized.
 pub async fn close() {
-    THREAD.async_api().close().await;
-}
-
-/// Closes the localization thread.
-///
-/// This blocks the current thread.
-///
-/// # Panics
-///
-/// Panics if the localization thread is not initialized or if this is called in an asynchronous context.
-pub fn blocking_close() {
-    THREAD.sync_api().close();
+    HANDLE.uninitialize().await;
 }
 
 /// Runs the thread's process.
-async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) -> Response {
+fn run((state, value): (Arc<RwLock<Localizer>>, Request)) -> Response {
+    #[inline]
+    fn read(state: &Arc<RwLock<Localizer>>) -> impl Deref<Target = Localizer> + '_ {
+        assert!(!state.is_poisoned(), "storage was poisoned, possibly leading to corrupted data");
+
+        state.read().unwrap_or_else(|_| unreachable!("the lock is guaranteed to not be poisoned"))
+    }
+
+    #[inline]
+    fn write(state: &Arc<RwLock<Localizer>>) -> impl DerefMut<Target = Localizer> + '_ {
+        assert!(!state.is_poisoned(), "storage was poisoned, possibly leading to corrupted data");
+
+        state.write().unwrap_or_else(|_| unreachable!("the lock is guaranteed to not be poisoned"))
+    }
+
     match value {
-        Request::Get(locale, category, key) => {
-            let state = state.read().await;
+        Request::Get(runtime_handle, locale, category, key) => {
+            let state = read(&state);
             let locale = locale.unwrap_or_else(|| state.settings.default_locale);
 
             match state.get(locale, &category, &key) {
                 Ok(text) => {
-                    if text.is_missing() && ina_logging::thread::is_started().await {
+                    if text.is_missing() {
                         let Text::Missing(category, key) = &text else {
                             unreachable!("the text is guaranteed to be missing at this point");
                         };
 
                         // This is error is intentionally ignored because it's better to return the text regardless of
                         // whether this log fails.
-                        _ = ina_logging::error!(async "missing text for key '{category}::{key}'").await;
+                        _ = runtime_handle.block_on(ina_logging::error!("missing text for key '{category}::{key}'"));
                     }
 
                     Response::Text(text)
@@ -156,40 +125,40 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
             }
         }
         Request::Has(locales) => {
-            let state = state.read().await;
+            let state = read(&state);
 
             Response::Has(locales.iter().all(|l| state.has_locale(l)))
         }
         Request::List => {
-            let state = state.read().await;
+            let state = read(&state);
 
             Response::List(state.locales().collect())
         }
         Request::Clear(locales) => {
-            let mut state = state.write().await;
+            let mut state = write(&state);
 
             state.clear_locales(locales);
 
             Response::Acknowledge
         }
-        Request::Load(Some(locales)) => {
-            let mut state = state.write().await;
+        Request::Load(_, Some(locales)) => {
+            let mut state = write(&state);
 
-            match state.load_locales(locales).await {
+            match state.load_locales(locales) {
                 Ok(count) => Response::Load(count),
                 Err(error) => Response::Error(Box::new(error)),
             }
         }
-        Request::Load(None) => {
-            let mut state = state.write().await;
+        Request::Load(runtime_handle, None) => {
+            let mut state = write(&state);
 
-            match state.load_directory().await {
+            match state.load_directory(&runtime_handle) {
                 Ok(count) => Response::Load(count),
                 Err(error) => Response::Error(Box::new(error)),
             }
         }
         Request::Keys(locale, category) => {
-            let state = state.read().await;
+            let state = read(&state);
             let locale = locale.unwrap_or_else(|| state.default_locale());
 
             Response::Keys(state.keys(&locale, &category).map_or_else(Box::default, |v| v.cloned().collect()))
@@ -197,11 +166,11 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
     }
 }
 
-/// Creates a thread invoker function.
+/// Creates a thread invocation function.
 macro_rules! invoke {
     ($(
         $(#[$attribute:meta])*
-        $name:ident, $blocking_name:ident $(($($input:ident: $type:ty),*))? {
+        $name:ident$(($($input:ident: $type:ty),*))? {
             $($request:tt)*
         } -> $return:ty {
             $($response:tt)*
@@ -209,22 +178,7 @@ macro_rules! invoke {
     )*) => {$(
         $(#[$attribute])*
         pub async fn $name($($($input: $type),*)?) -> Result<$return> {
-            let response = THREAD.async_api().get_mut().await.call($($request)*).await?;
-
-            match response {
-                $($response)*
-                Response::Error(error) => Err(*error),
-                _ => unreachable!("unexpected response: '{response:?}'"),
-            }
-        }
-
-        $(#[$attribute])*
-        ///
-        /// # Panics
-        ///
-        /// Panics if this is called from within a synchronous context.
-        pub fn $blocking_name($($($input: $type),*)?) -> Result<$return> {
-            let response = THREAD.sync_api().get_mut().blocking_call($($request)*)?;
+            let response = HANDLE.try_get_mut().await?.invoke($($request)*).await?;
 
             match response {
                 $($response)*
@@ -241,7 +195,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    list, blocking_list {
+    list {
         Request::List
     } -> Box<[Locale]> {
         Response::List(list) => Ok(list),
@@ -252,7 +206,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    has, blocking_has (locales: impl Send + IntoIterator<Item = Locale>) {
+    has(locales: impl Send + IntoIterator<Item = Locale>) {
         Request::Has(locales.into_iter().collect())
     } -> bool {
         Response::Has(has) => Ok(has),
@@ -263,7 +217,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    clear, blocking_clear (locales: Option<impl Send + IntoIterator<Item = Locale>>) {
+    clear(locales: Option<impl Send + IntoIterator<Item = Locale>>) {
         Request::Clear(locales.map(|i| i.into_iter().collect()))
     } -> () {
         Response::Acknowledge => Ok(()),
@@ -274,8 +228,8 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    load, blocking_load (locales: Option<impl Send + IntoIterator<Item = Locale>>) {
-        Request::Load(locales.map(|i| i.into_iter().collect()))
+    load(locales: Option<impl Send + IntoIterator<Item = Locale>>) {
+        Request::Load(::tokio::runtime::Handle::current(), locales.map(|i| i.into_iter().collect()))
     } -> usize {
         Response::Load(count) => Ok(count),
     };
@@ -285,8 +239,8 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    get, blocking_get (locale: Option<Locale>, category: impl Send + AsRef<str>, key: impl Send + AsRef<str>) {
-        Request::Get(locale, category.as_ref().into(), key.as_ref().into())
+    get(locale: Option<Locale>, category: impl Send + AsRef<str>, key: impl Send + AsRef<str>) {
+        Request::Get(::tokio::runtime::Handle::current(), locale, category.as_ref().into(), key.as_ref().into())
     } -> Text {
         Response::Text(text) => Ok(text),
     };
@@ -296,7 +250,7 @@ invoke! {
     /// # Errors
     ///
     /// This function will return an error if the message could not be sent.
-    keys, blocking_keys (locale: Option<Locale>, category: impl Send + AsRef<str>) {
+    keys(locale: Option<Locale>, category: impl Send + AsRef<str>) {
         Request::Keys(locale, category.as_ref().into())
     } -> Box<[Arc<str>]> {
         Response::Keys(keys) => Ok(keys),
@@ -316,49 +270,23 @@ invoke! {
 /// let locale = "es-MX".parse::<Locale>()?;
 ///
 /// // In the specified optional locale.
-/// localize!(async(try in Some(locale)) "ui", "test-key").await?;
+/// localize!((try in Some(locale)) "ui", "test-key").await?;
 /// // In the specified locale.
-/// localize!(async(in locale) "ui", "test-key").await?;
+/// localize!((in locale) "ui", "test-key").await?;
 /// // In the default locale ('en-US' by default).
-/// localize!(async "ui", "test-key").await?;
-/// # Ok(())
-/// # }
-/// ```
-///
-/// ```no_run
-/// # use ina_localizing::localize;
-/// # use ina_localizing::locale::Locale;
-/// #
-/// # fn main() -> Result<(), ina_localizing::Error> {
-/// let locale = "es-MX".parse::<Locale>()?;
-///
-/// // In the specified optional locale.
-/// localize!((try in Some(locale)) "ui", "test-key")?;
-/// // In the specified locale.
-/// localize!((in locale) "ui", "test-key")?;
-/// // In the default locale ('en-US' by default).
-/// localize!("ui", "test-key")?;
+/// localize!("ui", "test-key").await?;
 /// # Ok(())
 /// # }
 /// ```
 #[macro_export]
 macro_rules! localize {
-    (async(try in $locale:expr) $category:expr, $key:expr) => {
+    ((try in $locale:expr) $category:expr, $key:expr) => {
         $crate::thread::get($locale, $category, $key)
     };
-    (async(in $locale:expr) $category:expr, $key:expr) => {
+    ((in $locale:expr) $category:expr, $key:expr) => {
         $crate::thread::get(Some($locale), $category, $key)
     };
-    (async $category:expr, $key:expr) => {
-        $crate::thread::get(None, $category, $key)
-    };
-    ((try in $locale:expr) $category:expr, $key:expr) => {
-        $crate::thread::blocking_get($locale, $category, $key)
-    };
-    ((in $locale:expr) $category:expr, $key:expr) => {
-        $crate::thread::blocking_get(Some($locale), $category, $key)
-    };
     ($category:expr, $key:expr) => {
-        $crate::thread::blocking_get(None, $category, $key)
+        $crate::thread::get(None, $category, $key)
     };
 }

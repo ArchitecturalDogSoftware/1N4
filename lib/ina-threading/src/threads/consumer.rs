@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2025 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -14,131 +14,176 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroUsize;
+//! Defines consumer threads.
 
+use std::num::NonZero;
+use std::ops::{Deref, DerefMut};
+
+use tokio::runtime::Handle;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::{Handle, Result, SenderHandle, Thread};
+use crate::{JoinHandle, JoinHandleWrapper};
 
-/// A thread that receives values through a sender channel.
+/// A thread that has a linked channel through which data can be sent.
 #[derive(Debug)]
-pub struct Consumer<S, T> {
-    /// The inner thread.
-    thread: Thread<T>,
-    /// The inner sender channel.
+pub struct ConsumerJoinHandle<S, T> {
+    /// The sender-end of the linked channel.
     sender: Sender<S>,
+    /// The inner join handle.
+    handle: JoinHandle<T>,
 }
 
-impl<S, T> Consumer<S, T>
-where
-    S: Send + 'static,
-    T: Send + 'static,
-{
-    /// Spawns a new [`Consumer<S, T>`] with the given name and task.
+impl<S, T> ConsumerJoinHandle<S, T> {
+    /// Creates a new [`ConsumerJoinHandle<S, T>`] using the given function.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
-    /// # use ina_threading::{Handle, SenderHandle};
-    /// # use ina_threading::threads::consumer::Consumer;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
-    /// let thread = Consumer::spawn("worker", capacity, |mut r| {
-    ///     assert_eq!(r.blocking_recv(), Some(123));
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(2).unwrap();
+    /// let handle = ConsumerJoinHandle::<i32, i32>::spawn(capacity, |mut receiver| {
+    ///     let lhs = receiver.blocking_recv().unwrap();
+    ///     let rhs = receiver.blocking_recv().unwrap();
+    ///
+    ///     lhs + rhs
     /// })?;
     ///
-    /// thread.as_sender().blocking_send(123).expect("the channel should not be closed");
+    /// handle.sender().send(2).await.unwrap();
+    /// handle.sender().send(5).await.unwrap();
     ///
-    /// assert!(thread.into_join_handle().join().is_ok());
+    /// assert_eq!(7, handle.into_join_handle().join().unwrap());
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    #[inline]
+    pub fn spawn<F>(capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
     where
-        N: AsRef<str>,
+        S: Send + 'static,
+        T: Send + 'static,
         F: FnOnce(Receiver<S>) -> T + Send + 'static,
     {
         let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
 
-        Ok(Self { thread: Thread::spawn(name, || f(receiver))?, sender })
+        JoinHandle::spawn(|| f(receiver)).map(|handle| Self { sender, handle })
     }
 
-    /// Spawns a new [`Consumer<S, T>`] with the given name and asynchronous task.
+    /// Creates a new [`ConsumerJoinHandle<S, T>`] using the given runtime handle and asynchronous function.
     ///
-    /// The created runtime has both IO and time drivers enabled, and is configured to only run on the spawned thread.
+    /// # Errors
+    ///
+    /// This function will return an error if the operating system fails to spawn the thread.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
-    /// # use ina_threading::{Handle, SenderHandle};
-    /// # use ina_threading::threads::consumer::Consumer;
-    /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
-    /// let thread = Consumer::spawn_with_runtime("worker", capacity, |mut r| async move {
-    ///     assert_eq!(r.recv().await, Some(123));
-    /// })?;
+    /// # use std::num::NonZero;
+    /// #
+    /// # use ina_threading::JoinHandleWrapper;
+    /// # use ina_threading::threads::consumer::ConsumerJoinHandle;
+    /// # use tokio::runtime::Handle;
+    /// # use tokio::sync::mpsc::Receiver;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> std::io::Result<()> {
+    /// let capacity = NonZero::new(2).unwrap();
+    /// let handle = ConsumerJoinHandle::spawn_async(
+    ///     Handle::current(),
+    ///     capacity,
+    ///     |mut receiver: Receiver<i32>| async move {
+    ///         let lhs = receiver.recv().await.unwrap();
+    ///         let rhs = receiver.recv().await.unwrap();
     ///
-    /// thread.as_sender().blocking_send(123).expect("the channel should not be closed");
+    ///         lhs + rhs
+    ///     },
+    /// )?;
     ///
-    /// assert!(thread.into_join_handle().join().is_ok());
+    /// handle.sender().send(2).await.unwrap();
+    /// handle.sender().send(5).await.unwrap();
+    ///
+    /// assert_eq!(7, handle.into_join_handle().join().unwrap());
     /// # Ok(())
     /// # }
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the thread fails to spawn.
-    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    #[inline]
+    pub fn spawn_async<F>(handle: Handle, capacity: NonZero<usize>, f: F) -> std::io::Result<Self>
     where
-        N: AsRef<str>,
-        F: FnOnce(Receiver<S>) -> O + Send + 'static,
-        O: Future<Output = T>,
+        S: Send + 'static,
+        T: Send + 'static,
+        F: AsyncFnOnce(Receiver<S>) -> T + Send + 'static,
     {
-        let (sender, receiver) = tokio::sync::mpsc::channel(capacity.get());
-
-        Ok(Self { thread: Thread::spawn_with_runtime(name, || f(receiver))?, sender })
-    }
-}
-
-impl<S, T> Handle for Consumer<S, T>
-where
-    T: Send + 'static,
-{
-    type Output = T;
-
-    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
-        self.thread.as_join_handle()
+        Self::spawn(capacity, move |receiver| handle.block_on(f(receiver)))
     }
 
-    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
-        self.thread.as_join_handle_mut()
-    }
-
-    fn into_join_handle(self) -> std::thread::JoinHandle<Self::Output> {
-        self.thread.into_join_handle()
-    }
-}
-
-impl<S, T> SenderHandle<S> for Consumer<S, T>
-where
-    S: Send + 'static,
-    T: Send + 'static,
-{
-    fn as_sender(&self) -> &Sender<S> {
+    /// Returns a reference to the sender of the linked channel.
+    #[inline]
+    #[must_use]
+    pub const fn sender(&self) -> &Sender<S> {
         &self.sender
     }
+}
 
-    fn as_sender_mut(&mut self) -> &mut Sender<S> {
-        &mut self.sender
+impl<S, T> JoinHandleWrapper for ConsumerJoinHandle<S, T> {
+    type Output = T;
+
+    #[inline]
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<T> {
+        self.handle.as_join_handle()
     }
 
-    fn into_sender(self) -> Sender<S> {
-        self.sender
+    #[inline]
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
+        self.handle.as_join_handle_mut()
+    }
+
+    #[inline]
+    fn into_join_handle(self) -> std::thread::JoinHandle<T> {
+        self.handle.into_join_handle()
+    }
+}
+
+impl<S, T> AsRef<std::thread::JoinHandle<T>> for ConsumerJoinHandle<S, T> {
+    #[inline]
+    fn as_ref(&self) -> &std::thread::JoinHandle<T> {
+        self.as_join_handle()
+    }
+}
+
+impl<S, T> Deref for ConsumerJoinHandle<S, T> {
+    type Target = std::thread::JoinHandle<T>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_join_handle()
+    }
+}
+
+impl<S, T> AsMut<std::thread::JoinHandle<T>> for ConsumerJoinHandle<S, T> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut std::thread::JoinHandle<T> {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<S, T> DerefMut for ConsumerJoinHandle<S, T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_join_handle_mut()
+    }
+}
+
+impl<S, T> From<ConsumerJoinHandle<S, T>> for std::thread::JoinHandle<T> {
+    #[inline]
+    fn from(value: ConsumerJoinHandle<S, T>) -> Self {
+        value.into_join_handle()
     }
 }

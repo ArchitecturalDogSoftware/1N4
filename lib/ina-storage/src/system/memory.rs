@@ -17,9 +17,7 @@
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::sync::{Arc, LazyLock};
-
-use tokio::sync::RwLock;
+use std::sync::{Arc, LazyLock, RwLock};
 
 use super::{DataReader, DataSystem, DataWriter};
 
@@ -43,36 +41,25 @@ pub struct MemorySystem {
     inner: HashMap<Box<Path>, Arc<[u8]>>,
 }
 
+#[expect(clippy::expect_used, reason = "a lock being poisoned means that there is potentially invalid state")]
 impl DataSystem for MemorySystem {
-    fn blocking_get() -> impl Deref<Target = Self> {
-        INSTANCE.blocking_read()
+    fn get() -> impl Deref<Target = Self> {
+        INSTANCE.read().expect("the lock has been poisoned")
     }
 
-    async fn get() -> impl Deref<Target = Self> {
-        INSTANCE.read().await
-    }
-
-    fn blocking_get_mut() -> impl DerefMut<Target = Self> {
-        INSTANCE.blocking_write()
-    }
-
-    async fn get_mut() -> impl DerefMut<Target = Self> {
-        INSTANCE.write().await
+    fn get_mut() -> impl DerefMut<Target = Self> {
+        INSTANCE.write().expect("the lock has been poisoned")
     }
 }
 
 impl DataReader for MemorySystem {
     type Error = Error;
 
-    fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
+    fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
         Ok(self.inner.contains_key(path))
     }
 
-    async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        Ok(self.inner.contains_key(path))
-    }
-
-    fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
+    fn size(&self, path: &Path) -> Result<u64, Self::Error> {
         let Some(value) = self.inner.get(path) else {
             return Err(Error::MissingPath(path.into()));
         };
@@ -80,33 +67,21 @@ impl DataReader for MemorySystem {
         Ok(value.len() as u64)
     }
 
-    async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
-        self.blocking_size(path)
-    }
-
-    fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
+    fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         self.inner.get(path).cloned().ok_or_else(|| Error::MissingPath(path.into()))
-    }
-
-    async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        self.blocking_read(path)
     }
 }
 
 impl DataWriter for MemorySystem {
     type Error = Error;
 
-    fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
+    fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         self.inner.insert(path.into(), bytes.into());
 
         Ok(())
     }
 
-    async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        self.blocking_write(path, bytes)
-    }
-
-    fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
+    fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         let Some(value) = self.inner.remove(from) else {
             return Err(Error::MissingPath(from.into()));
         };
@@ -116,21 +91,13 @@ impl DataWriter for MemorySystem {
         Ok(())
     }
 
-    async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        self.blocking_rename(from, into)
-    }
-
-    fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        if !self.blocking_exists(path)? {
+    fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
+        if !self.exists(path)? {
             return Err(Error::MissingPath(path.into()));
         }
 
         self.inner.remove(path);
 
         Ok(())
-    }
-
-    async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        self.blocking_delete(path)
     }
 }

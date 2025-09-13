@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use owo_colors::Stream;
-use tokio::io::{AsyncWriteExt, Stderr, Stdout};
+use tokio::io::{AsyncWriteExt, Stderr};
 
 use super::Endpoint;
 use crate::Result;
@@ -25,8 +25,6 @@ use crate::settings::Settings;
 /// A logger endpoint for the terminal.
 #[derive(Debug, Default)]
 pub struct TerminalEndpoint {
-    /// The standard output stream.
-    stdout: Option<Stdout>,
     /// The standard error stream.
     stderr: Option<Stderr>,
 }
@@ -35,7 +33,7 @@ impl TerminalEndpoint {
     /// Creates a new [`TerminalEndpoint`].
     #[must_use]
     pub const fn new() -> Self {
-        Self { stdout: None, stderr: None }
+        Self { stderr: None }
     }
 }
 
@@ -46,43 +44,25 @@ impl Endpoint for TerminalEndpoint {
     }
 
     async fn setup(&mut self, _: &Settings) -> Result<()> {
-        self.stdout = Some(tokio::io::stdout());
         self.stderr = Some(tokio::io::stderr());
 
         Ok(())
     }
 
     async fn close(&mut self) -> Result<()> {
-        if let Some(stdout) = self.stdout.as_mut() {
-            stdout.flush().await?;
+        if let Some(mut stderr) = self.stderr.take() {
+            stderr.shutdown().await?;
         }
-        if let Some(stderr) = self.stderr.as_mut() {
-            stderr.flush().await?;
-        }
-
-        drop(self.stdout.take());
-        drop(self.stderr.take());
 
         Ok(())
     }
 
     async fn write(&mut self, entry: &Entry<'static>) -> Result<()> {
-        let stream = if entry.level.error { Stream::Stderr } else { Stream::Stdout };
-        let content = entry.display(Some(stream)).to_string() + "\n";
+        let content = entry.display(Some(Stream::Stderr)).to_string() + "\n";
+        let Some(ref mut stderr) = self.stderr else {
+            return Err(self.invalid_state());
+        };
 
-        if entry.level.error {
-            let Some(ref mut stderr) = self.stderr else {
-                return Err(self.invalid_state());
-            };
-
-            stderr.write_all(content.as_bytes()).await
-        } else {
-            let Some(ref mut stdout) = self.stdout else {
-                return Err(self.invalid_state());
-            };
-
-            stdout.write_all(content.as_bytes()).await
-        }
-        .map_err(Into::into)
+        stderr.write_all(content.as_bytes()).await.map_err(Into::into)
     }
 }

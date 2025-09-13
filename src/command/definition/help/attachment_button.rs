@@ -61,7 +61,7 @@ macro_rules! attachment_button {
                 )
                 .label(
                     ::ina_localizing::localize!(
-                        async(try in locale) $crate::utility::category::UI, $localization_key
+                        (try in locale) $crate::utility::category::UI, $localization_key
                     ).await?.to_string()
                 )?
                 .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })?
