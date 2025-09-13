@@ -149,9 +149,7 @@ impl FromStream for ArbitraryNameValue {
         };
         let _: Token![=] = match unexpected_end!(input.next()) {
             TokenTree::Punct(punct) if punct.as_char() == '=' => syn::token::Eq { spans: [punct.span()] },
-            other => {
-                return Err(Error::new(other.span(), "expected an equal sign (=)"));
-            }
+            other => return Err(Error::new(other.span(), "expected an equal sign (=)")),
         };
         let value = match unexpected_end!(input.next()) {
             TokenTree::Group(group) => ExprOrGroup::Group(group),
@@ -362,7 +360,6 @@ impl Parse for OptionalArguments {
                 "keep_field_annotations" => keep_field_annotations.append(&mut parse_paths(value)?),
                 "apply_derives" => apply_derives.append(&mut parse_paths(value)?),
                 "apply_annotations" => apply_annotations.append(&mut AttributeList::try_from(value)?.attributes),
-
                 _ => return Err(Error::new(ident.span(), "unknown argument")),
             }
         }

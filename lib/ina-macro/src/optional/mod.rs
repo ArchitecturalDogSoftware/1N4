@@ -62,21 +62,24 @@ pub fn procedure(
     let optional_ident = quote::format_ident!("Optional{input_ident}");
     let ident = input_ident;
 
-    let mut fields_with_defaults = self::fields::FieldsWithDefaults {
-        ident: ident.clone(),
-        optional_ident: optional_ident.clone(),
-        fields: Vec::with_capacity(input_fields.len()),
-    };
-
     let optional_fields = self::fields::fields_to_optional(input_fields.clone())?;
     let mut fields = input_fields;
+    let fields_with_defaults = self::fields::FieldsWithDefaults {
+        ident: ident.clone(),
+        optional_ident: optional_ident.clone(),
+        fields: fields
+            .iter_mut()
+            .map(|field| {
+                let with_default = self::fields::FieldWithDefault::new(field)?;
 
-    for field in &mut fields {
-        fields_with_defaults.fields.push(self::fields::FieldWithDefault::new(field)?);
+                // Unrelated to this particular [`Vec`] being collected, this just happens to be a convenient place to
+                // put it.
+                arguments.retain_only_kept_field_attrs(field);
 
-        arguments.retain_only_kept_field_attrs(field);
-    }
-
+                Ok(with_default)
+            })
+            .collect::<syn::Result<_>>()?,
+    };
     let conversions = fields_with_defaults.generate_conversions();
 
     let attrs = arguments.only_kept_and_applied_attrs(&input_attrs)?;
