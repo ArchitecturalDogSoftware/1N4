@@ -82,8 +82,8 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
 
             self::pass()
         }
-        Event::GatewayHeartbeat(event) => {
-            debug!(async "shard #{id} received heartbeat (seq. {event})").await?;
+        Event::GatewayHeartbeat => {
+            debug!(async "shard #{id} received heartbeat").await?;
 
             self::pass()
         }

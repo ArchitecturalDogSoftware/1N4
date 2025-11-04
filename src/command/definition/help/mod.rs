@@ -30,6 +30,7 @@ use twilight_model::guild::{PartialMember, Permissions, Role};
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
 use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
+use twilight_util::builder::message::{ActionRowBuilder, ButtonBuilder};
 use twilight_util::permission_calculator::PermissionCalculator;
 
 use crate::client::event::EventResult;
@@ -37,7 +38,6 @@ use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
-use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
 use crate::utility::types::custom_id::CustomId;
 use crate::utility::{category, color};
 
@@ -116,25 +116,25 @@ async fn on_command<'ap: 'ev, 'ev>(
     let command_name = command_entry.name;
 
     let build_information_button = ButtonBuilder::new(ButtonStyle::Secondary)
-        .label(localize!(async(try in locale) category::UI, "help-button-build-information").await?.to_string())?
-        .emoji(EmojiReactionType::Unicode { name: "ℹ️".to_string() })?
-        .custom_id(CustomId::new(command_name, "build_information")?)?
+        .label(localize!(async(try in locale) category::UI, "help-button-build-information").await?.to_string())
+        .emoji(EmojiReactionType::Unicode { name: "ℹ️".to_string() })
+        .custom_id(CustomId::new(command_name, "build_information")?)
         .build();
     let source_code_button = ButtonBuilder::new(ButtonStyle::Link)
-        .url(env!("CARGO_PKG_REPOSITORY"))?
-        .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())?
-        .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })?
+        .url(env!("CARGO_PKG_REPOSITORY"))
+        .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())
+        .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })
         .build();
     let licenses_button = self::attachment_button::licenses::button(locale, command_name).await?;
     let privacy_policy_button = self::attachment_button::privacy_policy::button(locale, command_name).await?;
     let security_policy_button = self::attachment_button::security_policy::button(locale, command_name).await?;
 
     let buttons = ActionRowBuilder::new()
-        .component(build_information_button)?
-        .component(source_code_button)?
-        .component(licenses_button)?
-        .component(privacy_policy_button)?
-        .component(security_policy_button)?
+        .component(build_information_button)
+        .component(source_code_button)
+        .component(licenses_button)
+        .component(privacy_policy_button)
+        .component(security_policy_button)
         .build();
 
     crate::follow_up_response!(context, struct {

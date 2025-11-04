@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 use twilight_model::channel::message::Component;
-use twilight_model::channel::message::component::{ActionRow, TextInput};
+use twilight_util::builder::message::ActionRowBuilder;
 use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
 
 /// The maximum amount of permitted inputs within a single modal.
@@ -117,14 +117,12 @@ impl ModalDataBuilder {
     /// # Errors
     ///
     /// This function will return an error if the input is invalid or the maximum number has been reached.
-    pub fn input(&mut self, input: impl Into<TextInput>) -> Result<(), Error> {
+    pub fn input(&mut self, input: impl Into<Component>) -> Result<(), Error> {
         if self.components.len() >= MODAL_INPUT_COUNT {
             return Err(Error::MaximumInputs);
         }
 
-        let input = Component::TextInput(input.into());
-
-        self.components.push(ActionRow { components: vec![input] }.into());
+        self.components.push(ActionRowBuilder::new().component(input.into()).build().into());
 
         Ok(())
     }

@@ -30,13 +30,13 @@ use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, UserMarker};
 use twilight_model::user::User;
 use twilight_util::builder::embed::{EmbedAuthorBuilder, EmbedBuilder, EmbedFieldBuilder, ImageSource};
+use twilight_util::builder::message::ButtonBuilder;
 use twilight_validate::embed::FIELD_VALUE_LENGTH;
 
 use super::input::PollInput;
 use super::response::PollResponse;
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
-use crate::utility::types::builder::ButtonBuilder;
 use crate::utility::{category, color};
 
 /// A poll's type.
@@ -233,7 +233,7 @@ impl Poll {
             this: &Poll,
             name: &'static str,
             style: ButtonStyle,
-            emoji: impl Into<EmojiReactionType> + Send,
+            emoji: impl Into<EmojiReactionType>,
             disabled: bool,
             entry: &CommandEntry,
             locale: Option<Locale>,
@@ -241,8 +241,9 @@ impl Poll {
             let key = format!("{}-builder-{name}", entry.name);
             let label = localize!(async(try in locale) category::UI_BUTTON, key).await?;
             let id = entry.id(name)?.with_str(this.guild_id.to_string())?.with_str(this.user_id.to_string())?;
+            let emoji = emoji.into();
 
-            Ok(ButtonBuilder::new(style).label(label)?.emoji(emoji)?.custom_id(id)?.disabled(disabled).build().into())
+            Ok(ButtonBuilder::new(style).label(label).emoji(emoji).custom_id(id).disabled(disabled).build().into())
         }
 
         Box::pin(async_stream::try_stream! {

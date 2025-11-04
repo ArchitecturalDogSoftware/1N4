@@ -56,16 +56,16 @@ macro_rules! attachment_button {
                 locale: ::std::option::Option<::ina_localizing::locale::Locale>,
                 command_name: &'static ::std::primitive::str
             ) -> ::anyhow::Result<::twilight_model::channel::message::component::Button> {
-                let button = $crate::utility::types::builder::ButtonBuilder::new(
+                let button = ::twilight_util::builder::message::ButtonBuilder::new(
                     ::twilight_model::channel::message::component::ButtonStyle::Secondary
                 )
                 .label(
                     ::ina_localizing::localize!(
                         async(try in locale) $crate::utility::category::UI, $localization_key
                     ).await?.to_string()
-                )?
-                .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })?
-                .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)?
+                )
+                .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })
+                .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)
                 .build();
 
                 ::anyhow::Result::Ok(button)

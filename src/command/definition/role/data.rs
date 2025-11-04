@@ -22,11 +22,11 @@ use twilight_model::channel::message::Component;
 use twilight_model::channel::message::component::{Button, ButtonStyle};
 use twilight_model::id::Id;
 use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
+use twilight_util::builder::message::{ActionRowBuilder, ButtonBuilder};
 use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
-use crate::utility::types::builder::{ActionRowBuilder, ButtonBuilder};
 
 /// A role selector entry.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,10 +50,10 @@ impl Selector {
         let custom_id = entry.id(kind)?.with_str(self.id.to_string())?;
 
         Ok(ButtonBuilder::new(style)
-            .custom_id(custom_id)?
+            .custom_id(custom_id)
             .disabled(disabled)
-            .emoji(self.icon.as_emoji()?)?
-            .label(self.name.as_ref())?
+            .emoji(self.icon.as_emoji()?)
+            .label(self.name.as_ref())
             .build())
     }
 }
@@ -96,7 +96,7 @@ impl SelectorList {
 
             let button = selector.build(entry, kind, disabled)?;
 
-            action_row = action_row.component(button)?;
+            action_row = action_row.component(button);
         }
 
         let action_row = action_row.build();
