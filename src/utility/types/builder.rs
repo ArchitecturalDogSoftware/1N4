@@ -15,25 +15,114 @@
 // <https://www.gnu.org/licenses/>.
 
 use twilight_model::channel::message::Component;
-use twilight_model::channel::message::component::{TextInput, TextInputStyle};
-use twilight_validate::component::{
-    COMPONENT_CUSTOM_ID_LENGTH, TEXT_INPUT_LABEL_MAX, TEXT_INPUT_LABEL_MIN, TEXT_INPUT_LENGTH_MAX,
-    TEXT_INPUT_LENGTH_MIN, TEXT_INPUT_PLACEHOLDER_MAX,
+use twilight_model::channel::message::component::{
+    MediaGallery, MediaGalleryItem, TextInput, TextInputStyle, UnfurledMediaItem,
 };
+use twilight_validate::component::{self as validation, ComponentValidationError};
 
-/// An error that may be returned when interacting with builders.
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// Returned when a method is used on an invalid builder type.
-    #[error("the '{0}' method is not applicable for the specified type")]
-    InvalidType(&'static str),
-    /// Returned when a method is given an invalid value.
-    #[error("an invalid value was provided")]
-    InvalidValue,
-    /// Returned when a limit is exceeded.
-    #[error("{0} limit exceeded: {1}/{2}")]
-    LimitExceeded(&'static str, usize, usize),
+use crate::utility::traits::extension::UnfurledMediaItemExt;
+
+/// An aliased result type that returns a [`ComponentValidationError`] as its error type.
+type Result<T> = std::result::Result<T, ComponentValidationError>;
+
+/// Builds a [`MediaGallery`].
+#[must_use = "builders must be constructed"]
+#[repr(transparent)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MediaGalleryBuilder(MediaGallery);
+
+impl MediaGalleryBuilder {
+    /// Creates a new [`MediaGalleryBuilder`].
+    pub const fn new() -> Self {
+        Self(MediaGallery { id: None, items: Vec::new() })
+    }
+
+    /// Sets the media gallery's numeric identifier.
+    pub const fn id(mut self, id: i32) -> Self {
+        self.0.id = Some(id);
+        self
+    }
+
+    /// Adds an item to the media gallery.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if too many items have been added.
+    pub fn item(mut self, item: impl Into<MediaGalleryItem>) -> Result<Self> {
+        self.0.items.push(item.into());
+
+        self::validation::media_gallery(&self.0).map(|()| self)
+    }
+
+    /// Builds the completed text input.
+    #[must_use]
+    pub fn build(self) -> MediaGallery {
+        self.0
+    }
+}
+
+impl Default for MediaGalleryBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<MediaGalleryBuilder> for MediaGallery {
+    fn from(value: MediaGalleryBuilder) -> Self {
+        value.build()
+    }
+}
+
+impl From<MediaGalleryBuilder> for Component {
+    fn from(value: MediaGalleryBuilder) -> Self {
+        Self::MediaGallery(value.build())
+    }
+}
+/// Builds a [`MediaGalleryItem`].
+#[must_use = "builders must be constructed"]
+#[repr(transparent)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MediaGalleryItemBuilder(MediaGalleryItem);
+
+impl MediaGalleryItemBuilder {
+    /// Creates a new [`MediaGalleryItemBuilder`].
+    pub fn new(media: impl Into<UnfurledMediaItem>) -> Self {
+        Self(MediaGalleryItem { media: media.into(), description: None, spoiler: None })
+    }
+
+    /// Creates a new [`MediaGalleryItemBuilder`] using the given URL.
+    pub fn url(url: impl Into<String>) -> Self {
+        Self::new(UnfurledMediaItem::url(url))
+    }
+
+    /// Sets the media gallery item's description.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given description is too long.
+    pub fn description(mut self, description: impl Into<String>) -> Result<Self> {
+        self.0.description = Some(description.into());
+
+        self::validation::media_gallery_item(&self.0).map(|()| self)
+    }
+
+    /// Sets whether the media gallery item is spoilered.
+    pub const fn spoiler(mut self, spoiler: bool) -> Self {
+        self.0.spoiler = Some(spoiler);
+        self
+    }
+
+    /// Builds the completed text input.
+    #[must_use]
+    pub fn build(self) -> MediaGalleryItem {
+        self.0
+    }
+}
+
+impl From<MediaGalleryItemBuilder> for MediaGalleryItem {
+    fn from(value: MediaGalleryItemBuilder) -> Self {
+        value.build()
+    }
 }
 
 /// Builds a [`TextInput`].
@@ -48,32 +137,20 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if a value exceeds the character limit.
-    pub fn new(custom_id: impl Into<String>, label: impl Into<String>, style: TextInputStyle) -> Result<Self, Error> {
-        let custom_id: String = custom_id.into();
-
-        if custom_id.len() > COMPONENT_CUSTOM_ID_LENGTH {
-            return Err(Error::LimitExceeded("identifier length", custom_id.len(), COMPONENT_CUSTOM_ID_LENGTH));
-        }
-
-        let label: String = label.into();
-
-        if label.len() < TEXT_INPUT_LABEL_MIN {
-            return Err(Error::LimitExceeded("label length", label.len(), TEXT_INPUT_LABEL_MIN));
-        } else if label.len() > TEXT_INPUT_LABEL_MAX {
-            return Err(Error::LimitExceeded("label length", label.len(), TEXT_INPUT_LABEL_MAX));
-        }
-
-        Ok(Self(TextInput {
+    pub fn new(custom_id: impl Into<String>, label: impl Into<String>, style: TextInputStyle) -> Result<Self> {
+        let inner = TextInput {
             id: None,
-            custom_id,
-            label,
+            custom_id: custom_id.into(),
+            label: Some(label.into()),
             max_length: None,
             min_length: None,
             placeholder: None,
             required: None,
             style,
             value: None,
-        }))
+        };
+
+        self::validation::text_input(&inner, true).map(|()| Self(inner))
     }
 
     /// Sets the text input's numeric identifier.
@@ -87,16 +164,10 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if the value is outside of the valid range.
-    pub fn max_length(mut self, max: u16) -> Result<Self, Error> {
-        if (max as usize) < TEXT_INPUT_LENGTH_MIN {
-            return Err(Error::LimitExceeded("value", max as usize, TEXT_INPUT_LENGTH_MIN));
-        } else if (max as usize) > TEXT_INPUT_LENGTH_MAX {
-            return Err(Error::LimitExceeded("value", max as usize, TEXT_INPUT_LENGTH_MAX));
-        }
-
+    pub fn max_length(mut self, max: u16) -> Result<Self> {
         self.0.max_length = Some(max);
 
-        Ok(self)
+        self::validation::text_input(&self.0, true).map(|()| self)
     }
 
     /// Sets the text input's minimum input length.
@@ -104,16 +175,10 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if the value is outside of the valid range.
-    pub fn min_length(mut self, min: u16) -> Result<Self, Error> {
-        if (min as usize) < TEXT_INPUT_LENGTH_MIN {
-            return Err(Error::LimitExceeded("value", min as usize, TEXT_INPUT_LENGTH_MIN));
-        } else if (min as usize) > TEXT_INPUT_LENGTH_MAX {
-            return Err(Error::LimitExceeded("value", min as usize, TEXT_INPUT_LENGTH_MAX));
-        }
-
+    pub fn min_length(mut self, min: u16) -> Result<Self> {
         self.0.min_length = Some(min);
 
-        Ok(self)
+        self::validation::text_input(&self.0, true).map(|()| self)
     }
 
     /// Sets the text input's placeholder text.
@@ -121,16 +186,10 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if the value's length exceeds the limit.
-    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Result<Self, Error> {
-        let placeholder: String = placeholder.into();
+    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Result<Self> {
+        self.0.placeholder = Some(placeholder.into());
 
-        if placeholder.len() > TEXT_INPUT_PLACEHOLDER_MAX {
-            return Err(Error::LimitExceeded("placeholder length", placeholder.len(), TEXT_INPUT_PLACEHOLDER_MAX));
-        }
-
-        self.0.placeholder = Some(placeholder);
-
-        Ok(self)
+        self::validation::text_input(&self.0, true).map(|()| self)
     }
 
     /// Sets whether the button is required.
@@ -145,17 +204,10 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if the value's length exceeds the limit.
-    pub fn value(mut self, value: impl Into<String>) -> Result<Self, Error> {
-        let value: String = value.into();
-        let max_len = self.0.max_length.map_or(TEXT_INPUT_LENGTH_MAX, |v| v as usize);
+    pub fn value(mut self, value: impl Into<String>) -> Result<Self> {
+        self.0.value = Some(value.into());
 
-        if value.len() > max_len {
-            return Err(Error::LimitExceeded("value length", value.len(), max_len));
-        }
-
-        self.0.value = Some(value);
-
-        Ok(self)
+        self::validation::text_input(&self.0, true).map(|()| self)
     }
 
     /// Builds the completed text input.
