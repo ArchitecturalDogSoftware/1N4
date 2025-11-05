@@ -434,8 +434,8 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
     .await;
 
     crate::follow_up_response!(api.client, event, struct {
-        embeds: &[embed.build()],
         flags: MessageFlags::EPHEMERAL,
+        embeds: &[embed.build()],
     })
     .await?;
 

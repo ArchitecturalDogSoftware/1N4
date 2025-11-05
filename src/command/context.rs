@@ -158,8 +158,8 @@ where
             ContextState::Pending => {
                 crate::create_response!(self, struct {
                     kind: InteractionResponseType::ChannelMessageWithSource,
-                    content: content.to_string(),
                     flags: if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
+                    content: content.to_string(),
                 })
                 .await?;
             }
@@ -195,8 +195,8 @@ where
             ContextState::Pending => {
                 crate::create_response!(self, struct {
                     kind: InteractionResponseType::ChannelMessageWithSource,
-                    embeds: [embed.into()],
                     flags: if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
+                    embeds: [embed.into()],
                 })
                 .await?;
             }
@@ -460,13 +460,13 @@ macro_rules! create_response {
     };
     (@new($client:expr, $id:expr, $token:expr, {
         kind: $kind:expr,
+        $(flags: $flags:expr,)?
         $(attachments: $attachments:expr,)?
         $(choices: $choices:expr,)?
         $(components: $components:expr,)?
         $(content: $content:expr,)?
         $(custom_id: $custom_id:expr,)?
         $(embeds: $embeds:expr,)?
-        $(flags: $flags:expr,)?
         $(mentions: $mentions:expr,)?
         $(title: $title:expr,)?
         $(tts: $tts:expr,)?
@@ -474,13 +474,13 @@ macro_rules! create_response {
         $client.create_response($id, $token, &::twilight_model::http::interaction::InteractionResponse {
             kind: $kind,
             data: Some(::twilight_util::builder::InteractionResponseDataBuilder::new()
+                $(.flags($flags))?
                 $(.attachments($attachments))?
                 $(.choices($choices))?
                 $(.components($components))?
                 $(.content($content))?
                 $(.custom_id($custom_id))?
                 $(.embeds($embeds))?
-                $(.flags($flags))?
                 $(.allowed_mentions($mentions))?
                 $(.title($title))?
                 $(.tts($tts))?
@@ -528,20 +528,20 @@ macro_rules! follow_up_response {
         ))
     };
     (@new($client:expr, $token:expr, {
+        $(flags: $flags:expr,)?
         $(attachments: $attachments:expr,)?
         $(components: $components:expr,)?
         $(content: $content:expr,)?
         $(embeds: $embeds:expr,)?
-        $(flags: $flags:expr,)?
         $(mentions: $mentions:expr,)?
         $(tts: $tts:expr,)?
     })) => {
         $client.create_followup($token)
+            $(.flags($flags))?
             $(.attachments($attachments))?
             $(.components($components))?
             $(.content($content))?
             $(.embeds($embeds))?
-            $(.flags($flags))?
             $(.allowed_mentions($mentions))?
             $(.tts($tts))?
     };
