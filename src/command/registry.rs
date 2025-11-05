@@ -362,7 +362,7 @@ macro_rules! define_entry {
                     entry: &$crate::command::registry::CommandEntry,
                     context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
                     custom_id: $crate::utility::types::custom_id::CustomId,
-                    resolver: $crate::command::resolver::ModalFieldResolver<'ev>,
+                    resolver: $crate::command::resolver::ModalComponentResolver<'ev>,
                 ) -> $crate::client::event::EventResult
                 {
                     $modal_callback(entry, context, custom_id, resolver).await

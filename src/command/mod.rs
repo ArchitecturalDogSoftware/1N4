@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use resolver::{CommandOptionResolver, ModalFieldResolver};
+use resolver::{CommandOptionResolver, ModalComponentResolver};
 use twilight_model::application::command::{Command, CommandOptionChoice, CommandOptionType};
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
@@ -108,7 +108,7 @@ pub trait ModalCallable: Send + Sync {
         entry: &CommandEntry,
         context: Context<'ap, 'ev, &'ev ModalInteractionData>,
         custom_id: CustomId,
-        resolver: ModalFieldResolver<'ev>,
+        resolver: ModalComponentResolver<'ev>,
     ) -> EventResult;
 }
 
@@ -274,7 +274,7 @@ macro_rules! define_modals {
             entry: &$crate::command::registry::CommandEntry,
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::modal::ModalInteractionData>,
             custom_id: $crate::utility::types::custom_id::CustomId,
-            resolver: $crate::command::resolver::ModalFieldResolver<'ev>,
+            resolver: $crate::command::resolver::ModalComponentResolver<'ev>,
         ) -> $crate::client::event::EventResult {
             match &**custom_id.variant() {
                 $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id, resolver).await,)*

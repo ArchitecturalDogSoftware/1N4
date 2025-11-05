@@ -34,7 +34,7 @@ use twilight_validate::embed::DESCRIPTION_LENGTH;
 use super::api::{Api, ApiRef};
 use crate::command::context::Context;
 use crate::command::registry::registry;
-use crate::command::resolver::{CommandOptionResolver, ModalFieldResolver, find_focused_option};
+use crate::command::resolver::{CommandOptionResolver, ModalComponentResolver, find_focused_option};
 use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
 use crate::utility::traits::extension::InteractionExt;
 use crate::utility::types::custom_id::CustomId;
@@ -273,7 +273,7 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
         bail!("missing component callback for '{}'", data_id.command());
     };
 
-    let resolver = ModalFieldResolver::new(data);
+    let resolver = ModalComponentResolver::new(data);
 
     callback.on_modal(command, Context::new(api, event, data), data_id, resolver).await
 }
