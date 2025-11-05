@@ -47,8 +47,6 @@ define_command_modules! {
         pub mod localizer;
         /// The ping command.
         pub mod ping;
-        /// The poll command.
-        pub mod poll;
         /// The role command.
         pub mod role;
     }
