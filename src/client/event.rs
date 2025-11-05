@@ -76,7 +76,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
     let id = shard_id.number();
     let result: EventResult = match event {
         Event::Ready(event) => self::on_ready(api, event, shard_id).await,
-        Event::InteractionCreate(event) => self::on_interaction(api, *event, shard_id).await,
+        Event::InteractionCreate(event) => Box::pin(self::on_interaction(api, *event, shard_id)).await,
         Event::Resumed => {
             debug!(async "shard #{id} successfully resumed").await?;
 
