@@ -85,6 +85,137 @@ impl<'ev> CommandOptionResolver<'ev> {
         self.options.get(name).copied().ok_or_else(|| Error::MissingOption(name.into()))
     }
 
+    /// Returns a reference to the stored attachment identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not an
+    /// attachment identifier.
+    pub fn attachment_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<AttachmentMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Attachment(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Attachment, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored boolean associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
+    pub fn boolean(&'ev self, name: impl AsRef<str>) -> Result<&'ev bool, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Boolean(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Boolean, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored channel identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a channel
+    /// identifier.
+    pub fn channel_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<ChannelMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Channel(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Channel, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored float associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a float.
+    pub fn float(&'ev self, name: impl AsRef<str>) -> Result<&'ev f64, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Number(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Number, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored integer associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not an integer.
+    pub fn integer(&'ev self, name: impl AsRef<str>) -> Result<&'ev i64, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Integer(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Integer, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored mentionable identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a
+    /// mentionable identifier.
+    pub fn mentionable_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<GenericMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Mentionable(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Mentionable, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored role identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a role
+    /// identifier.
+    pub fn role_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<RoleMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Role(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Role, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored string associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a string.
+    pub fn string(&'ev self, name: impl AsRef<str>) -> Result<&'ev str, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::String(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::String, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored user identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a user
+    /// identifier.
+    pub fn user_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<UserMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::User(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::User, other.kind())),
+        }
+    }
+
     /// Returns a new [`CommandOptionResolver`] for the options assigned to the subcommand associated with the given
     /// name.
     ///
@@ -116,110 +247,6 @@ impl<'ev> CommandOptionResolver<'ev> {
             other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommandGroup, other.kind())),
         }
     }
-}
-
-/// Defines getter functions for the [`CommandOptionResolver`] type.
-///
-/// # Examples
-///
-/// ```
-/// command_option_resolver_getters! {
-///    /// Returns a reference to the stored boolean associated with the given name.
-///    ///
-///    /// # Errors
-///    ///
-///    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
-///    boolean as Boolean -> &'ev bool;
-/// }
-///
-/// // generates a function with the following signature:
-/// //
-/// // fn boolean<'ev>(&'ev self, name: impl AsRef<str>) -> Result<&'ev bool, Error>;
-/// ```
-macro_rules! command_option_resolver_getters {
-    ($($(#[$attribute:meta])* $name:ident as $type:ident -> $return:ty;)*) => {
-        impl<'ev> CommandOptionResolver<'ev> {$(
-            $(#[$attribute])*
-            pub fn $name(&'ev self, name: impl AsRef<str>) -> Result<$return, Error> {
-                let name = name.as_ref();
-
-                match self.any(name)? {
-                    CommandOptionValue::$type(value) => Ok(value),
-                    other => Err(Error::InvalidOption(name.into(), CommandOptionType::$type, other.kind())),
-                }
-            }
-        )*}
-    };
-}
-
-command_option_resolver_getters! {
-    /// Returns a reference to the stored attachment identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not an
-    /// attachment identifier.
-    attachment_id as Attachment -> &'ev Id<AttachmentMarker>;
-
-    /// Returns a reference to the stored boolean associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
-    boolean as Boolean -> &'ev bool;
-
-    /// Returns a reference to the stored channel identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a channel
-    /// identifier.
-    channel_id as Channel -> &'ev Id<ChannelMarker>;
-
-    /// Returns a reference to the stored float associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a float.
-    float as Number -> &'ev f64;
-
-    /// Returns a reference to the stored integer associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not an integer.
-    integer as Integer -> &'ev i64;
-
-    /// Returns a reference to the stored mentionable identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a
-    /// mentionable identifier.
-    mentionable_id as Mentionable -> &'ev Id<GenericMarker>;
-
-    /// Returns a reference to the stored role identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a role
-    /// identifier.
-    role_id as Role -> &'ev Id<RoleMarker>;
-
-    /// Returns a reference to the stored string associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a string.
-    string as String -> &'ev str;
-
-    /// Returns a reference to the stored user identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a user
-    /// identifier.
-    user_id as User -> &'ev Id<UserMarker>;
 }
 
 /// Resolves and caches a modal's defined fields.
