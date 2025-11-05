@@ -109,13 +109,13 @@ time = { workspace = true, features = ["local-offset", "serde"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = "~0.1"
 toml = { workspace = true, features = ["preserve_order"] }
-twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight", branch = "main" }
-twilight-gateway = { git = "https://github.com/twilight-rs/twilight", branch = "main" }
-twilight-http = { git = "https://github.com/twilight-rs/twilight", branch = "main" }
-twilight-mention = { git = "https://github.com/twilight-rs/twilight", branch = "main" }
-twilight-model = { git = "https://github.com/twilight-rs/twilight", branch = "main" }
-twilight-util = { git = "https://github.com/twilight-rs/twilight", branch = "main", features = ["full"] }
-twilight-validate = { git = "https://github.com/twilight-rs/twilight", branch = "main" }
+twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight", branch = "next" }
+twilight-gateway = { git = "https://github.com/twilight-rs/twilight", branch = "next" }
+twilight-http = { git = "https://github.com/twilight-rs/twilight", branch = "next" }
+twilight-mention = { git = "https://github.com/twilight-rs/twilight", branch = "next" }
+twilight-model = { git = "https://github.com/twilight-rs/twilight", branch = "next" }
+twilight-util = { git = "https://github.com/twilight-rs/twilight", branch = "next", features = ["full"] }
+twilight-validate = { git = "https://github.com/twilight-rs/twilight", branch = "next" }
 
 [build-dependencies]
 camino = "1.1.10"
