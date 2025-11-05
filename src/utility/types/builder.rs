@@ -137,11 +137,12 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if a value exceeds the character limit.
-    pub fn new(custom_id: impl Into<String>, label: impl Into<String>, style: TextInputStyle) -> Result<Self> {
+    pub fn new(custom_id: impl Into<String>, style: TextInputStyle) -> Result<Self> {
+        #[expect(deprecated, reason = "we still need to set the field, even if it's just to `None`")]
         let inner = TextInput {
             id: None,
             custom_id: custom_id.into(),
-            label: Some(label.into()),
+            label: None,
             max_length: None,
             min_length: None,
             placeholder: None,
