@@ -21,6 +21,7 @@ use time::macros::datetime;
 use time::{Duration, OffsetDateTime};
 use twilight_cache_inmemory::model::{CachedGuild, CachedMember};
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
+use twilight_model::channel::message::component::UnfurledMediaItem;
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
@@ -142,6 +143,19 @@ impl GuildExt for TemplateGuild {
 
     fn icon_hash(&self) -> Option<&ImageHash> {
         self.icon_hash.as_ref()
+    }
+}
+
+/// Extends an [`UnfurledMediaItem`].
+pub trait UnfurledMediaItemExt: Sized {
+    /// Creates a new [`UnfurledMediaItem`] with the specified URL.
+    fn url(url: impl Into<String>) -> Self;
+}
+
+impl UnfurledMediaItemExt for UnfurledMediaItem {
+    fn url(url: impl Into<String>) -> Self {
+        // All other fields are ignored when sent from the client.
+        Self { url: url.into(), proxy_url: None, height: None, width: None, content_type: None }
     }
 }
 
