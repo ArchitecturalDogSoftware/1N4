@@ -19,15 +19,17 @@ use ina_logging::debug;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
-use twilight_util::builder::embed::EmbedBuilder;
+use twilight_model::channel::message::MessageFlags;
+use twilight_util::builder::message::{ContainerBuilder, TextDisplayBuilder};
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
+use crate::utility::category;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::traits::extension::IdExt;
-use crate::utility::{category, color};
+use crate::utility::types::builder::ValidatedBuilder;
 
 crate::define_entry!("ping", CommandType::ChatInput, struct {
     contexts: [InteractionContextType::Guild, InteractionContextType::BotDm],
@@ -52,16 +54,27 @@ async fn on_command<'ap: 'ev, 'ev>(
     };
 
     let title = localize!(async(try in locale) category::UI, "ping-start").await?;
-    let embed = EmbedBuilder::new().title(title).color(color::BACKDROP.rgb());
+    let component = ContainerBuilder::new()
+        .accent_color(Some(crate::utility::color::BACKDROP.rgb()))
+        .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
+        .try_build()?;
 
-    context.embed(embed.build(), Visibility::Ephemeral).await?;
+    context.components([component], Visibility::Ephemeral).await?;
 
     let response = context.client().response(&context.interaction.token).await?.model().await?;
     let delay = response.id.creation_date() - context.interaction.id.creation_date();
     let title = localize!(async(try in locale) category::UI, "ping-finish").await?;
-    let embed = EmbedBuilder::new().title(format!("{title} ({delay})")).color(color::BRANDING.rgb());
+    let component = ContainerBuilder::new()
+        .accent_color(Some(crate::utility::color::BRANDING.rgb()))
+        .component(TextDisplayBuilder::new(format!("### {title} ({delay})")).try_build()?)
+        .try_build()?;
 
-    context.client().update_response(&context.interaction.token).embeds(Some(&[embed.build()])).await?;
+    context
+        .client()
+        .update_response(&context.interaction.token)
+        .flags(MessageFlags::IS_COMPONENTS_V2)
+        .components(Some(&[component.into()]))
+        .await?;
 
     debug!(async "received ping command: response delayed by {delay}").await?;
 
