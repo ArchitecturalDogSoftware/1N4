@@ -22,11 +22,12 @@ use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::channel::message::{Component, Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
-use twilight_util::builder::embed::EmbedBuilder;
+use twilight_util::builder::message::{ContainerBuilder, TextDisplayBuilder};
 
 use crate::client::api::ApiRef;
 use crate::utility::color;
 use crate::utility::traits::convert::AsLocale;
+use crate::utility::types::builder::ValidatedBuilder;
 use crate::utility::types::modal::ModalData;
 
 /// An interaction context.
@@ -293,13 +294,15 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        let mut embed = EmbedBuilder::new().color(color).title(title.to_string());
+        let mut container = ContainerBuilder::new()
+            .accent_color(Some(color))
+            .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?);
 
         if let Some(description) = description {
-            embed = embed.description(description.to_string());
+            container = container.component(TextDisplayBuilder::new(description.to_string()).try_build()?);
         }
 
-        self.embed(embed.build(), self.visibility.unwrap_or(Visibility::Ephemeral)).await
+        self.components([container.try_build()?], Visibility::Ephemeral).await
     }
 
     /// Finishes an interaction with an embedded success message.
