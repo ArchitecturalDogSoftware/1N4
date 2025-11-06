@@ -16,14 +16,112 @@
 
 use twilight_model::channel::message::Component;
 use twilight_model::channel::message::component::{
-    MediaGallery, MediaGalleryItem, TextInput, TextInputStyle, UnfurledMediaItem,
+    ActionRow, Button, Container, FileDisplay, FileUpload, Label, MediaGallery, MediaGalleryItem, Section, SelectMenu,
+    SelectMenuOption, Separator, TextDisplay, TextInput, TextInputStyle, Thumbnail, UnfurledMediaItem,
 };
-use twilight_validate::component::{self as validation, ComponentValidationError};
+use twilight_util::builder::message::{
+    ActionRowBuilder, ButtonBuilder, ContainerBuilder, FileDisplayBuilder, FileUploadBuilder, LabelBuilder,
+    SectionBuilder, SelectMenuBuilder, SelectMenuOptionBuilder, SeparatorBuilder, TextDisplayBuilder, ThumbnailBuilder,
+};
+use twilight_validate::component::ComponentValidationError;
 
 use crate::utility::traits::extension::UnfurledMediaItemExt;
 
 /// An aliased result type that returns a [`ComponentValidationError`] as its error type.
 type Result<T> = std::result::Result<T, ComponentValidationError>;
+
+/// A builder that automatically validates the inner type when completed.
+pub trait ValidatedBuilder {
+    /// The inner type.
+    type Inner: Sized;
+
+    /// Validates that the constructed value is considered valid.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value is invalid.
+    fn validate(inner: &Self::Inner) -> Result<()>;
+
+    /// Builds the value, returning it if it is valid.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value is invalid.
+    fn try_build(self) -> Result<Self::Inner>;
+}
+
+/// Implements [`ValidatedBuilder`] for various types.
+///
+/// # Examples
+///
+/// ```
+/// define_validated_builders! {
+///     ContainerBuilder => Container : twilight_validate::component::container;
+/// }
+/// ```
+macro_rules! define_validated_builders {
+    ($($type:path => $inner:path : $function:path $([ $($args:expr), +$(,)? ])?;)*) => {
+        $(
+            impl ValidatedBuilder for $type {
+                type Inner = $inner;
+
+                #[inline]
+                fn validate(inner: &Self::Inner) -> Result<()> {
+                    $function(inner $(, $($args),+)?)
+                }
+
+                fn try_build(self) -> Result<Self::Inner> {
+                    let inner = self.build();
+
+                    <Self as ValidatedBuilder>::validate(&inner).map(|()| inner)
+                }
+            }
+        )*
+    };
+}
+
+define_validated_builders! {
+    ActionRowBuilder => ActionRow : twilight_validate::component::action_row [true];
+    ButtonBuilder => Button : twilight_validate::component::button;
+    FileDisplayBuilder => FileDisplay : never_validate;
+    FileUploadBuilder => FileUpload : twilight_validate::component::file_upload;
+    ContainerBuilder => Container : twilight_validate::component::container;
+    LabelBuilder => Label : twilight_validate::component::label;
+    MediaGalleryBuilder => MediaGallery : twilight_validate::component::media_gallery;
+    MediaGalleryItemBuilder => MediaGalleryItem : twilight_validate::component::media_gallery_item;
+    SectionBuilder => Section : twilight_validate::component::section;
+    SelectMenuBuilder => SelectMenu : twilight_validate::component::select_menu [false];
+    SelectMenuOptionBuilder => SelectMenuOption : never_validate;
+    SeparatorBuilder => Separator : never_validate;
+    TextDisplayBuilder => TextDisplay : twilight_validate::component::text_display;
+    TextInputBuilder => TextInput : twilight_validate::component::text_input [false];
+    ThumbnailBuilder => Thumbnail : twilight_validate::component::thumbnail;
+}
+
+/// Always considers the given component valid.
+///
+/// This function can be removed by passing the `INA_COMPONENT_VALIDATION=strict` environment variable during
+/// compilation.
+///
+/// # Errors
+///
+/// This function will never return an error.
+#[cfg(ina_component_validation = "relaxed")]
+#[inline]
+pub const fn never_validate<T>(_: &T) -> Result<()> {
+    Ok(())
+}
+
+/// This function fails with a compile error.
+///
+/// # Errors
+///
+/// This function will never return an error.
+#[cfg(ina_component_validation = "strict")]
+#[inline]
+pub const fn never_validate<T>(_: &T) -> Result<()> {
+    compile_error!("the component builder must be validated");
+}
 
 /// Builds a [`MediaGallery`].
 #[must_use = "builders must be constructed"]
@@ -48,10 +146,9 @@ impl MediaGalleryBuilder {
     /// # Errors
     ///
     /// This function will return an error if too many items have been added.
-    pub fn item(mut self, item: impl Into<MediaGalleryItem>) -> Result<Self> {
+    pub fn item(mut self, item: impl Into<MediaGalleryItem>) -> Self {
         self.0.items.push(item.into());
-
-        self::validation::media_gallery(&self.0).map(|()| self)
+        self
     }
 
     /// Builds the completed text input.
@@ -100,10 +197,9 @@ impl MediaGalleryItemBuilder {
     /// # Errors
     ///
     /// This function will return an error if the given description is too long.
-    pub fn description(mut self, description: impl Into<String>) -> Result<Self> {
+    pub fn description(mut self, description: impl Into<String>) -> Self {
         self.0.description = Some(description.into());
-
-        self::validation::media_gallery_item(&self.0).map(|()| self)
+        self
     }
 
     /// Sets whether the media gallery item is spoilered.
@@ -137,9 +233,9 @@ impl TextInputBuilder {
     /// # Errors
     ///
     /// This function will return an error if a value exceeds the character limit.
-    pub fn new(custom_id: impl Into<String>, style: TextInputStyle) -> Result<Self> {
-        #[expect(deprecated, reason = "we still need to set the field, even if it's just to `None`")]
-        let inner = TextInput {
+    #[expect(deprecated, reason = "we still need to set the field, even if it's just to `None`")]
+    pub fn new(custom_id: impl Into<String>, style: TextInputStyle) -> Self {
+        Self(TextInput {
             id: None,
             custom_id: custom_id.into(),
             label: None,
@@ -149,9 +245,7 @@ impl TextInputBuilder {
             required: None,
             style,
             value: None,
-        };
-
-        self::validation::text_input(&inner, true).map(|()| Self(inner))
+        })
     }
 
     /// Sets the text input's numeric identifier.
@@ -161,54 +255,33 @@ impl TextInputBuilder {
     }
 
     /// Sets the text input's maximum input length.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value is outside of the valid range.
-    pub fn max_length(mut self, max: u16) -> Result<Self> {
+    pub const fn max_length(mut self, max: u16) -> Self {
         self.0.max_length = Some(max);
-
-        self::validation::text_input(&self.0, true).map(|()| self)
+        self
     }
 
     /// Sets the text input's minimum input length.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value is outside of the valid range.
-    pub fn min_length(mut self, min: u16) -> Result<Self> {
+    pub const fn min_length(mut self, min: u16) -> Self {
         self.0.min_length = Some(min);
-
-        self::validation::text_input(&self.0, true).map(|()| self)
+        self
     }
 
     /// Sets the text input's placeholder text.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value's length exceeds the limit.
-    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Result<Self> {
+    pub fn placeholder(mut self, placeholder: impl Into<String>) -> Self {
         self.0.placeholder = Some(placeholder.into());
-
-        self::validation::text_input(&self.0, true).map(|()| self)
+        self
     }
 
     /// Sets whether the button is required.
     pub const fn required(mut self, required: bool) -> Self {
         self.0.required = Some(required);
-
         self
     }
 
     /// Sets the text input's pre-filled value text.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the value's length exceeds the limit.
-    pub fn value(mut self, value: impl Into<String>) -> Result<Self> {
+    pub fn value(mut self, value: impl Into<String>) -> Self {
         self.0.value = Some(value.into());
-
-        self::validation::text_input(&self.0, true).map(|()| self)
+        self
     }
 
     /// Builds the completed text input.
