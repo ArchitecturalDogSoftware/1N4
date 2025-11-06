@@ -27,7 +27,136 @@ use camino::{Utf8Path, Utf8PathBuf};
 use license_page::CrateList;
 use license_page::opt::{GetLicensesOpt, ToMarkdownPageOpt};
 
+/// Describes the permitted values of a custom configuration.
+#[expect(unused, reason = "these values may be used in the future")]
+#[non_exhaustive]
+enum CustomCfgValues<'s> {
+    /// No value is expected.
+    None,
+    /// Any value is expected.
+    Any,
+    /// One of the specified values is expected.
+    List(&'s [&'s str]),
+    /// No value, or one of the specified values, is expected.
+    NoneOrList(&'s [&'s str]),
+}
+
+/// Contains data for creating custom configurations.
+#[non_exhaustive]
+struct CustomCfg<'s> {
+    /// The configuration key. This must be a valid Rust identifier.
+    key: &'s str,
+    /// The configuration's expected value(s).
+    values: CustomCfgValues<'s>,
+}
+
+impl<'s> CustomCfg<'s> {
+    /// Creates a new [`CustomCfg`].
+    const fn new(key: &'s str, values: CustomCfgValues<'s>) -> Self {
+        Self { key, values }
+    }
+
+    /// Informs the build system to check for this configuration during compilation.
+    fn register(self) -> Self {
+        fn list_string(values: &[&str]) -> String {
+            values.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(", ")
+        }
+
+        println!("cargo::rustc-check-cfg=cfg(ina_{}, values({}))", self.key, match self.values {
+            CustomCfgValues::None => "none()".to_string(),
+            CustomCfgValues::Any => "any()".to_string(),
+            CustomCfgValues::List(items) => list_string(items),
+            CustomCfgValues::NoneOrList(items) => format!("none(), {}", list_string(items)),
+        });
+
+        self
+    }
+
+    /// Enables the configuration for the current compilation, assigning the provided value.
+    fn set(self, value: Option<&str>) {
+        match (value, &self.values) {
+            (None, CustomCfgValues::None | CustomCfgValues::NoneOrList(_)) => {
+                println!("cargo::rustc-cfg=ina_{}", self.key);
+            }
+            (Some(value), CustomCfgValues::Any) => {
+                println!("cargo::rustc-cfg=ina_{}=\"{value}\"", self.key);
+            }
+            (Some(value), CustomCfgValues::List(items) | CustomCfgValues::NoneOrList(items))
+                if items.contains(&value) =>
+            {
+                println!("cargo::rustc-cfg=ina_{}=\"{value}\"", self.key);
+            }
+            (None, CustomCfgValues::Any) => {
+                println!("cargo::error=expected a value for cfg '{}'", self.key);
+            }
+            (None, CustomCfgValues::List(items)) => {
+                println!("cargo::error=expected a value (one of {items:?}) for cfg '{}'", self.key);
+            }
+            (Some(value), CustomCfgValues::None) => {
+                println!("cargo::error=unexpected value '{value}' for cfg '{}'", self.key);
+            }
+            (Some(value), CustomCfgValues::List(items)) => {
+                println!("cargo::error=unexpected value '{value}' (expected one of {items:?}) for cfg '{}'", self.key);
+            }
+            (Some(value), CustomCfgValues::NoneOrList(items)) => {
+                println!(
+                    "cargo::error=unexpected value '{value}' (expected none or one of {items:?}) for cfg '{}'",
+                    self.key
+                );
+            }
+        }
+    }
+
+    /// Associates this configuration with an environment variable, assigning it to the variable's value.
+    #[expect(clippy::expect_used, reason = "if the expect fails, it means there is a logic error that should be fixed")]
+    #[expect(unused, reason = "this function may be used in the future")]
+    fn env<P, F>(self, should_enable: P, get_value: F)
+    where
+        P: FnOnce(&str) -> bool,
+        F: FnOnce(String) -> Option<String>,
+    {
+        let env_key = format!("INA_{}", self.key.to_uppercase());
+        let env_value = std::env::var(&env_key);
+
+        println!("cargo::rerun-if-env-changed={env_key}");
+
+        if env_value.as_deref().is_ok_and(should_enable) {
+            self.set(get_value(env_value.expect("this should only run if the variable is set")).as_deref());
+        }
+    }
+
+    /// Associates this configuration with an environment variable, assigning it to the variable's value.
+    ///
+    /// If the variable's value is invalid or missing, the configuration will be set to the provided default.
+    fn env_or_else<P, F, D>(self, should_use_value: P, get_value: F, default: D)
+    where
+        P: FnOnce(&str) -> bool,
+        F: FnOnce(String) -> Option<String>,
+        D: FnOnce() -> Option<&'static str>,
+    {
+        let env_key = format!("INA_{}", self.key.to_uppercase());
+        let env_value = std::env::var(&env_key);
+
+        println!("cargo::rerun-if-env-changed={env_key}");
+
+        if let Ok(env_value) = env_value
+            && should_use_value(&env_value)
+        {
+            self.set(get_value(env_value).as_deref());
+        } else {
+            self.set(default());
+        }
+    }
+}
+
 fn main() -> std::io::Result<()> {
+    // Add custom `#[cfg]` entries.
+    CustomCfg::new("component_validation", CustomCfgValues::List(&["relaxed", "strict"])).register().env_or_else(
+        |env_value| matches!(env_value, "relaxed" | "strict"),
+        Some,
+        || Some("relaxed"),
+    );
+
     // These environment variables are provided by Cargo, so they should always be present. It
     // looks like Cargo is only handling UTF-8 paths anyways, so it's safe to unwrap on that too.
     //
