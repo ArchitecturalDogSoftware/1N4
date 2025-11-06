@@ -20,7 +20,7 @@ use anyhow::{Result, ensure};
 use ina_localizing::locale::Locale;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::{Interaction, InteractionType};
-use twilight_model::channel::message::{Embed, MessageFlags};
+use twilight_model::channel::message::{Component, Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
 use twilight_util::builder::embed::EmbedBuilder;
 
@@ -203,6 +203,50 @@ where
             ContextState::Deferred => {
                 crate::follow_up_response!(self, struct {
                     embeds: &[embed.into()],
+                })
+                .await?;
+            }
+            ContextState::Completed => unreachable!("the interaction must not be completed"),
+        }
+
+        self.state = ContextState::Completed;
+        self.visibility = Some(visibility);
+
+        Ok(())
+    }
+
+    /// Responds to the interaction with a component-based message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    pub async fn components<C, I>(&mut self, components: I, visibility: Visibility) -> Result<()>
+    where
+        C: Into<Component>,
+        I: IntoIterator<Item = C>,
+    {
+        ensure!(!self.is_completed(), "the interaction must not be completed");
+
+        if let Some(assigned) = self.visibility {
+            ensure!(assigned == visibility, "the response visibility has already been set");
+        }
+
+        match self.state {
+            ContextState::Pending => {
+                crate::create_response!(self, struct {
+                    kind: InteractionResponseType::ChannelMessageWithSource,
+                    flags: MessageFlags::IS_COMPONENTS_V2 | (
+                        if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() }
+                    ),
+                    components: components.into_iter().map(Into::into),
+                })
+                .await?;
+            }
+            ContextState::Deferred => {
+                crate::follow_up_response!(self, struct {
+                    flags: MessageFlags::IS_COMPONENTS_V2,
+                    components: &(components.into_iter().map(Into::into).collect::<Box<[_]>>()),
                 })
                 .await?;
             }
