@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+use std::error::Error;
+
 use twilight_model::channel::message::Component;
 use twilight_model::channel::message::component::{
     ActionRow, Button, Container, FileDisplay, FileUpload, Label, MediaGallery, MediaGalleryItem, Section, SelectMenu,
@@ -27,27 +29,26 @@ use twilight_validate::component::ComponentValidationError;
 
 use crate::utility::traits::extension::UnfurledMediaItemExt;
 
-/// An aliased result type that returns a [`ComponentValidationError`] as its error type.
-type Result<T> = std::result::Result<T, ComponentValidationError>;
-
 /// A builder that automatically validates the inner type when completed.
 pub trait ValidatedBuilder {
     /// The inner type.
     type Inner: Sized;
+    /// The error type.
+    type Error: Error + Sized;
 
     /// Validates that the constructed value is considered valid.
     ///
     /// # Errors
     ///
     /// This function will return an error if the value is invalid.
-    fn validate(inner: &Self::Inner) -> Result<()>;
+    fn validate(inner: &Self::Inner) -> Result<(), Self::Error>;
 
     /// Builds the value, returning it if it is valid.
     ///
     /// # Errors
     ///
     /// This function will return an error if the value is invalid.
-    fn try_build(self) -> Result<Self::Inner>;
+    fn try_build(self) -> Result<Self::Inner, Self::Error>;
 }
 
 /// Implements [`ValidatedBuilder`] for various types.
@@ -64,13 +65,14 @@ macro_rules! define_validated_builders {
         $(
             impl ValidatedBuilder for $type {
                 type Inner = $inner;
+                type Error = ComponentValidationError;
 
                 #[inline]
-                fn validate(inner: &Self::Inner) -> Result<()> {
+                fn validate(inner: &Self::Inner) -> Result<(), Self::Error> {
                     $function(inner $(, $($args),+)?)
                 }
 
-                fn try_build(self) -> Result<Self::Inner> {
+                fn try_build(self) -> Result<Self::Inner, Self::Error> {
                     let inner = self.build();
 
                     <Self as ValidatedBuilder>::validate(&inner).map(|()| inner)
@@ -108,7 +110,7 @@ define_validated_builders! {
 /// This function will never return an error.
 #[cfg(ina_component_validation = "relaxed")]
 #[inline]
-pub const fn never_validate<T>(_: &T) -> Result<()> {
+pub const fn never_validate<T, E>(_: &T) -> Result<(), E> {
     Ok(())
 }
 
@@ -119,7 +121,7 @@ pub const fn never_validate<T>(_: &T) -> Result<()> {
 /// This function will never return an error.
 #[cfg(ina_component_validation = "strict")]
 #[inline]
-pub const fn never_validate<T>(_: &T) -> Result<()> {
+pub const fn never_validate<T, E>(_: &T) -> Result<(), E> {
     compile_error!("the component builder must be validated");
 }
 

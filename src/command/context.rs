@@ -28,7 +28,7 @@ use crate::client::api::ApiRef;
 use crate::utility::color;
 use crate::utility::traits::convert::AsLocale;
 use crate::utility::types::builder::ValidatedBuilder;
-use crate::utility::types::modal::ModalData;
+use crate::utility::types::modal::Modal;
 
 /// An interaction context.
 #[non_exhaustive]
@@ -266,7 +266,7 @@ where
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn modal(&mut self, ModalData { custom_id, title, components }: ModalData) -> Result<()> {
+    pub async fn modal(&mut self, Modal { custom_id, title, components }: Modal) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
         ensure!(!self.is_deferred(), "the interaction must not be deferred");
 
