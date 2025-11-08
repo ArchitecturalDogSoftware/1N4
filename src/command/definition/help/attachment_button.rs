@@ -29,7 +29,6 @@ macro_rules! attachment_button {
     (
         $button_id:ident,
         $localization_key:expr,
-        $icon:expr,
         $embedded_input_dir:expr,
         $input_file_name:expr,
         $output_file_name:expr,
@@ -61,10 +60,9 @@ macro_rules! attachment_button {
                 )
                 .label(
                     ::ina_localizing::localize!(
-                        async(try in locale) $crate::utility::category::UI, $localization_key
+                        async(try in locale) $crate::utility::category::UI_BUTTON, $localization_key
                     ).await?.to_string()
                 )
-                .emoji(::twilight_model::channel::message::EmojiReactionType::Unicode { name: $icon.to_string() })
                 .custom_id($crate::utility::types::custom_id::CustomId::new(command_name, ::std::stringify!($button_id))?)
                 .build();
 
@@ -133,11 +131,10 @@ macro_rules! attachment_button {
         }
     };
 
-    ($button_id:ident, $localization_key:expr, $icon:expr, $embedded_input_dir:expr, $input_file_name:expr,) => {
+    ($button_id:ident, $localization_key:expr, $embedded_input_dir:expr, $input_file_name:expr,) => {
         attachment_button!(
             $button_id,
             $localization_key,
-            $icon,
             $embedded_input_dir,
             $input_file_name,
             $input_file_name,
@@ -145,18 +142,11 @@ macro_rules! attachment_button {
     }
 }
 
-attachment_button!(licenses, "help-button-licenses", "📃", env!("OUT_DIR"), "licenses.md",);
-attachment_button!(
-    privacy_policy,
-    "help-button-privacy-policy",
-    "🔐",
-    concat!(env!("CARGO_MANIFEST_DIR"), "/docs"),
-    "PRIVACY_POLICY.md",
-);
+attachment_button!(licenses, "help-view", env!("OUT_DIR"), "licenses.md",);
+attachment_button!(privacy_policy, "help-view", concat!(env!("CARGO_MANIFEST_DIR"), "/docs"), "PRIVACY_POLICY.md",);
 attachment_button!(
     security_policy,
-    "help-button-security-policy",
-    "📢",
+    "help-view",
     concat!(env!("CARGO_MANIFEST_DIR"), "/docs"),
     "SECURITY.md",
     "SECURITY_POLICY.md",

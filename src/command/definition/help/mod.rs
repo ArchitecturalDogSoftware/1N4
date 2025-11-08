@@ -24,22 +24,23 @@ use twilight_model::application::command::{Command, CommandOptionType, CommandTy
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
-use twilight_model::channel::message::EmojiReactionType;
-use twilight_model::channel::message::component::ButtonStyle;
-use twilight_model::guild::{PartialMember, Permissions, Role};
+use twilight_model::channel::message::Component;
+use twilight_model::channel::message::component::{Button, ButtonStyle, UnfurledMediaItem};
 use twilight_model::id::Id;
-use twilight_model::id::marker::{GuildMarker, RoleMarker, UserMarker};
-use twilight_util::builder::embed::{EmbedBuilder, EmbedFooterBuilder};
-use twilight_util::builder::message::{ActionRowBuilder, ButtonBuilder};
-use twilight_util::permission_calculator::PermissionCalculator;
+use twilight_model::id::marker::GuildMarker;
+use twilight_util::builder::message::{
+    ButtonBuilder, ContainerBuilder, SectionBuilder, SeparatorBuilder, TextDisplayBuilder, ThumbnailBuilder,
+};
 
 use crate::client::event::EventResult;
 use crate::command::context::{Context, Visibility};
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
-use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
+use crate::utility::category;
+use crate::utility::traits::convert::{AsImage, AsLocale};
+use crate::utility::traits::extension::UnfurledMediaItemExt;
+use crate::utility::types::builder::ValidatedBuilder;
 use crate::utility::types::custom_id::CustomId;
-use crate::utility::{category, color};
 
 mod attachment_button;
 
@@ -81,68 +82,59 @@ async fn on_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    let mut buffer = String::new();
-
-    writeln!(&mut buffer, "{}", localize!(async(try in locale) category::UI, "help-header").await?)?;
-
-    writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-global").await?)?;
-
-    let commands = context.client().global_commands().await?.model().await?;
-
-    self::write_command_section(&context, locale, commands, &mut buffer).await?;
-
-    if let Some(guild_id) = context.interaction.guild_id {
-        writeln!(&mut buffer, "### {}:\n", localize!(async(try in locale) category::UI, "help-guild").await?)?;
-
-        let commands = context.client().guild_commands(guild_id).await?.model().await?;
-
-        self::write_command_section(&context, locale, commands, &mut buffer).await?;
-    }
-
-    let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
-    let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
-    let footer = EmbedFooterBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).build();
-    let color = color::BRANDING.rgb();
-    let author = if let Some(user) = context.api.cache.current_user() {
-        user.as_embed_author()?
+    let avatar_url = if let Some(user) = context.api.cache.current_user() {
+        user.as_image_url()?
     } else {
         let user = context.api.client.current_user().await?.model().await?;
 
-        user.as_embed_author()?
+        user.as_image_url()?
     };
 
-    let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).footer(footer).build();
+    let title = localize!(async(try in locale) category::UI, "help-title").await?.to_string();
+    let header = localize!(async(try in locale) category::UI, "help-header").await?;
+
+    let section = SectionBuilder::new(ThumbnailBuilder::new(UnfurledMediaItem::url(avatar_url)).try_build()?)
+        .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
+        .component(TextDisplayBuilder::new(header).try_build()?);
+
+    let mut container = ContainerBuilder::new()
+        .accent_color(Some(crate::utility::color::BRANDING.rgb()))
+        .component(section.try_build()?)
+        .component(SeparatorBuilder::new().try_build()?)
+        .component(self::create_command_section(context, locale, None).await?);
+
+    if let Some(guild_id) = context.interaction.guild_id {
+        container = container.component(self::create_command_section(context, locale, Some(guild_id)).await?);
+    }
 
     let command_name = command_entry.name;
 
     let build_information_button = ButtonBuilder::new(ButtonStyle::Secondary)
-        .label(localize!(async(try in locale) category::UI, "help-button-build-information").await?.to_string())
-        .emoji(EmojiReactionType::Unicode { name: "ℹ️".to_string() })
+        .label(localize!(async(try in locale) category::UI_BUTTON, "help-view").await?.to_string())
         .custom_id(CustomId::new(command_name, "build_information")?)
-        .build();
+        .try_build()?;
     let source_code_button = ButtonBuilder::new(ButtonStyle::Link)
         .url(env!("CARGO_PKG_REPOSITORY"))
-        .label(localize!(async(try in locale) category::UI, "help-button-source-code").await?.to_string())
-        .emoji(EmojiReactionType::Unicode { name: "🔗".to_string() })
-        .build();
+        .label(localize!(async(try in locale) category::UI_BUTTON, "help-open").await?.to_string())
+        .try_build()?;
     let licenses_button = self::attachment_button::licenses::button(locale, command_name).await?;
     let privacy_policy_button = self::attachment_button::privacy_policy::button(locale, command_name).await?;
     let security_policy_button = self::attachment_button::security_policy::button(locale, command_name).await?;
 
-    let buttons = ActionRowBuilder::new()
-        .component(build_information_button)
-        .component(source_code_button)
-        .component(licenses_button)
-        .component(privacy_policy_button)
-        .component(security_policy_button)
-        .build();
+    let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
+    let footer = footer.split('\n').map(|s| format!("-# {s}")).collect::<Vec<_>>().join("\n");
 
-    crate::follow_up_response!(context, struct {
-        components: &[buttons.into()],
-        embeds: &[embed],
-    })
-    .await?;
-    context.complete();
+    container = container
+        .component(SeparatorBuilder::new().try_build()?)
+        .component(self::create_button_section(locale, "source-code", "url", source_code_button).await?)
+        .component(self::create_button_section(locale, "build-information", "reply", build_information_button).await?)
+        .component(self::create_button_section(locale, "licenses", "reply", licenses_button).await?)
+        .component(self::create_button_section(locale, "privacy-policy", "reply", privacy_policy_button).await?)
+        .component(self::create_button_section(locale, "security-policy", "reply", security_policy_button).await?)
+        .component(SeparatorBuilder::new().try_build()?)
+        .component(TextDisplayBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).try_build()?);
+
+    context.components([container.try_build()?], Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
@@ -164,176 +156,141 @@ async fn on_build_information_component<'ap: 'ev, 'ev>(
 
     context.defer(Visibility::Ephemeral).await?;
 
-    let mut buffer = String::new();
-    writeln!(buffer, "- `VERSION`: `{}`", env!("CARGO_PKG_VERSION"))?;
-    writeln!(buffer, "- `FEATURES`: `{}`", info::FEATURES)?;
-    writeln!(buffer, "- `COMMIT_HASH`: `{}`", info::COMMIT_HASH)?;
-    writeln!(buffer, "- `TARGET_TRIPLE`: `{}`", info::TARGET_TRIPLE)?;
-    writeln!(buffer, "- `PROFILE`: `{}`", info::PROFILE)?;
-
     let locale = match context.as_locale() {
         Ok(locale) => Some(locale),
         Err(ina_localizing::Error::MissingLocale) => None,
         Err(error) => return Err(error.into()),
     };
 
-    let title = localize!(async(try in locale) category::UI, "help-embed-build-information-header").await?.to_string();
-    let color = color::BRANDING.rgb();
-    let author = if let Some(user) = context.api.cache.current_user() {
-        user.as_embed_author()?
-    } else {
-        let user = context.api.client.current_user().await?.model().await?;
+    let mut buffer = String::new();
 
-        user.as_embed_author()?
-    };
+    writeln!(&mut buffer, "- `VERSION`: `{}`", env!("CARGO_PKG_VERSION"))?;
+    writeln!(&mut buffer, "- `FEATURES`: `{}`", info::FEATURES)?;
+    writeln!(&mut buffer, "- `COMMIT_HASH`: `{}`", info::COMMIT_HASH)?;
+    writeln!(&mut buffer, "- `TARGET_TRIPLE`: `{}`", info::TARGET_TRIPLE)?;
+    writeln!(&mut buffer, "- `PROFILE`: `{}`", info::PROFILE)?;
 
-    let embed = EmbedBuilder::new().title(title).author(author).color(color).description(buffer).build();
-    context.embed(embed, Visibility::Ephemeral).await?;
+    let title = localize!(async(try in locale) category::UI, "help-build-information-header").await?;
+    let container = ContainerBuilder::new()
+        .accent_color(Some(crate::utility::color::BRANDING.rgb()))
+        .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
+        .component(SeparatorBuilder::new().try_build()?)
+        .component(TextDisplayBuilder::new(buffer).try_build()?);
+
+    context.components([container.try_build()?], Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
 
-/// Writes a command section into the given buffer.
+/// Creates a component that displays all available command entries.
 ///
 /// # Errors
 ///
 /// This function will return an error if a command entry could not be created.
-async fn write_command_section<'ap: 'ev, 'ev, F>(
-    context: &Context<'ap, 'ev, &'ev CommandData>,
+async fn create_command_section<'ap: 'ev, 'ev>(
+    context: Context<'ap, 'ev, &'ev CommandData>,
     locale: Option<Locale>,
-    mut commands: Vec<Command>,
-    f: &mut F,
-) -> Result<()>
-where
-    F: Write + Send,
-{
-    self::clean_commands(context, &mut commands);
+    guild_id: Option<Id<GuildMarker>>,
+) -> Result<Component> {
+    let mut section_content = String::new();
+
+    let (title, mut commands) = if let Some(guild_id) = guild_id {
+        (
+            localize!(async(try in locale) category::UI, "help-global").await?,
+            context.client().guild_commands(guild_id).await?.model().await?,
+        )
+    } else {
+        (
+            localize!(async(try in locale) category::UI, "help-guild").await?,
+            context.client().global_commands().await?.model().await?,
+        )
+    };
+
+    writeln!(&mut section_content, "**{title}:**")?;
+
+    // TODO: See if there's any way to reliably trim commands that the calling user doesn't have access to.
 
     if commands.is_empty() {
-        writeln!(f, "> *{}*", localize!(async(try in locale) category::UI, "help-missing").await?)?;
+        let missing_text = localize!(async(try in locale) category::UI, "help-missing").await?;
 
-        return Ok(());
+        write!(&mut section_content, "> *{missing_text}*")?;
+    } else {
+        commands.sort_unstable_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
+
+        for command in commands {
+            let Some(command_content) = self::create_command_entry(locale, command).await? else { continue };
+
+            writeln!(&mut section_content, "{command_content}")?;
+        }
     }
 
-    for command in commands {
-        self::write_command(locale, command, f).await?;
-
-        writeln!(f)?;
-    }
-
-    Ok(())
+    Ok(TextDisplayBuilder::new(section_content).try_build()?.into())
 }
 
-/// Writes a command entry into the given buffer.
+/// Creates a string that displays a command entry.
 ///
 /// # Errors
 ///
 /// This function will return an error if the command entry could not be created.
-async fn write_command<F>(locale: Option<Locale>, command: Command, f: &mut F) -> Result<()>
-where
-    F: Write + Send,
-{
-    let Command { name, kind, id, contexts, nsfw, options, .. } = command;
+async fn create_command_entry(locale: Option<Locale>, command: Command) -> Result<Option<String>> {
+    // If this is none, it means that the command has not been registered and we should skip it.
+    let Some(command_id) = command.id else { return Ok(None) };
 
-    let Some(id) = id else {
-        return Ok(());
-    };
-    if kind != CommandType::ChatInput {
-        return Ok(());
+    if command.kind != CommandType::ChatInput {
+        return Ok(None);
     }
 
-    let localized_name_key = format!("{name}-name");
-    let localized_description_key = format!("{name}-description");
+    let mut content = String::new();
+    let mut command_flags = Vec::<String>::with_capacity(3);
 
-    let localized_name = localize!(async(try in locale) category::COMMAND, localized_name_key).await?;
-    let localized_description = localize!(async(try in locale) category::COMMAND, localized_description_key).await?;
-    let has_subcommands = options.iter().any(|option| {
+    if command.options.iter().any(|option| {
         //
         matches!(option.kind, CommandOptionType::SubCommand | CommandOptionType::SubCommandGroup)
-    });
+    }) {
+        command_flags.push(localize!(async(try in locale) category::UI, "help-tag-subcommands").await?.into());
 
-    if has_subcommands { write!(f, "- `/{localized_name}`") } else { write!(f, "- </{name}:{id}>") }?;
+        let localized_name_key = format!("{}-name", command.name);
+        let localized_name = localize!(async(try in locale) category::COMMAND, localized_name_key).await?;
 
-    let mut flags = Vec::with_capacity(3);
-
-    if has_subcommands {
-        flags.push(localize!(async(try in locale) category::UI, "help-tag-subcommands").await?);
-    }
-    if contexts.is_some_and(|v| v.contains(&InteractionContextType::BotDm)) {
-        flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?);
-    }
-    if nsfw.unwrap_or(false) {
-        flags.push(localize!(async(try in locale) category::UI, "help-tag-nsfw").await?);
+        write!(&mut content, "- `/{localized_name}`")?;
+    } else {
+        write!(&mut content, "- </{}:{command_id}>", command.name)?;
     }
 
-    if !flags.is_empty() {
-        let flags = flags.into_iter().map(|t| t.to_string()).collect::<Box<[_]>>();
-
-        write!(f, " - *{}*", flags.join(", "))?;
+    if command.contexts.is_some_and(|context| context.contains(&InteractionContextType::BotDm)) {
+        command_flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?.into());
+    }
+    if command.nsfw.unwrap_or(false) {
+        command_flags.push(localize!(async(try in locale) category::UI, "help-tag-nsfw").await?.into());
     }
 
-    write!(f, "\n> {localized_description}").map_err(Into::into)
+    if !command_flags.is_empty() {
+        write!(&mut content, " - *{}*", command_flags.join(", "))?;
+    }
+
+    let localized_description_key = format!("{}-description", command.name);
+    let localized_description = localize!(async(try in locale) category::COMMAND, localized_description_key).await?;
+
+    write!(&mut content, "\n> {localized_description}")?;
+
+    Ok(Some(content))
 }
 
-/// Cleans up a list of commands.
-fn clean_commands<'ap: 'ev, 'ev>(_: &Context<'ap, 'ev, &'ev CommandData>, commands: &mut [Command]) {
-    // TODO: See if there's a way to improve this; currently it hides *too many* commands.
-    //
-    // if let Some((guild_id, user_id)) = context.interaction.guild_id.zip(context.interaction.author_id()) {
-    // let member = context.interaction.member.as_ref();
-    // let permissions = self::get_member_permissions(context, guild_id, user_id, member).await?;
-    //
-    // commands.retain(|c| c.default_member_permissions.is_none_or(|p| p.contains(permissions)));
-    // };
-
-    commands.sort_unstable_by_key(|c| c.name.clone());
-}
-
-/// Returns a given member's permissions.
+/// Creates a new section for the given button.
 ///
 /// # Errors
 ///
-/// This function will return an error if the member's permissions could not be resolved.
-#[expect(dead_code, reason = "this is not currently used")]
-async fn get_member_permissions<'ap: 'ev, 'ev>(
-    context: &Context<'ap, 'ev, &'ev CommandData>,
-    guild_id: Id<GuildMarker>,
-    user_id: Id<UserMarker>,
-    member: Option<&PartialMember>,
-) -> Result<Permissions> {
-    #[inline]
-    fn get_role_permissions(roles: &[Role], role_id: Id<RoleMarker>) -> Permissions {
-        roles.iter().find_map(|r| (r.id == role_id).then_some(r.permissions)).unwrap_or(Permissions::empty())
-    }
+/// This function will return an error if the section could not be created.
+async fn create_button_section(
+    locale: Option<Locale>,
+    text_key: &str,
+    action_key: &str,
+    button: Button,
+) -> Result<Component> {
+    let text = localize!(async(try in locale) category::UI_BUTTON, format!("help-label-{text_key}")).await?;
+    let action = localize!(async(try in locale) category::UI_BUTTON, format!("help-action-{action_key}")).await?;
 
-    if let Some(permissions) = member.and_then(|m| m.permissions) {
-        return Ok(permissions);
-    }
+    let text_display = TextDisplayBuilder::new(format!("{text}\n-# {action}")).try_build()?;
 
-    let owner_id = if let Some(guild) = context.api.cache.guild(guild_id) {
-        guild.owner_id()
-    } else {
-        context.api.client.guild(guild_id).await?.model().await?.owner_id
-    };
-
-    let guild_roles = context.api.client.roles(guild_id).await?.model().await?;
-    let everyone_role = get_role_permissions(&guild_roles, guild_id.cast());
-    let member_roles: Box<[_]> = if let Some(member) = member {
-        member.roles.iter().map(|&r| (r, get_role_permissions(&guild_roles, r))).collect()
-    } else if let Some(member) = context.api.cache.member(guild_id, user_id) {
-        member.roles().iter().map(|&r| (r, get_role_permissions(&guild_roles, r))).collect()
-    } else {
-        let member = context.api.client.guild_member(guild_id, user_id).await?.model().await?;
-
-        member.roles.into_iter().map(|r| (r, get_role_permissions(&guild_roles, r))).collect()
-    };
-
-    let calculator = PermissionCalculator::new(guild_id, user_id, everyone_role, &member_roles).owner_id(owner_id);
-
-    Ok(if let Some(ref channel) = context.interaction.channel {
-        // TODO: See if there's a way to check overridden permissions instead.
-        calculator.in_channel(channel.kind, channel.permission_overwrites.as_deref().unwrap_or(&[]))
-    } else {
-        calculator.root()
-    })
+    Ok(SectionBuilder::new(button).component(text_display).try_build()?.into())
 }
