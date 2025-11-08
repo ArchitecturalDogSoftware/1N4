@@ -27,6 +27,7 @@ use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
 
 use crate::command::registry::CommandEntry;
 use crate::utility::traits::convert::AsEmoji;
+use crate::utility::types::builder::ValidatedBuilder;
 
 /// A role selector entry.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,7 +55,7 @@ impl Selector {
             .disabled(disabled)
             .emoji(self.icon.as_emoji()?)
             .label(self.name.as_ref())
-            .build())
+            .try_build()?)
     }
 }
 
@@ -89,7 +90,7 @@ impl SelectorList {
 
         for (index, selector) in self.inner.iter().enumerate() {
             if index != 0 && index % ACTION_ROW_COMPONENT_COUNT == 0 {
-                action_rows.push(action_row.build().into());
+                action_rows.push(action_row.try_build()?.into());
 
                 action_row = ActionRowBuilder::new();
             }
@@ -99,7 +100,7 @@ impl SelectorList {
             action_row = action_row.component(button);
         }
 
-        let action_row = action_row.build();
+        let action_row = action_row.try_build()?;
 
         if !action_row.components.is_empty() {
             action_rows.push(action_row.into());
