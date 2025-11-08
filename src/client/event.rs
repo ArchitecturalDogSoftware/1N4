@@ -23,22 +23,25 @@ use ina_logging::{debug, error, info, warn};
 use rand::{Rng, rng};
 use time::{Duration, OffsetDateTime};
 use twilight_gateway::{Event, ShardId};
+use twilight_mention::Mention;
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::gateway::payload::incoming::{InteractionCreate, Ready};
 use twilight_model::http::attachment::Attachment;
 use twilight_model::http::interaction::InteractionResponseType;
-use twilight_util::builder::embed::EmbedBuilder;
-use twilight_validate::embed::DESCRIPTION_LENGTH;
+use twilight_util::builder::message::{
+    ContainerBuilder, SectionBuilder, SeparatorBuilder, TextDisplayBuilder, ThumbnailBuilder,
+};
 
 use super::api::{Api, ApiRef};
 use crate::command::context::Context;
 use crate::command::registry::registry;
 use crate::command::resolver::{CommandOptionResolver, ModalComponentResolver, find_focused_option};
-use crate::utility::traits::convert::{AsEmbedAuthor, AsLocale};
-use crate::utility::traits::extension::InteractionExt;
+use crate::utility::category;
+use crate::utility::traits::convert::{AsImage, AsLocale};
+use crate::utility::traits::extension::{InteractionExt, UserExt};
+use crate::utility::types::builder::ValidatedBuilder;
 use crate::utility::types::custom_id::CustomId;
-use crate::utility::{category, color};
 
 /// A result returned by an event handler.
 pub type EventResult = std::result::Result<EventOutput, anyhow::Error>;
@@ -339,12 +342,6 @@ pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Erro
 ///
 /// This function will return an error if the channel could not be notified.
 pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
-    const PREFIX: &str = "```json\n";
-    const ELLIPSES: &str = "...";
-    const SUFFIX: &str = "\n```";
-
-    const MAX_DESCRIPTION_LENGTH: usize = DESCRIPTION_LENGTH - PREFIX.len() - SUFFIX.len();
-
     let Ok(channel_id) = crate::utility::secret::development_channel_id() else {
         warn!(async "skipping channel error notification as no channel has been configured").await?;
 
@@ -355,43 +352,57 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
     let titles = titles.lines().collect::<Box<[_]>>();
     let index = rng().random_range(0 .. titles.len());
 
-    let header = format!("`{}`\n\n", event.display_label());
-    let mut description = error.to_string();
+    let mut container = ContainerBuilder::new().accent_color(Some(crate::utility::color::FAILURE.rgb()));
 
-    if description.len() > MAX_DESCRIPTION_LENGTH - header.len() {
-        description.truncate(MAX_DESCRIPTION_LENGTH - header.len() - ELLIPSES.len());
-        description += ELLIPSES;
+    if let Some(user) = event.author() {
+        let section = SectionBuilder::new(ThumbnailBuilder::new(user.as_unfurled_media()?).try_build()?)
+            .component(TextDisplayBuilder::new(format!("### {}", titles[index])).try_build()?)
+            .component(TextDisplayBuilder::new(format!("`{}`", event.display_label())).try_build()?)
+            .component(TextDisplayBuilder::new(format!("> {} ({})", user.display_name(), user.mention())).try_build()?)
+            .try_build()?;
+
+        container = container.component(section);
+    } else {
+        container = container
+            .component(TextDisplayBuilder::new(format!("### {}", titles[index])).try_build()?)
+            .component(TextDisplayBuilder::new(format!("`{}`", event.display_label())).try_build()?);
     }
 
-    description = format!("{header}{PREFIX}{description}{SUFFIX}");
+    container = container
+        .component(SeparatorBuilder::new().divider(true).try_build()?)
+        .component(TextDisplayBuilder::new(format!("```json\n{error}\n```")).try_build()?);
 
-    let backtrace = (error.backtrace().status() == BacktraceStatus::Captured).then(|| {
+    let attachment = (error.backtrace().status() == BacktraceStatus::Captured).then(|| {
         let errors = error.chain().enumerate().map(|(i, v)| format!("{} {v}", "-".repeat(i + 1))).collect::<Box<[_]>>();
         let mut lines = error.backtrace().to_string().lines().map(str::to_string).collect::<Box<[_]>>();
 
         if let Some(home_dir) = BaseDirs::new().map(|v| v.home_dir().to_path_buf()) {
             let home_dir = home_dir.to_string_lossy();
 
-            lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), "$HOME"));
+            lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), ""));
         }
 
-        format!("{}\n\n{}", errors.join("\n"), lines.join("\n"))
+        let backtrace = format!("{}\n\n{}", errors.join("\n"), lines.join("\n"));
+
+        Attachment::from_bytes("backtrace.txt".to_string(), backtrace.into_bytes(), 1)
     });
 
-    let mut embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(titles[index]).description(description);
+    let message = api
+        .client
+        .create_message(channel_id)
+        .flags(MessageFlags::SUPPRESS_NOTIFICATIONS | MessageFlags::IS_COMPONENTS_V2)
+        .components(&[container.try_build()?.into()])
+        .await?
+        .model()
+        .await?;
 
-    if let Some(user) = event.author() {
-        embed = embed.author(user.as_embed_author()?);
-    }
-
-    let builder = api.client.create_message(channel_id).flags(MessageFlags::SUPPRESS_NOTIFICATIONS);
-    let message = builder.embeds(&[embed.validate()?.build()]).await?;
-
-    if let Some(backtrace) = backtrace {
-        let attachment = Attachment::from_bytes("backtrace.txt".into(), backtrace.into_bytes(), 1);
-        let message = message.model().await?;
-
-        api.client.create_message(channel_id).reply(message.id).attachments(&[attachment]).await?;
+    if let Some(attachment) = attachment {
+        api.client
+            .create_message(channel_id)
+            .flags(MessageFlags::SUPPRESS_NOTIFICATIONS)
+            .reply(message.id)
+            .attachments(&[attachment])
+            .await?;
     }
 
     self::pass()
@@ -421,11 +432,6 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
         Err(error) => return Err(error.into()),
     };
 
-    let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
-    let description = localize!(async(try in locale) category::UI, "error-inform-description").await?;
-    let description = format!("{description}: `{}`", event.display_label());
-    let embed = EmbedBuilder::new().color(color::FAILURE.rgb()).title(title).description(description);
-
     // Do our best to ensure that this is handled ephemerally.
     let _ = crate::create_response!(api.client, event, struct {
         kind: InteractionResponseType::DeferredChannelMessageWithSource,
@@ -433,9 +439,16 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
     })
     .await;
 
+    let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
+    let description = localize!(async(try in locale) category::UI, "error-inform-description").await?;
+    let component = ContainerBuilder::new()
+        .accent_color(Some(crate::utility::color::FAILURE.rgb()))
+        .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
+        .component(TextDisplayBuilder::new(format!("{description}:\n`{}`", event.display_label())).try_build()?);
+
     crate::follow_up_response!(api.client, event, struct {
-        flags: MessageFlags::EPHEMERAL,
-        embeds: &[embed.build()],
+        flags: MessageFlags::EPHEMERAL | MessageFlags::IS_COMPONENTS_V2,
+        components: &[component.try_build()?.into()],
     })
     .await?;
 
