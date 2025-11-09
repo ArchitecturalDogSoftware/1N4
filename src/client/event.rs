@@ -379,7 +379,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
         if let Some(home_dir) = BaseDirs::new().map(|v| v.home_dir().to_path_buf()) {
             let home_dir = home_dir.to_string_lossy();
 
-            lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), ""));
+            lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), "$HOME"));
         }
 
         let backtrace = format!("{}\n\n{}", errors.join("\n"), lines.join("\n"));
