@@ -81,8 +81,8 @@ export "CARGO_TARGET_${target_triple_variable_upper}_LINKER=${toolchain_prefix}-
 export "CC_${target_triple_variable}=${toolchain_prefix}-gcc"
 export "CXX_${target_triple_variable}=${toolchain_prefix}-g++"
 
-cargo build --target "$target_triple" --locked --release
-binary_path="target/$target_triple/release/$APP_NAME"
+cargo build --target "$target_triple" --locked --profile release-super-optimized
+binary_path="target/$target_triple/release-super-optimized/$APP_NAME"
 
 mkdir /out
 cp -r res /out/res 
