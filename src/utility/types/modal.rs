@@ -84,9 +84,9 @@ impl ModalBuilder {
 
 impl ValidatedBuilder for ModalBuilder {
     type Error = Error;
-    type Inner = Modal;
+    type Output = Modal;
 
-    fn validate(inner: &Self::Inner) -> Result<(), Self::Error> {
+    fn validate(inner: &Self::Output) -> Result<(), Self::Error> {
         if inner.title.len() > MODAL_TITLE_LENGTH {
             Err(Error::InvalidTitle(inner.title.clone()))
         } else if inner.custom_id.len() > COMPONENT_CUSTOM_ID_LENGTH {
@@ -98,7 +98,7 @@ impl ValidatedBuilder for ModalBuilder {
         }
     }
 
-    fn try_build(self) -> Result<Self::Inner, Self::Error> {
+    fn try_build(self) -> Result<Self::Output, Self::Error> {
         <Self as ValidatedBuilder>::validate(&self.inner).map(|()| self.inner)
     }
 }

@@ -31,8 +31,8 @@ use crate::utility::traits::extension::UnfurledMediaItemExt;
 
 /// A builder that automatically validates the inner type when completed.
 pub trait ValidatedBuilder {
-    /// The inner type.
-    type Inner: Sized;
+    /// The output type.
+    type Output: Sized;
     /// The error type.
     type Error: Error + Sized;
 
@@ -41,14 +41,14 @@ pub trait ValidatedBuilder {
     /// # Errors
     ///
     /// This function will return an error if the value is invalid.
-    fn validate(inner: &Self::Inner) -> Result<(), Self::Error>;
+    fn validate(inner: &Self::Output) -> Result<(), Self::Error>;
 
     /// Builds the value, returning it if it is valid.
     ///
     /// # Errors
     ///
     /// This function will return an error if the value is invalid.
-    fn try_build(self) -> Result<Self::Inner, Self::Error>;
+    fn try_build(self) -> Result<Self::Output, Self::Error>;
 }
 
 /// Implements [`ValidatedBuilder`] for various types.
@@ -61,18 +61,18 @@ pub trait ValidatedBuilder {
 /// }
 /// ```
 macro_rules! define_validated_builders {
-    ($($type:path => $inner:path : $function:path $([ $($args:expr), +$(,)? ])?;)*) => {
+    ($($type:path => $output:path : $function:path $([ $($args:expr), +$(,)? ])?;)*) => {
         $(
             impl ValidatedBuilder for $type {
-                type Inner = $inner;
+                type Output = $output;
                 type Error = ComponentValidationError;
 
                 #[inline]
-                fn validate(inner: &Self::Inner) -> Result<(), Self::Error> {
+                fn validate(inner: &Self::Output) -> Result<(), Self::Error> {
                     $function(inner $(, $($args),+)?)
                 }
 
-                fn try_build(self) -> Result<Self::Inner, Self::Error> {
+                fn try_build(self) -> Result<Self::Output, Self::Error> {
                     let inner = self.build();
 
                     <Self as ValidatedBuilder>::validate(&inner).map(|()| inner)
