@@ -20,7 +20,9 @@ use std::num::NonZeroU16;
 use time::macros::datetime;
 use time::{Duration, OffsetDateTime};
 use twilight_cache_inmemory::model::{CachedGuild, CachedMember};
+use twilight_model::application::interaction::modal::ModalInteractionComponent;
 use twilight_model::application::interaction::{Interaction, InteractionData, InteractionType};
+use twilight_model::channel::message::component::UnfurledMediaItem;
 use twilight_model::gateway::payload::incoming::invite_create::PartialUser;
 use twilight_model::guild::template::TemplateGuild;
 use twilight_model::guild::{Guild, GuildInfo, GuildPreview, Member, PartialGuild, PartialMember};
@@ -142,6 +144,43 @@ impl GuildExt for TemplateGuild {
 
     fn icon_hash(&self) -> Option<&ImageHash> {
         self.icon_hash.as_ref()
+    }
+}
+
+/// Extends a [`ModalInteractionComponent`].
+pub trait ModalInteractionComponentExt {
+    /// Returns this [`ModalInteractionComponent`]'s numeric identifier.
+    fn id(&self) -> i32;
+}
+
+impl ModalInteractionComponentExt for ModalInteractionComponent {
+    fn id(&self) -> i32 {
+        match self {
+            Self::Label(value) => value.id,
+            Self::ActionRow(value) => value.id,
+            Self::StringSelect(value) => value.id,
+            Self::UserSelect(value) => value.id,
+            Self::RoleSelect(value) => value.id,
+            Self::MentionableSelect(value) => value.id,
+            Self::ChannelSelect(value) => value.id,
+            Self::TextInput(value) => value.id,
+            Self::TextDisplay(value) => value.id,
+            Self::FileUpload(value) => value.id,
+            Self::Unknown(repr) => unreachable!("unsupported modal component (type={repr})"),
+        }
+    }
+}
+
+/// Extends an [`UnfurledMediaItem`].
+pub trait UnfurledMediaItemExt: Sized {
+    /// Creates a new [`UnfurledMediaItem`] with the specified URL.
+    fn url(url: impl Into<String>) -> Self;
+}
+
+impl UnfurledMediaItemExt for UnfurledMediaItem {
+    fn url(url: impl Into<String>) -> Self {
+        // All other fields are ignored when sent from the client.
+        Self { url: url.into(), proxy_url: None, height: None, width: None, content_type: None }
     }
 }
 

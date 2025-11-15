@@ -21,6 +21,7 @@ use anyhow::{bail, ensure};
 use ina_localizing::locale::Locale;
 use twilight_cache_inmemory::model::{CachedEmoji, CachedGuild, CachedMember, CachedMessage, CachedSticker};
 use twilight_model::application::interaction::Interaction;
+use twilight_model::channel::message::component::UnfurledMediaItem;
 use twilight_model::channel::message::embed::EmbedAuthor;
 use twilight_model::channel::message::sticker::StickerFormatType;
 use twilight_model::channel::message::{EmojiReactionType, Sticker};
@@ -37,6 +38,7 @@ use twilight_model::user::{CurrentUser, CurrentUserGuild, User};
 use twilight_util::builder::embed::{EmbedAuthorBuilder, ImageSource};
 
 use super::extension::{GuildExt, UserExt};
+use crate::utility::traits::extension::UnfurledMediaItemExt;
 use crate::utility::{DISCORD_CDN_URL, TWEMOJI_CDN_URL};
 
 /// Converts the implementing type into an embed author.
@@ -66,7 +68,7 @@ pub trait AsEmbedAuthor {
 /// # Errors
 ///
 /// This function will return an error if the value could not be converted.
-fn guild_as_embed_author_builder<G: GuildExt + AsImageSource>(value: &G) -> Result<EmbedAuthorBuilder, G::Error> {
+fn guild_as_embed_author_builder<G: GuildExt + AsImage>(value: &G) -> anyhow::Result<EmbedAuthorBuilder> {
     let name = value.name();
     let icon = value.as_image_source()?;
 
@@ -78,7 +80,7 @@ fn guild_as_embed_author_builder<G: GuildExt + AsImageSource>(value: &G) -> Resu
 /// # Errors
 ///
 /// This function will return an error if the value could not be converted.
-fn user_as_embed_author_builder<U: UserExt + AsImageSource>(value: &U) -> Result<EmbedAuthorBuilder, U::Error> {
+fn user_as_embed_author_builder<U: UserExt + AsImage>(value: &U) -> anyhow::Result<EmbedAuthorBuilder> {
     let name = value.display_name().to_string();
     let icon = value.as_image_source()?;
 
@@ -86,7 +88,7 @@ fn user_as_embed_author_builder<U: UserExt + AsImageSource>(value: &U) -> Result
 }
 
 impl AsEmbedAuthor for CachedGuild {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
@@ -94,7 +96,7 @@ impl AsEmbedAuthor for CachedGuild {
 }
 
 impl AsEmbedAuthor for CurrentUser {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder(self)
@@ -102,7 +104,7 @@ impl AsEmbedAuthor for CurrentUser {
 }
 
 impl AsEmbedAuthor for CurrentUserGuild {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
@@ -110,7 +112,7 @@ impl AsEmbedAuthor for CurrentUserGuild {
 }
 
 impl AsEmbedAuthor for Guild {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
@@ -118,7 +120,7 @@ impl AsEmbedAuthor for Guild {
 }
 
 impl AsEmbedAuthor for GuildInfo {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
@@ -126,7 +128,7 @@ impl AsEmbedAuthor for GuildInfo {
 }
 
 impl AsEmbedAuthor for GuildPreview {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
@@ -134,7 +136,7 @@ impl AsEmbedAuthor for GuildPreview {
 }
 
 impl AsEmbedAuthor for PartialGuild {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::guild_as_embed_author_builder(self)
@@ -142,7 +144,7 @@ impl AsEmbedAuthor for PartialGuild {
 }
 
 impl AsEmbedAuthor for User {
-    type Error = <Self as AsImageSource>::Error;
+    type Error = anyhow::Error;
 
     fn as_embed_author_builder(&self) -> Result<EmbedAuthorBuilder, Self::Error> {
         self::user_as_embed_author_builder(self)
@@ -176,10 +178,10 @@ pub trait AsEmbedAuthorWith<T> {
 /// # Errors
 ///
 /// This function will return an error if the value could not be converted.
-fn user_as_embed_author_builder_with<U: UserExt + AsImageSourceWith<T>, T>(
+fn user_as_embed_author_builder_with<U: UserExt + AsImageWith<T>, T>(
     value: &U,
     arguments: T,
-) -> Result<EmbedAuthorBuilder, U::Error> {
+) -> anyhow::Result<EmbedAuthorBuilder> {
     let name = value.display_name().to_string();
     let icon = value.as_image_source_with(arguments)?;
 
@@ -312,89 +314,94 @@ as_id_impl! {
     User as UserMarker = id;
 }
 
-/// Converts the implementing type into an image source.
-pub trait AsImageSource {
-    /// The error that may be returned when converting.
-    type Error;
+/// Converts the implementing type into various image reference formats.
+pub trait AsImage {
+    /// Fallibly converts this value into an image URL.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be converted.
+    fn as_image_url(&self) -> anyhow::Result<String>;
 
     /// Fallibly converts this value into an image source.
     ///
     /// # Errors
     ///
     /// This function will return an error if the value could not be converted.
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error>;
+    fn as_image_source(&self) -> anyhow::Result<ImageSource> {
+        ImageSource::url(self.as_image_url()?).map_err(Into::into)
+    }
+
+    /// Fallibly converts this value into an unfurled media item.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be converted.
+    fn as_unfurled_media(&self) -> anyhow::Result<UnfurledMediaItem> {
+        Ok(UnfurledMediaItem::url(self.as_image_url()?))
+    }
 }
 
-/// Converts the given guild into an image source.
+/// Converts the given guild into an image URL.
 ///
 /// # Errors
 ///
 /// This function will return an error if the conversion fails.
-fn guild_as_image_source<G: GuildExt + AsId<GuildMarker>>(value: &G) -> anyhow::Result<ImageSource> {
+fn guild_as_icon_url<G>(value: &G) -> anyhow::Result<String>
+where
+    G: GuildExt + AsId<GuildMarker>,
+{
     let Some(hash) = value.icon_hash() else { bail!("missing icon hash") };
     let extension = if hash.is_animated() { "gif" } else { "png" };
-    let url = format!("{DISCORD_CDN_URL}/icons/{}/{hash}.{extension}", value.as_id());
 
-    ImageSource::url(url).map_err(Into::into)
+    Ok(format!("{DISCORD_CDN_URL}/icons/{}/{hash}.{extension}", value.as_id()))
 }
 
-/// Converts the given user into an image source.
+/// Converts the given user into an image URL.
 ///
 /// # Errors
 ///
 /// This function will return an error if the conversion fails.
-fn user_as_image_source<U: UserExt + AsId<UserMarker>>(value: &U) -> anyhow::Result<ImageSource> {
+fn user_as_avatar_url<U: UserExt + AsId<UserMarker>>(value: &U) -> anyhow::Result<String> {
     let Some(hash) = value.icon_hash() else { bail!("missing avatar hash") };
     let extension = if hash.is_animated() { "gif" } else { "png" };
-    let url = format!("{DISCORD_CDN_URL}/avatars/{}/{hash}.{extension}", value.as_id());
 
-    ImageSource::url(url).map_err(Into::into)
+    Ok(format!("{DISCORD_CDN_URL}/avatars/{}/{hash}.{extension}", value.as_id()))
 }
 
-impl AsImageSource for CachedGuild {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::guild_as_image_source(self)
+impl AsImage for CachedGuild {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::guild_as_icon_url(self)
     }
 }
 
-impl AsImageSource for CurrentUser {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::user_as_image_source(self)
+impl AsImage for CurrentUser {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::user_as_avatar_url(self)
     }
 }
 
-impl AsImageSource for CurrentUserGuild {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::guild_as_image_source(self)
+impl AsImage for CurrentUserGuild {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::guild_as_icon_url(self)
     }
 }
 
-impl AsImageSource for Emoji {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
+impl AsImage for Emoji {
+    fn as_image_url(&self) -> anyhow::Result<String> {
         let extension = if self.animated { "gif" } else { "png" };
-        let url = format!("{DISCORD_CDN_URL}/emojis/{}.{extension}", self.id);
 
-        ImageSource::url(url).map_err(Into::into)
+        Ok(format!("{DISCORD_CDN_URL}/emojis/{}.{extension}", self.id))
     }
 }
 
-impl AsImageSource for EmojiReactionType {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        let url = match self {
+impl AsImage for EmojiReactionType {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        match self {
             Self::Custom { animated, id, .. } => {
                 let extension = if *animated { "gif" } else { "png" };
 
-                format!("{DISCORD_CDN_URL}/emojis/{id}.{extension}")
+                Ok(format!("{DISCORD_CDN_URL}/emojis/{id}.{extension}"))
             }
             Self::Unicode { name } => {
                 // Each file is encoded as hex numbers separated by hyphens. Some examples:
@@ -404,58 +411,44 @@ impl AsImageSource for EmojiReactionType {
                 // See also: spiders 🕷️🕸️.
                 let id = name.chars().map(|c| format!("{:x}", c as u32));
 
-                format!("{TWEMOJI_CDN_URL}/{}.png", id.collect::<Box<[_]>>().join("-"))
+                Ok(format!("{TWEMOJI_CDN_URL}/{}.png", id.collect::<Box<[_]>>().join("-")))
             }
-        };
-
-        ImageSource::url(url).map_err(Into::into)
+        }
     }
 }
 
-impl AsImageSource for Guild {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::guild_as_image_source(self)
+impl AsImage for Guild {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::guild_as_icon_url(self)
     }
 }
 
-impl AsImageSource for GuildInfo {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::guild_as_image_source(self)
+impl AsImage for GuildInfo {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::guild_as_icon_url(self)
     }
 }
 
-impl AsImageSource for GuildPreview {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::guild_as_image_source(self)
+impl AsImage for GuildPreview {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::guild_as_icon_url(self)
     }
 }
 
-impl AsImageSource for PartialGuild {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::guild_as_image_source(self)
+impl AsImage for PartialGuild {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::guild_as_icon_url(self)
     }
 }
 
-impl AsImageSource for PartialUser {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::user_as_image_source(self)
+impl AsImage for PartialUser {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::user_as_avatar_url(self)
     }
 }
 
-impl AsImageSource for Sticker {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
+impl AsImage for Sticker {
+    fn as_image_url(&self) -> anyhow::Result<String> {
         let extension = match self.format_type {
             StickerFormatType::Png | StickerFormatType::Apng => "png",
             StickerFormatType::Lottie => "json",
@@ -464,87 +457,88 @@ impl AsImageSource for Sticker {
         };
 
         // Why do `.gif` stickers specifically use a different CDN??? This is stupid.
-        let url = format!(
+        Ok(format!(
             "{}/stickers/{}.{extension}",
             if self.format_type == StickerFormatType::Gif { "https://media.discordapp.net" } else { DISCORD_CDN_URL },
             self.id
-        );
-
-        ImageSource::url(url).map_err(Into::into)
+        ))
     }
 }
 
-impl AsImageSource for User {
-    type Error = anyhow::Error;
-
-    fn as_image_source(&self) -> Result<ImageSource, Self::Error> {
-        self::user_as_image_source(self)
+impl AsImage for User {
+    fn as_image_url(&self) -> anyhow::Result<String> {
+        self::user_as_avatar_url(self)
     }
 }
 
-/// Converts the implementing type into an image source using the type `<T>` as an argument.
-pub trait AsImageSourceWith<T> {
-    /// The error that may be returned when converting.
-    type Error;
-
-    /// Fallibly converts this value into an image source with the given argument.
+/// Converts the implementing type into various image reference formats.
+pub trait AsImageWith<T> {
+    /// Fallibly converts this value into an image URL.
     ///
     /// # Errors
     ///
     /// This function will return an error if the value could not be converted.
-    fn as_image_source_with(&self, value: T) -> Result<ImageSource, Self::Error>;
-}
+    fn as_image_url_with(&self, value: T) -> anyhow::Result<String>;
 
-impl AsImageSourceWith<Id<GuildMarker>> for CachedMember {
-    type Error = anyhow::Error;
+    /// Fallibly converts this value into an image source.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be converted.
+    fn as_image_source_with(&self, value: T) -> anyhow::Result<ImageSource> {
+        ImageSource::url(self.as_image_url_with(value)?).map_err(Into::into)
+    }
 
-    fn as_image_source_with(&self, value: Id<GuildMarker>) -> Result<ImageSource, Self::Error> {
-        let Some(ref hash) = self.avatar() else { bail!("missing avatar hash") };
-        let extension = if hash.is_animated() { "gif" } else { "png" };
-        let url = format!("{DISCORD_CDN_URL}/guilds/{value}/users/{}/avatars/{hash}.{extension}", self.user_id());
-
-        ImageSource::url(url).map_err(Into::into)
+    /// Fallibly converts this value into an unfurled media item.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the value could not be converted.
+    fn as_unfurled_media_with(&self, value: T) -> anyhow::Result<UnfurledMediaItem> {
+        Ok(UnfurledMediaItem::url(self.as_image_url_with(value)?))
     }
 }
 
-impl AsImageSourceWith<Id<GuildMarker>> for Member {
-    type Error = anyhow::Error;
+impl AsImageWith<Id<GuildMarker>> for CachedMember {
+    fn as_image_url_with(&self, value: Id<GuildMarker>) -> anyhow::Result<String> {
+        let Some(ref hash) = self.avatar() else { bail!("missing avatar hash") };
+        let extension = if hash.is_animated() { "gif" } else { "png" };
 
-    fn as_image_source_with(&self, value: Id<GuildMarker>) -> Result<ImageSource, Self::Error> {
-        let url = if let Some(ref hash) = self.avatar {
+        Ok(format!("{DISCORD_CDN_URL}/guilds/{value}/users/{}/avatars/{hash}.{extension}", self.user_id()))
+    }
+}
+
+impl AsImageWith<Id<GuildMarker>> for Member {
+    fn as_image_url_with(&self, value: Id<GuildMarker>) -> anyhow::Result<String> {
+        if let Some(ref hash) = self.avatar {
             let extension = if hash.is_animated() { "gif" } else { "png" };
 
-            format!("{DISCORD_CDN_URL}/guilds/{value}/users/{}/avatars/{hash}.{extension}", self.user.id)
+            Ok(format!("{DISCORD_CDN_URL}/guilds/{value}/users/{}/avatars/{hash}.{extension}", self.user.id))
         } else if let Some(ref hash) = self.user.avatar {
             let extension = if hash.is_animated() { "gif" } else { "png" };
 
-            format!("{DISCORD_CDN_URL}/avatars/{}/{hash}.{extension}", self.user.id)
+            Ok(format!("{DISCORD_CDN_URL}/avatars/{}/{hash}.{extension}", self.user.id))
         } else {
             bail!("missing avatar hash");
-        };
-
-        ImageSource::url(url).map_err(Into::into)
+        }
     }
 }
 
-impl AsImageSourceWith<Id<GuildMarker>> for PartialMember {
-    type Error = anyhow::Error;
-
-    fn as_image_source_with(&self, value: Id<GuildMarker>) -> Result<ImageSource, Self::Error> {
+impl AsImageWith<Id<GuildMarker>> for PartialMember {
+    fn as_image_url_with(&self, value: Id<GuildMarker>) -> anyhow::Result<String> {
         let Some(user_id) = self.user.as_ref().map(|u| u.id) else { bail!("missing user identifier") };
-        let url = if let Some(ref hash) = self.avatar {
+
+        if let Some(ref hash) = self.avatar {
             let extension = if hash.is_animated() { "gif" } else { "png" };
 
-            format!("{DISCORD_CDN_URL}/guilds/{value}/users/{user_id}/avatars/{hash}.{extension}")
+            Ok(format!("{DISCORD_CDN_URL}/guilds/{value}/users/{user_id}/avatars/{hash}.{extension}"))
         } else if let Some(hash) = self.user.as_ref().and_then(|u| u.avatar.as_ref()) {
             let extension = if hash.is_animated() { "gif" } else { "png" };
 
-            format!("{DISCORD_CDN_URL}/avatars/{user_id}/{hash}.{extension}")
+            Ok(format!("{DISCORD_CDN_URL}/avatars/{user_id}/{hash}.{extension}"))
         } else {
             bail!("missing avatar hash");
-        };
-
-        ImageSource::url(url).map_err(Into::into)
+        }
     }
 }
 

@@ -22,6 +22,7 @@ use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::application::interaction::message_component::MessageComponentInteractionData;
+use twilight_model::channel::message::MessageFlags;
 use twilight_model::id::Id;
 use twilight_model::id::marker::RoleMarker;
 use twilight_validate::component::{ACTION_ROW_COMPONENT_COUNT, COMPONENT_COUNT};
@@ -238,11 +239,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
 
     let components = selectors.build(entry, component::select::NAME, true)?;
 
-    crate::follow_up_response!(context, struct {
-        components: &components,
-    })
-    .await?;
-    context.complete();
+    context.components(components, Visibility::Ephemeral).await?;
 
     crate::client::event::pass()
 }
@@ -293,7 +290,7 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
 
     let components = selectors.build(entry, component::select::NAME, false)?;
 
-    context.api.client.create_message(channel_id).components(&components).await?;
+    context.api.client.create_message(channel_id).flags(MessageFlags::IS_COMPONENTS_V2).components(&components).await?;
     selectors.as_async_api().delete().await?;
 
     let text = localize!(async(try in locale) category::UI, "role-finished").await?;
@@ -417,11 +414,7 @@ async fn on_remove_component<'ap: 'ev, 'ev>(
 
         let components = selectors.build(entry, component::remove::NAME, false)?;
 
-        crate::follow_up_response!(context, struct {
-            components: &components,
-        })
-        .await?;
-        context.complete();
+        context.components(components, Visibility::Ephemeral).await?;
     }
 
     crate::client::event::pass()

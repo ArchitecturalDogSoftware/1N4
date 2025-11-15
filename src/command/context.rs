@@ -20,14 +20,15 @@ use anyhow::{Result, ensure};
 use ina_localizing::locale::Locale;
 use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::{Interaction, InteractionType};
-use twilight_model::channel::message::{Embed, MessageFlags};
+use twilight_model::channel::message::{Component, Embed, MessageFlags};
 use twilight_model::http::interaction::InteractionResponseType;
-use twilight_util::builder::embed::EmbedBuilder;
+use twilight_util::builder::message::{ContainerBuilder, TextDisplayBuilder};
 
 use crate::client::api::ApiRef;
 use crate::utility::color;
 use crate::utility::traits::convert::AsLocale;
-use crate::utility::types::modal::ModalData;
+use crate::utility::types::builder::ValidatedBuilder;
+use crate::utility::types::modal::Modal;
 
 /// An interaction context.
 #[non_exhaustive]
@@ -158,8 +159,8 @@ where
             ContextState::Pending => {
                 crate::create_response!(self, struct {
                     kind: InteractionResponseType::ChannelMessageWithSource,
-                    content: content.to_string(),
                     flags: if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
+                    content: content.to_string(),
                 })
                 .await?;
             }
@@ -195,8 +196,8 @@ where
             ContextState::Pending => {
                 crate::create_response!(self, struct {
                     kind: InteractionResponseType::ChannelMessageWithSource,
-                    embeds: [embed.into()],
                     flags: if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() },
+                    embeds: [embed.into()],
                 })
                 .await?;
             }
@@ -215,13 +216,57 @@ where
         Ok(())
     }
 
+    /// Responds to the interaction with a component-based message.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the interaction has been completed, or if the context fails to respond to
+    /// the interaction.
+    pub async fn components<C, I>(&mut self, components: I, visibility: Visibility) -> Result<()>
+    where
+        C: Into<Component>,
+        I: IntoIterator<Item = C>,
+    {
+        ensure!(!self.is_completed(), "the interaction must not be completed");
+
+        if let Some(assigned) = self.visibility {
+            ensure!(assigned == visibility, "the response visibility has already been set");
+        }
+
+        match self.state {
+            ContextState::Pending => {
+                crate::create_response!(self, struct {
+                    kind: InteractionResponseType::ChannelMessageWithSource,
+                    flags: MessageFlags::IS_COMPONENTS_V2 | (
+                        if visibility.is_ephemeral() { MessageFlags::EPHEMERAL } else { MessageFlags::empty() }
+                    ),
+                    components: components.into_iter().map(Into::into),
+                })
+                .await?;
+            }
+            ContextState::Deferred => {
+                crate::follow_up_response!(self, struct {
+                    flags: MessageFlags::IS_COMPONENTS_V2,
+                    components: &(components.into_iter().map(Into::into).collect::<Box<[_]>>()),
+                })
+                .await?;
+            }
+            ContextState::Completed => unreachable!("the interaction must not be completed"),
+        }
+
+        self.state = ContextState::Completed;
+        self.visibility = Some(visibility);
+
+        Ok(())
+    }
+
     /// Responds to the interaction with a modal pop-up.
     ///
     /// # Errors
     ///
     /// This function will return an error if the interaction has been completed, or if the context fails to respond to
     /// the interaction.
-    pub async fn modal(&mut self, ModalData { custom_id, title, components }: ModalData) -> Result<()> {
+    pub async fn modal(&mut self, Modal { custom_id, title, components }: Modal) -> Result<()> {
         ensure!(!self.is_completed(), "the interaction must not be completed");
         ensure!(!self.is_deferred(), "the interaction must not be deferred");
 
@@ -249,13 +294,15 @@ where
         N: Display + Send,
         D: Display + Send,
     {
-        let mut embed = EmbedBuilder::new().color(color).title(title.to_string());
+        let mut container = ContainerBuilder::new()
+            .accent_color(Some(color))
+            .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?);
 
         if let Some(description) = description {
-            embed = embed.description(description.to_string());
+            container = container.component(TextDisplayBuilder::new(description.to_string()).try_build()?);
         }
 
-        self.embed(embed.build(), self.visibility.unwrap_or(Visibility::Ephemeral)).await
+        self.components([container.try_build()?], Visibility::Ephemeral).await
     }
 
     /// Finishes an interaction with an embedded success message.
@@ -460,13 +507,13 @@ macro_rules! create_response {
     };
     (@new($client:expr, $id:expr, $token:expr, {
         kind: $kind:expr,
+        $(flags: $flags:expr,)?
         $(attachments: $attachments:expr,)?
         $(choices: $choices:expr,)?
         $(components: $components:expr,)?
         $(content: $content:expr,)?
         $(custom_id: $custom_id:expr,)?
         $(embeds: $embeds:expr,)?
-        $(flags: $flags:expr,)?
         $(mentions: $mentions:expr,)?
         $(title: $title:expr,)?
         $(tts: $tts:expr,)?
@@ -474,13 +521,13 @@ macro_rules! create_response {
         $client.create_response($id, $token, &::twilight_model::http::interaction::InteractionResponse {
             kind: $kind,
             data: Some(::twilight_util::builder::InteractionResponseDataBuilder::new()
+                $(.flags($flags))?
                 $(.attachments($attachments))?
                 $(.choices($choices))?
                 $(.components($components))?
                 $(.content($content))?
                 $(.custom_id($custom_id))?
                 $(.embeds($embeds))?
-                $(.flags($flags))?
                 $(.allowed_mentions($mentions))?
                 $(.title($title))?
                 $(.tts($tts))?
@@ -528,20 +575,20 @@ macro_rules! follow_up_response {
         ))
     };
     (@new($client:expr, $token:expr, {
+        $(flags: $flags:expr,)?
         $(attachments: $attachments:expr,)?
         $(components: $components:expr,)?
         $(content: $content:expr,)?
         $(embeds: $embeds:expr,)?
-        $(flags: $flags:expr,)?
         $(mentions: $mentions:expr,)?
         $(tts: $tts:expr,)?
     })) => {
         $client.create_followup($token)
+            $(.flags($flags))?
             $(.attachments($attachments))?
             $(.components($components))?
             $(.content($content))?
             $(.embeds($embeds))?
-            $(.flags($flags))?
             $(.allowed_mentions($mentions))?
             $(.tts($tts))?
     };

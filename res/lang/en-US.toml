@@ -86,9 +86,7 @@ echo-done = "Message echoed."
 help-title = "1N4 Command Listing"
 help-header = """\
 Thank you for using 1N4! I'm happy to be of service.
-Below is a list of all commands that are available to you.
-
-If you encounter any issues, please report them through our [issue tracker](https://github.com/ArchitecturalDogSoftware/1N4/issues).\
+Below is a list of all commands that are available to you. If you encounter any issues, please report them through our [issue tracker](https://github.com/ArchitecturalDogSoftware/1N4/issues).\
 """
 help-footer = """\
 Property of Arden Inc., version %V+neon.
@@ -103,13 +101,7 @@ help-tag-subcommands = "Has sub-commands"
 help-tag-dms = "Usable in DMs"
 help-tag-nsfw = "NSFW"
 
-help-button-build-information = "Build Information"
-help-button-source-code = "Source Code"
-help-button-licenses = "Licenses"
-help-button-privacy-policy = "Privacy Policy"
-help-button-security-policy = "Security Policy"
-
-help-embed-build-information-header = "Build Information"
+help-build-information-header = "Build Information"
 
 localizer-reloaded = "Reloaded!"
 localizer-locales = "Locales"
@@ -136,6 +128,21 @@ role-remove-emptied = "All role selectors were removed."
 role-remove-missing = "The selected role was already removed."
 
 role-finished = "Finished role selectors."
+
+[ui-button]
+help-open = "Open"
+help-view = "View"
+
+help-label-build-information = "Build Information"
+help-description-build-information = "Displays 1N4's version and other related information."
+help-label-source-code = "Source Code"
+help-description-source-code = "Opens the repository that contains all of 1N4's code."
+help-label-licenses = "Licenses"
+help-description-licenses = "Lists all of the software licenses used by 1N4 and her dependencies."
+help-label-privacy-policy = "Privacy Policy"
+help-description-privacy-policy = "Displays information about how 1N4 uses user data."
+help-label-security-policy = "Security Policy"
+help-description-security-policy = "Displays information regarding 1N4's vulnerability reporting process."
 
 [ui-input]
 poll-create-title = "Title"

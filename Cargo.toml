@@ -73,7 +73,7 @@ ina-storage = { version = "*", path = "./lib/ina-storage/" }
 serde = "~1.0"
 time = "~0.3"
 thiserror = "~2.0"
-tokio = "~1.47"
+tokio = "~1.48"
 toml = "~0.9"
 
 [lints]
@@ -109,13 +109,13 @@ time = { workspace = true, features = ["local-offset", "serde"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = "~0.1"
 toml = { workspace = true, features = ["preserve_order"] }
-twilight-cache-inmemory = "~0.16"
-twilight-gateway = "~0.16"
-twilight-http = "~0.16"
-twilight-mention = "~0.16"
-twilight-model = "~0.16"
-twilight-util = { version = "~0.16", features = ["full"] }
-twilight-validate = "~0.16"
+twilight-cache-inmemory = "~0.17"
+twilight-gateway = "~0.17"
+twilight-http = "~0.17"
+twilight-mention = "~0.17"
+twilight-model = "~0.17"
+twilight-util = { version = "~0.17", features = ["full"] }
+twilight-validate = "~0.17"
 
 [build-dependencies]
 camino = "1.1.10"

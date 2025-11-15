@@ -14,26 +14,36 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use twilight_model::application::command::CommandOptionType;
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
 };
-use twilight_model::application::interaction::modal::{ModalInteractionData, ModalInteractionDataActionRow};
+use twilight_model::application::interaction::modal::{
+    ModalInteractionChannelSelect, ModalInteractionComponent, ModalInteractionData, ModalInteractionFileUpload,
+    ModalInteractionMentionableSelect, ModalInteractionRoleSelect, ModalInteractionStringSelect,
+    ModalInteractionTextInput, ModalInteractionUserSelect,
+};
+use twilight_model::channel::message::component::ComponentType;
 use twilight_model::id::Id;
 use twilight_model::id::marker::{AttachmentMarker, ChannelMarker, GenericMarker, RoleMarker, UserMarker};
+
+use crate::utility::traits::extension::ModalInteractionComponentExt;
 
 /// An error that may be returned when interacting with resolvers.
 #[non_exhaustive]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Returned if a component is of an invalid type.
+    #[error("the modal component '{0}' is invalid (expected '{1:?}', found '{2:?}')")]
+    InvalidComponent(i32, ComponentType, ComponentType),
     /// Returned if an option is of an invalid type.
     #[error("the option '{0}' is invalid (expected '{1:?}', found '{2:?}')")]
     InvalidOption(Box<str>, CommandOptionType, CommandOptionType),
-    /// Returned if a field is missing from the resolver.
-    #[error("the field '{0}' is missing")]
-    MissingField(Box<str>),
+    /// Returned if a component is missing from the resolver.
+    #[error("the modal component '{0}' is missing")]
+    MissingComponent(i32),
     /// Returned if an option is missing from the resolver.
     #[error("the option '{0}' is missing")]
     MissingOption(Box<str>),
@@ -56,8 +66,17 @@ impl<'ev> CommandOptionResolver<'ev> {
         Self::with_options(data, &data.options)
     }
 
+    /// Returns a reference to the inner command data.
+    #[must_use]
+    pub const fn data(&self) -> &'ev CommandData {
+        self.data
+    }
+
     /// Creates a new [`CommandOptionResolver`] using the given option list.
-    fn with_options(data: &'ev CommandData, options: impl IntoIterator<Item = &'ev CommandDataOption>) -> Self {
+    fn with_options<I>(data: &'ev CommandData, options: I) -> Self
+    where
+        I: IntoIterator<Item = &'ev CommandDataOption>,
+    {
         Self { data, options: options.into_iter().map(|o| (&(*o.name), &o.value)).collect() }
     }
 
@@ -70,6 +89,137 @@ impl<'ev> CommandOptionResolver<'ev> {
         let name = name.as_ref();
 
         self.options.get(name).copied().ok_or_else(|| Error::MissingOption(name.into()))
+    }
+
+    /// Returns a reference to the stored attachment identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not an
+    /// attachment identifier.
+    pub fn attachment_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<AttachmentMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Attachment(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Attachment, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored boolean associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
+    pub fn boolean(&'ev self, name: impl AsRef<str>) -> Result<&'ev bool, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Boolean(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Boolean, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored channel identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a channel
+    /// identifier.
+    pub fn channel_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<ChannelMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Channel(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Channel, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored float associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a float.
+    pub fn float(&'ev self, name: impl AsRef<str>) -> Result<&'ev f64, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Number(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Number, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored integer associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not an integer.
+    pub fn integer(&'ev self, name: impl AsRef<str>) -> Result<&'ev i64, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Integer(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Integer, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored mentionable identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a
+    /// mentionable identifier.
+    pub fn mentionable_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<GenericMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Mentionable(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Mentionable, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored role identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a role
+    /// identifier.
+    pub fn role_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<RoleMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::Role(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Role, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored string associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a string.
+    pub fn string(&'ev self, name: impl AsRef<str>) -> Result<&'ev str, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::String(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::String, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored user identifier associated with the given name.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the option does not exist, or if the associated option is not a user
+    /// identifier.
+    pub fn user_id(&'ev self, name: impl AsRef<str>) -> Result<&'ev Id<UserMarker>, Error> {
+        let name = name.as_ref();
+
+        match self.any(name)? {
+            CommandOptionValue::User(value) => Ok(value),
+            other => Err(Error::InvalidOption(name.into(), CommandOptionType::User, other.kind())),
+        }
     }
 
     /// Returns a new [`CommandOptionResolver`] for the options assigned to the subcommand associated with the given
@@ -105,154 +255,161 @@ impl<'ev> CommandOptionResolver<'ev> {
     }
 }
 
-/// Defines getter functions for the [`CommandOptionResolver`] type.
-///
-/// # Examples
-///
-/// ```
-/// command_option_resolver_getters! {
-///    /// Returns a reference to the stored boolean associated with the given name.
-///    ///
-///    /// # Errors
-///    ///
-///    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
-///    boolean as Boolean -> &'ev bool;
-/// }
-///
-/// // generates a function with the following signature:
-/// //
-/// // fn boolean<'ev>(&'ev self, name: impl AsRef<str>) -> Result<&'ev bool, Error>;
-/// ```
-macro_rules! command_option_resolver_getters {
-    ($($(#[$attribute:meta])* $name:ident as $type:ident -> $return:ty;)*) => {
-        impl<'ev> CommandOptionResolver<'ev> {$(
-            $(#[$attribute])*
-            pub fn $name(&'ev self, name: impl AsRef<str>) -> Result<$return, Error> {
-                let name = name.as_ref();
-
-                match self.any(name)? {
-                    CommandOptionValue::$type(value) => Ok(value),
-                    other => Err(Error::InvalidOption(name.into(), CommandOptionType::$type, other.kind())),
-                }
-            }
-        )*}
-    };
-}
-
-command_option_resolver_getters! {
-    /// Returns a reference to the stored attachment identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not an
-    /// attachment identifier.
-    attachment_id as Attachment -> &'ev Id<AttachmentMarker>;
-
-    /// Returns a reference to the stored boolean associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a boolean.
-    boolean as Boolean -> &'ev bool;
-
-    /// Returns a reference to the stored channel identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a channel
-    /// identifier.
-    channel_id as Channel -> &'ev Id<ChannelMarker>;
-
-    /// Returns a reference to the stored float associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a float.
-    float as Number -> &'ev f64;
-
-    /// Returns a reference to the stored integer associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not an integer.
-    integer as Integer -> &'ev i64;
-
-    /// Returns a reference to the stored mentionable identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a
-    /// mentionable identifier.
-    mentionable_id as Mentionable -> &'ev Id<GenericMarker>;
-
-    /// Returns a reference to the stored role identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a role
-    /// identifier.
-    role_id as Role -> &'ev Id<RoleMarker>;
-
-    /// Returns a reference to the stored string associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a string.
-    string as String -> &'ev str;
-
-    /// Returns a reference to the stored user identifier associated with the given name.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the option does not exist, or if the associated option is not a user
-    /// identifier.
-    user_id as User -> &'ev Id<UserMarker>;
-}
-
 /// Resolves and caches a modal's defined fields.
 #[must_use = "this type should be used to resolve modal fields"]
 #[non_exhaustive]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ModalFieldResolver<'ev> {
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModalComponentResolver<'ev> {
     /// The modal's data.
     data: &'ev ModalInteractionData,
-    /// The cached fields.
-    fields: HashMap<&'ev str, Option<&'ev str>>,
+    /// The modal's cached components.
+    components: BTreeMap<i32, &'ev ModalInteractionComponent>,
 }
 
-impl<'ev> ModalFieldResolver<'ev> {
-    /// Creates a new [`ModalFieldResolver`].
+impl<'ev> ModalComponentResolver<'ev> {
+    /// Creates a new [`ModalComponentResolver`].
     pub fn new(data: &'ev ModalInteractionData) -> Self {
-        Self::with_fields(data, &data.components)
+        Self::with_components(data, &data.components)
     }
 
-    /// Creates a new [`ModalFieldResolver`] using the given field list.
-    fn with_fields(
-        data: &'ev ModalInteractionData,
-        fields: impl IntoIterator<Item = &'ev ModalInteractionDataActionRow>,
-    ) -> Self {
-        let fields = fields.into_iter().filter_map(|r| {
-            // Do we want to keep this saved as `Option<_>`?
-            // It *does* better differentiate between not present and left empty.
-            r.components.first().map(|c| (&(*c.custom_id), c.value.as_deref()))
-        });
-
-        Self { data, fields: fields.collect() }
+    /// Returns a reference to the inner modal data.
+    #[must_use]
+    pub const fn data(&self) -> &'ev ModalInteractionData {
+        self.data
     }
 
-    /// Returns a reference to the stored value associated with the given field name.
+    /// Creates a new [`ModalComponentResolver`] using the given field list.
+    fn with_components<I>(data: &'ev ModalInteractionData, components: I) -> Self
+    where
+        I: IntoIterator<Item = &'ev ModalInteractionComponent>,
+    {
+        Self { data, components: components.into_iter().map(|component| (component.id(), component)).collect() }
+    }
+
+    /// Returns a reference to the stored [`ModalInteractionComponent`] associated with the given name.
     ///
     /// # Errors
     ///
-    /// This function will return an error if the field does not exist.
-    pub fn get(&self, name: impl AsRef<str>) -> Result<Option<&str>, Error> {
-        let name = name.as_ref();
+    /// This function will return an error if the component does not exist.
+    pub fn any(&'ev self, id: i32) -> Result<&'ev ModalInteractionComponent, Error> {
+        self.components.get(&id).copied().ok_or(Error::MissingComponent(id))
+    }
 
-        self.fields
-            .get(name)
-            .copied()
-            .map(|v| v.filter(|v| !v.is_empty()))
-            .ok_or_else(|| Error::MissingField(name.into()))
+    /// Returns a new [`ModalComponentResolver`] containing all components within the stored action row.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist or is not an action row.
+    pub fn action_row(&'ev self, id: i32) -> Result<Self, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::ActionRow(value) => Ok(Self::with_components(self.data, &(*value.components))),
+            other => Err(Error::InvalidComponent(id, ComponentType::ActionRow, other.kind())),
+        }
+    }
+
+    /// Returns a new [`ModalComponentResolver`] containing all components within the stored label.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist or is not a label.
+    pub fn label(&'ev self, id: i32) -> Result<Self, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::Label(value) => {
+                Ok(Self::with_components(self.data, std::iter::once(&(*value.component))))
+            }
+            other => Err(Error::InvalidComponent(id, ComponentType::Label, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored string selector associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a
+    /// string selector.
+    pub fn string_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionStringSelect, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::StringSelect(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::TextSelectMenu, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored text input associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a text
+    /// input.
+    pub fn text_input(&'ev self, id: i32) -> Result<&'ev ModalInteractionTextInput, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::TextInput(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::TextInput, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored user selector associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a user
+    /// selector.
+    pub fn user_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionUserSelect, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::UserSelect(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::UserSelectMenu, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored role selector associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a role
+    /// selector.
+    pub fn role_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionRoleSelect, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::RoleSelect(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::RoleSelectMenu, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored mentionable selector associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a
+    /// mentionable selector.
+    pub fn mentionable_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionMentionableSelect, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::MentionableSelect(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::MentionableSelectMenu, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored channel selector associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a
+    /// channel selector.
+    pub fn channel_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionChannelSelect, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::ChannelSelect(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::ChannelSelectMenu, other.kind())),
+        }
+    }
+
+    /// Returns a reference to the stored file upload associated with the given numeric identifier.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the component does not exist, or if the associated component is not a file
+    /// upload.
+    pub fn file_upload(&'ev self, id: i32) -> Result<&'ev ModalInteractionFileUpload, Error> {
+        match self.any(id)? {
+            ModalInteractionComponent::FileUpload(value) => Ok(value),
+            other => Err(Error::InvalidComponent(id, ComponentType::FileUpload, other.kind())),
+        }
     }
 }
 

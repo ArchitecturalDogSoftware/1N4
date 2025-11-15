@@ -86,9 +86,7 @@ echo-done = "Mensaje resonante."
 help-title = "Listado de Comandos de 1N4"
 help-header = """\
 ¡Gracias por usar 1N4! Estoy feliz de ser de servicio.
-A continuación se muestra una lista de todos los comandos que están disponsibles para usted.
-
-Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/ArchitecturalDogSoftware/1N4/issues).\
+A continuación se muestra una lista de todos los comandos que están disponsibles para usted. Si encuentra algún problema, por favor informalo a través de nuestro [rastreador de problemas](https://github.com/ArchitecturalDogSoftware/1N4/issues).\
 """
 help-footer = """\
 Propiedad de Arden Inc., versión %V+neon.
@@ -103,13 +101,7 @@ help-tag-subcommands = "Tiene subcomandos"
 help-tag-dms = "Utilizable en mensajes directos"
 help-tag-nsfw = "NSFW"
 
-help-button-build-information = "Información de compilación"
-help-button-source-code = "Código fuente"
-help-button-licenses = "Licencias"
-help-button-privacy-policy = "Directiva de privacidad"
-help-button-security-policy = "Directiva de seguridad"
-
-help-embed-build-information-header = "Información de compilación"
+help-build-information-header = "Información de compilación"
 
 localizer-reloaded = "¡Actualizado!"
 localizer-locales = "Configuraciones regionales"
@@ -136,6 +128,21 @@ role-remove-emptied = "Se han eliminado todos los selectores de roles."
 role-remove-missing = "El rol seleccionado ya se ha eliminado."
 
 role-finished = "Finalizados los selectores de roles."
+
+[ui-button]
+help-open = "Abrirlo"
+help-view = "Verlo/a"
+
+help-label-build-information = "Información de compilación"
+help-description-build-information = "Muestra la versión de 1N4 y otra información relacionada."
+help-label-source-code = "Código fuente"
+help-description-source-code = "Abre el repositorio que contiene todo el código de 1N4."
+help-label-licenses = "Licencias"
+help-description-licenses = "Enumera todas las licencias de software utilizadas por 1N4 y sus dependencias."
+help-label-privacy-policy = "Directiva de privacidad"
+help-description-privacy-policy = "Muestra información sobre cómo 1N4 utiliza los datos del usario."
+help-label-security-policy = "Directiva de seguridad"
+help-description-security-policy = "Muestra información sobre el proceso de notificación de vulnerabilidades de 1N4."
 
 [ui-input]
 poll-create-title = "Titulo"

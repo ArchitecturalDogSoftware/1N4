@@ -22,7 +22,7 @@ use twilight_model::application::interaction::application_command::CommandData;
 use twilight_model::guild::Permissions;
 
 use crate::client::event::EventResult;
-use crate::command::context::{Context, Visibility};
+use crate::command::context::Context;
 use crate::command::registry::CommandEntry;
 use crate::command::resolver::CommandOptionResolver;
 use crate::utility::category;
@@ -77,7 +77,7 @@ async fn on_command<'ap: 'ev, 'ev>(
 
     let done = localize!(async(try in locale) category::UI, "echo-done").await?;
 
-    context.text(done, Visibility::Ephemeral).await?;
+    context.success_message(done, None::<&str>).await?;
 
     crate::client::event::pass()
 }
