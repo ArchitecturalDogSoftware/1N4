@@ -191,8 +191,6 @@ async fn create_command_section<'ap: 'ev, 'ev>(
     locale: Option<Locale>,
     guild_id: Option<Id<GuildMarker>>,
 ) -> Result<Component> {
-    let mut section_content = String::new();
-
     let (title, mut commands) = if let Some(guild_id) = guild_id {
         (
             localize!(async(try in locale) category::UI, "help-guild").await?,
@@ -205,9 +203,9 @@ async fn create_command_section<'ap: 'ev, 'ev>(
         )
     };
 
-    writeln!(&mut section_content, "**{title}:**")?;
-
     // TODO: See if there's any way to reliably trim commands that the calling user doesn't have access to.
+
+    let mut section_content = format!("**{title}:**\n");
 
     if commands.is_empty() {
         let missing_text = localize!(async(try in locale) category::UI, "help-missing").await?;
