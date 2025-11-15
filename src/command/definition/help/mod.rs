@@ -163,7 +163,6 @@ async fn on_build_information_component<'ap: 'ev, 'ev>(
     };
 
     let mut buffer = String::new();
-
     writeln!(&mut buffer, "- `VERSION`: `{}`", env!("CARGO_PKG_VERSION"))?;
     writeln!(&mut buffer, "- `FEATURES`: `{}`", info::FEATURES)?;
     writeln!(&mut buffer, "- `COMMIT_HASH`: `{}`", info::COMMIT_HASH)?;
@@ -196,12 +195,12 @@ async fn create_command_section<'ap: 'ev, 'ev>(
 
     let (title, mut commands) = if let Some(guild_id) = guild_id {
         (
-            localize!(async(try in locale) category::UI, "help-global").await?,
+            localize!(async(try in locale) category::UI, "help-guild").await?,
             context.client().guild_commands(guild_id).await?.model().await?,
         )
     } else {
         (
-            localize!(async(try in locale) category::UI, "help-guild").await?,
+            localize!(async(try in locale) category::UI, "help-global").await?,
             context.client().global_commands().await?.model().await?,
         )
     };
