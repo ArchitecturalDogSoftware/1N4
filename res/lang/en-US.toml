@@ -137,10 +137,15 @@ help-open = "Open"
 help-view = "View"
 
 help-label-build-information = "Build Information"
+help-description-build-information = "Displays 1N4's version and other related information."
 help-label-source-code = "Source Code"
+help-description-source-code = "Opens the repository that contains all of 1N4's code."
 help-label-licenses = "Licenses"
+help-description-licenses = "Lists all of the software licenses used by 1N4 and her dependencies."
 help-label-privacy-policy = "Privacy Policy"
+help-description-privacy-policy = "Displays information about how 1N4 uses user data."
 help-label-security-policy = "Security Policy"
+help-description-security-policy = "Displays information regarding 1N4's vulnerability reporting process."
 
 [ui-input]
 poll-create-title = "Title"

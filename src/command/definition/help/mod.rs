@@ -126,11 +126,11 @@ async fn on_command<'ap: 'ev, 'ev>(
 
     container = container
         .component(SeparatorBuilder::new().try_build()?)
-        .component(self::create_button_section(locale, "source-code", "url", source_code_button).await?)
-        .component(self::create_button_section(locale, "build-information", "reply", build_information_button).await?)
-        .component(self::create_button_section(locale, "licenses", "reply", licenses_button).await?)
-        .component(self::create_button_section(locale, "privacy-policy", "reply", privacy_policy_button).await?)
-        .component(self::create_button_section(locale, "security-policy", "reply", security_policy_button).await?)
+        .component(self::create_button_section(locale, "source-code", source_code_button).await?)
+        .component(self::create_button_section(locale, "build-information", build_information_button).await?)
+        .component(self::create_button_section(locale, "licenses", licenses_button).await?)
+        .component(self::create_button_section(locale, "privacy-policy", privacy_policy_button).await?)
+        .component(self::create_button_section(locale, "security-policy", security_policy_button).await?)
         .component(SeparatorBuilder::new().try_build()?)
         .component(TextDisplayBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).try_build()?);
 
@@ -281,16 +281,11 @@ async fn create_command_entry(locale: Option<Locale>, command: Command) -> Resul
 /// # Errors
 ///
 /// This function will return an error if the section could not be created.
-async fn create_button_section(
-    locale: Option<Locale>,
-    text_key: &str,
-    action_key: &str,
-    button: Button,
-) -> Result<Component> {
-    let text = localize!(async(try in locale) category::UI_BUTTON, format!("help-label-{text_key}")).await?;
-    let action = localize!(async(try in locale) category::UI_BUTTON, format!("help-action-{action_key}")).await?;
+async fn create_button_section(locale: Option<Locale>, key: &str, button: Button) -> Result<Component> {
+    let text = localize!(async(try in locale) category::UI_BUTTON, format!("help-label-{key}")).await?;
+    let description = localize!(async(try in locale) category::UI_BUTTON, format!("help-description-{key}")).await?;
 
-    let text_display = TextDisplayBuilder::new(format!("{text}\n-# {action}")).try_build()?;
+    let text_display = TextDisplayBuilder::new(format!("{text}\n-# {description}")).try_build()?;
 
     Ok(SectionBuilder::new(button).component(text_display).try_build()?.into())
 }
