@@ -130,9 +130,6 @@ role-remove-missing = "El rol seleccionado ya se ha eliminado."
 role-finished = "Finalizados los selectores de roles."
 
 [ui-button]
-help-action-reply = "Este botón creará una respuesta a este mensaje."
-help-action-url = "Este botón abrirá una página en su navegador predeterminado."
-
 help-open = "Abrirlo"
 help-view = "Verlo/a"
 
