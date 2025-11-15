@@ -55,7 +55,7 @@ pub enum Error {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CommandOptionResolver<'ev> {
     /// The command's data.
-    pub data: &'ev CommandData,
+    data: &'ev CommandData,
     /// The cached options.
     options: HashMap<&'ev str, &'ev CommandOptionValue>,
 }
@@ -64,6 +64,12 @@ impl<'ev> CommandOptionResolver<'ev> {
     /// Creates a new [`CommandOptionResolver`].
     pub fn new(data: &'ev CommandData) -> Self {
         Self::with_options(data, &data.options)
+    }
+
+    /// Returns a reference to the inner command data.
+    #[must_use]
+    pub const fn data(&self) -> &'ev CommandData {
+        self.data
     }
 
     /// Creates a new [`CommandOptionResolver`] using the given option list.
@@ -255,7 +261,7 @@ impl<'ev> CommandOptionResolver<'ev> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModalComponentResolver<'ev> {
     /// The modal's data.
-    pub data: &'ev ModalInteractionData,
+    data: &'ev ModalInteractionData,
     /// The modal's cached components.
     components: BTreeMap<i32, &'ev ModalInteractionComponent>,
 }
@@ -264,6 +270,12 @@ impl<'ev> ModalComponentResolver<'ev> {
     /// Creates a new [`ModalComponentResolver`].
     pub fn new(data: &'ev ModalInteractionData) -> Self {
         Self::with_components(data, &data.components)
+    }
+
+    /// Returns a reference to the inner modal data.
+    #[must_use]
+    pub const fn data(&self) -> &'ev ModalInteractionData {
+        self.data
     }
 
     /// Creates a new [`ModalComponentResolver`] using the given field list.
