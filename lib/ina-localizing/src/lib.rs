@@ -16,7 +16,7 @@
 
 //! Provides localization solutions for 1N4.
 
-#![feature(array_try_from_fn)]
+#![feature(array_try_from_fn, array_try_map)]
 
 use std::collections::hash_map::Keys;
 use std::collections::{HashMap, HashSet};
@@ -34,7 +34,7 @@ use tokio::sync::RwLock;
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
 
-/// Defines the format for locales.
+pub mod ascii;
 pub mod locale;
 /// Defines the localizer's settings.
 pub mod settings;
@@ -55,7 +55,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
     /// A locale-specific error.
     #[error(transparent)]
-    Locale(#[from] self::locale::Error),
+    Locale(#[from] self::locale::LocaleError),
     /// The configured directory is missing.
     #[error("missing configured directory: '{0}'")]
     MissingDir(Box<Path>),

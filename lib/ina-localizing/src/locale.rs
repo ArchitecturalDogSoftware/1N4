@@ -14,119 +14,246 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
+//! Defines regional linguistic locales.
+
 use std::ffi::OsStr;
 use std::fmt::Display;
+use std::num::{NonZero, ParseIntError};
 use std::str::FromStr;
 
+use ascii::AsciiChar;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{Arg, Command};
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Serialize};
 
-/// An error that may be returned when using this library.
-#[non_exhaustive]
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    /// A character was invalid.
-    #[error("invalid character; expecting {0}, found {1}")]
-    InvalidCharacter(&'static str, char),
-    /// A string was parsed with an invalid length.
-    #[error("invalid string length: {0}")]
-    InvalidLength(usize),
-    /// A given language code was invalid.
-    #[error("invalid language code: {0:?}")]
-    InvalidLanguage([char; 2]),
-    /// A given territory code was invalid.
-    #[error("invalid territory code: '{0}'")]
-    InvalidTerritory(Territory),
-    /// A character was missing.
-    #[error("missing character; expecting {0}")]
-    MissingCharacter(&'static str),
-    /// A numeric code failed to parse.
-    #[error(transparent)]
-    Parse(#[from] std::num::ParseIntError),
+use crate::ascii::{AsciiArray, ToAsciiArrayError};
+
+/// An error returned when failing to create a [`Locale`].
+#[repr(transparent)]
+#[derive(Clone, Debug)]
+pub struct LocaleError(LocaleErrorKind);
+
+impl LocaleError {
+    /// Returns this error's type.
+    #[must_use]
+    pub const fn kind(&self) -> &LocaleErrorKind {
+        &self.0
+    }
+}
+
+impl std::error::Error for LocaleError {}
+
+impl Display for LocaleError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// A [`LocaleError`]'s type.
+#[derive(Clone, Debug)]
+pub enum LocaleErrorKind {
+    /// An invalid locale was provided.
+    Locale(Box<str>),
+
+    /// An invalid language code was provided.
+    LanguageCode(AsciiArray<2>),
+
+    /// An invalid alpha-2 territory code was provided.
+    TerritoryAlpha2Code(AsciiArray<2>),
+    /// An invalid alpha-3 territory code was provided.
+    TerritoryAlpha3Code(AsciiArray<3>),
+    /// An invalid numeric territory code was provided.
+    TerritoryNumericCode(NonZero<u16>),
+
+    /// A [`ParseIntError`].
+    ParseInt(ParseIntError),
+    /// A [`ToAsciiArrayError`].
+    ToAsciiArray(ToAsciiArrayError),
+}
+
+impl Display for LocaleErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Locale(string) => write!(f, "an invalid locale string was provided: {string:?}"),
+            Self::LanguageCode(code) => write!(f, "an invalid language code was provided: {code:?}"),
+            Self::TerritoryAlpha2Code(code) => write!(f, "an invalid alpha-2 territory code was provided: {code:?}"),
+            Self::TerritoryAlpha3Code(code) => write!(f, "an invalid alpha-3 territory code was provided: {code:?}"),
+            Self::TerritoryNumericCode(code) => write!(f, "an invalid numeric territory code was provided: {code:?}"),
+            Self::ParseInt(error) => write!(f, "failed to parse numeric territory code: {error}"),
+            Self::ToAsciiArray(error) => write!(f, "failed to parse ascii array: {error}"),
+        }
+    }
+}
+
+/// The language code for a locale.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LocaleLanguageCode(AsciiArray<2>);
+
+impl LocaleLanguageCode {
+    /// Creates a new [`LocaleLanguageCode`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given code is not entirely ASCII lowercase.
+    pub fn new(character_array: AsciiArray<2>) -> Result<Self, LocaleError> {
+        if character_array.iter().all(AsciiChar::is_ascii_lowercase) {
+            Ok(Self(character_array))
+        } else {
+            Err(LocaleError(LocaleErrorKind::LanguageCode(character_array)))
+        }
+    }
+}
+
+impl Display for LocaleLanguageCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.0[0], self.0[1])
+    }
+}
+
+impl FromStr for LocaleLanguageCode {
+    type Err = LocaleError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        Self::new(string.parse().map_err(|error| LocaleError(LocaleErrorKind::ToAsciiArray(error)))?)
+    }
+}
+
+/// The territory code for a locale.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LocaleTerritoryCode(LocaleTerritoryCodeInner);
+
+impl LocaleTerritoryCode {
+    /// Creates a new alpha-2 [`LocaleTerritoryCode`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given code is not entirely ASCII uppercase.
+    pub fn alpha2(character_array: AsciiArray<2>) -> Result<Self, LocaleError> {
+        if character_array.iter().all(AsciiChar::is_ascii_uppercase) {
+            Ok(Self(LocaleTerritoryCodeInner::Alpha2(character_array)))
+        } else {
+            Err(LocaleError(LocaleErrorKind::TerritoryAlpha2Code(character_array)))
+        }
+    }
+
+    /// Creates a new alpha-3 [`LocaleTerritoryCode`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given code is not entirely ASCII uppercase.
+    pub fn alpha3(character_array: AsciiArray<3>) -> Result<Self, LocaleError> {
+        if character_array.iter().all(AsciiChar::is_ascii_uppercase) {
+            Ok(Self(LocaleTerritoryCodeInner::Alpha3(character_array)))
+        } else {
+            Err(LocaleError(LocaleErrorKind::TerritoryAlpha3Code(character_array)))
+        }
+    }
+
+    /// Creates a new numeric [`LocaleTerritoryCode`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the given code is not within `001..=999`.
+    pub const fn numeric(number: NonZero<u16>) -> Result<Self, LocaleError> {
+        if number.get() <= 999 {
+            Ok(Self(LocaleTerritoryCodeInner::Numeric(number)))
+        } else {
+            Err(LocaleError(LocaleErrorKind::TerritoryNumericCode(number)))
+        }
+    }
+}
+
+impl Display for LocaleTerritoryCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl FromStr for LocaleTerritoryCode {
+    type Err = LocaleError;
+
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        if string.chars().all(|character| character.is_ascii_digit()) {
+            return Self::numeric(string.parse().map_err(|error| LocaleError(LocaleErrorKind::ParseInt(error)))?);
+        }
+
+        match string.chars().count() {
+            2 => Self::alpha2(string.parse().map_err(|error| LocaleError(LocaleErrorKind::ToAsciiArray(error)))?),
+            3 => Self::alpha3(string.parse().map_err(|error| LocaleError(LocaleErrorKind::ToAsciiArray(error)))?),
+            _ => Err(LocaleError(LocaleErrorKind::Locale(string.into()))),
+        }
+    }
+}
+
+/// The inner representation of a [`LocaleTerritoryCode`].
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+enum LocaleTerritoryCodeInner {
+    /// A two-letter regional identifier.
+    Alpha2(AsciiArray<2>),
+    /// A three-letter regional identifier.
+    Alpha3(AsciiArray<3>),
+    /// A numeric regional identifier, ranging from 001-999.
+    Numeric(NonZero<u16>),
+}
+
+impl Display for LocaleTerritoryCodeInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Alpha2(array) => array.iter().try_for_each(|character| character.fmt(f)),
+            Self::Alpha3(array) => array.iter().try_for_each(|character| character.fmt(f)),
+            Self::Numeric(number) => write!(f, "{number:03}"),
+        }
+    }
 }
 
 /// A regional linguistic locale.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Locale {
     /// The locale's language code.
-    language: [char; 2],
+    language: LocaleLanguageCode,
     /// The locale's territory identifier.
-    territory: Option<Territory>,
-}
-
-impl Default for Locale {
-    fn default() -> Self {
-        Self { language: ['e', 'n'], territory: Some(Territory::Alpha2(['U', 'S'])) }
-    }
+    territory: Option<LocaleTerritoryCode>,
 }
 
 impl Locale {
     /// Creates a new [`Locale`].
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the given language or territory codes are invalid.
-    pub fn new(language: [char; 2], territory: Option<Territory>) -> Result<Self, Error> {
-        if !language.iter().all(char::is_ascii_lowercase) {
-            return Err(Error::InvalidLanguage(language));
-        }
-
-        if territory.is_some_and(|t| match t {
-            Territory::Alpha2(c) => !c.iter().all(char::is_ascii_uppercase),
-            Territory::Alpha3(c) => !c.iter().all(char::is_ascii_uppercase),
-            Territory::Numeric(_) => false,
-        }) {
-            let Some(territory) = territory else { unreachable!("the territory is always present at this point") };
-
-            return Err(Error::InvalidTerritory(territory));
-        }
-
-        Ok(Self { language, territory })
+    #[must_use]
+    pub const fn new(language: LocaleLanguageCode, territory: Option<LocaleTerritoryCode>) -> Self {
+        Self { language, territory }
     }
 
     /// Returns the locale's language code.
     #[must_use]
-    pub fn language(&self) -> Box<str> {
-        self.language.iter().collect()
+    pub const fn language(&self) -> LocaleLanguageCode {
+        self.language
     }
 
     /// Returns the locale's territory code.
     #[must_use]
-    pub fn territory(&self) -> Option<Box<str>> {
-        self.territory.map(|t| t.to_string().into_boxed_str())
+    pub const fn territory(&self) -> Option<LocaleTerritoryCode> {
+        self.territory
     }
 }
 
-impl TryFrom<&str> for Locale {
-    type Error = <Self as FromStr>::Err;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        value.parse()
+impl Default for Locale {
+    fn default() -> Self {
+        Self::new(
+            LocaleLanguageCode(AsciiArray::from([AsciiChar::e, AsciiChar::n])),
+            Some(LocaleTerritoryCode(LocaleTerritoryCodeInner::Alpha2(AsciiArray::from([AsciiChar::U, AsciiChar::S])))),
+        )
     }
 }
 
-impl FromStr for Locale {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut iter = s.chars();
-        let next_char = |_| self::match_next_char(&mut iter, char::is_ascii_lowercase, "a lowercase ascii character");
-
-        let language = std::array::try_from_fn(next_char)?;
-        let territory = self::match_next_char(&mut iter, |c| c == &'-', "a hyphen character")
-            .ok()
-            .map(|_| iter.collect::<Box<str>>().parse())
-            .transpose()?;
-
-        Self::new(language, territory)
-    }
-}
-
-impl From<Locale> for Box<str> {
-    fn from(value: Locale) -> Self {
-        value.to_string().into_boxed_str()
+impl Display for Locale {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(territory) = self.territory() {
+            write!(f, "{}-{territory}", self.language())
+        } else {
+            self.language().fmt(f)
+        }
     }
 }
 
@@ -136,15 +263,15 @@ impl From<Locale> for String {
     }
 }
 
-impl Display for Locale {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.language().fmt(f)?;
+impl FromStr for Locale {
+    type Err = LocaleError;
 
-        if let Some(territory) = self.territory {
-            write!(f, "-{territory}")?;
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        if let Some((language, territory)) = string.split_once('-') {
+            Ok(Self::new(language.parse()?, Some(territory.parse()?)))
+        } else {
+            Ok(Self::new(string.parse()?, None))
         }
-
-        Ok(())
     }
 }
 
@@ -191,48 +318,8 @@ impl<'de> Deserialize<'de> for Locale {
     }
 }
 
-/// A locale's territory identifier.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Territory {
-    /// A two-letter alphabetic territory code.
-    Alpha2([char; 2]),
-    /// A three-letter alphabetic territory code.
-    Alpha3([char; 3]),
-    /// A numeric territory code.
-    Numeric(u32),
-}
-
-impl FromStr for Territory {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.chars().all(char::is_numeric) {
-            return Ok(s.parse().map(Self::Numeric)?);
-        }
-
-        let mut iter = s.chars();
-        let next_char = |_| self::match_next_char(&mut iter, char::is_ascii_uppercase, "an uppercase ascii character");
-
-        match s.chars().count() {
-            2 => std::array::try_from_fn(next_char).map(Self::Alpha2),
-            3 => std::array::try_from_fn(next_char).map(Self::Alpha3),
-            n => Err(Error::InvalidLength(n)),
-        }
-    }
-}
-
-impl Display for Territory {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Alpha2([a, b]) => write!(f, "{a}{b}"),
-            Self::Alpha3([a, b, c]) => write!(f, "{a}{b}{c}"),
-            Self::Numeric(n) => n.fmt(f),
-        }
-    }
-}
-
 /// Parses a locale from a command-line argument.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 pub struct LocaleValueParser;
 
 impl TypedValueParser for LocaleValueParser {
@@ -244,19 +331,4 @@ impl TypedValueParser for LocaleValueParser {
 
         value.parse().map_err(|_| clap::Error::new(clap::error::ErrorKind::ValueValidation))
     }
-}
-
-/// Returns the next character from the given iterator, ensuring that it matches the given predicate.
-///
-/// # Errors
-///
-/// This function will return an error if the character is missing or does not match the predicate.
-fn match_next_char<I, P>(iterator: &mut I, predicate: P, expecting: &'static str) -> Result<char, Error>
-where
-    I: Iterator<Item = char>,
-    P: FnOnce(&char) -> bool,
-{
-    iterator.next().ok_or(Error::MissingCharacter(expecting)).and_then(|character| {
-        predicate(&character).then_some(character).ok_or(Error::InvalidCharacter(expecting, character))
-    })
 }
