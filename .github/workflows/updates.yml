@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Copyright © 2024 RemasteredArch
+# Copyright © 2024-2026 RemasteredArch
 #
 # This file is part of 1N4.
 #
@@ -31,16 +31,16 @@ jobs:
             GO_VERSION: '1'
             # Spec: `binary:path:vSemVer`
             GO_PACKAGES: |
-                yamlfmt:github.com/google/yamlfmt:v0.17
+                yamlfmt:github.com/google/yamlfmt:v0.21
                 actionlint:github.com/rhysd/actionlint:v1
             # Spec: `package:SemVer`
             PYTHON_PACKAGES: |
-                mdformat:0.7
+                mdformat:1
             # Spec: `namespace/repository@semver`
             GITHUB_RELEASES: |
-                actions/cache@v4
-                actions/checkout@v5
-                actions/setup-go@v5
+                actions/cache@v5
+                actions/checkout@v6
+                actions/setup-go@v6
                 tamasfe/taplo@0.10
                 mvdan/sh@3
                 koalaman/shellcheck@0.11
@@ -53,7 +53,7 @@ jobs:
                 ubuntu-24.04:Ubuntu2404:Ubuntu
         steps:
             - name: Setup - Install go
-              uses: actions/setup-go@v5
+              uses: actions/setup-go@v6
               with:
                 go-version: '1'
                 check-latest: true
@@ -270,7 +270,7 @@ jobs:
                     namespace="$(get_column "$path" 1 '/')"
                     # E.g., `checkout`.
                     repository="$(get_column "$path" 2 '/')"
-                    # E.g., `v5`.
+                    # E.g., `v6`.
                     semver_target="$(get_column "$package" 2 '@')"
 
                     # This returns only one page of thirty releases by default, but it seems like they're sorted by
