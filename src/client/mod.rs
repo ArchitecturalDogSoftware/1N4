@@ -230,7 +230,7 @@ impl Instance {
     #[expect(clippy::cast_sign_loss, reason = "buckets cannot be negative")]
     #[expect(clippy::cast_precision_loss, reason = "there will never be enough shards for this to matter")]
     pub(crate) fn get_shard_timeout(connection: &BotConnectionInfo) -> Duration {
-        const DAY: Duration = Duration::from_secs(60 * 60 * 24);
+        const DAY: Duration = Duration::from_hours(24);
 
         let timeout = Duration::from_millis(connection.session_start_limit.reset_after);
         let refills = connection.shards / connection.session_start_limit.remaining;
@@ -239,7 +239,7 @@ impl Instance {
         let buckets = buckets.round() as u64;
 
         timeout * u32::from(refills > 0)
-            + (1 .. refills).map(|_| DAY).sum::<Duration>()
+            + (refills - 1) * DAY // _
             + Duration::from_secs(5 * buckets % sessions)
     }
 
@@ -253,9 +253,7 @@ impl Instance {
         settings: &Settings,
         status: Option<&StatusList>,
     ) -> Result<Box<[Shard]>> {
-        let seconds = settings.reshard_interval.get().saturating_mul(60 * 60);
-
-        tokio::time::sleep(Duration::from_secs(seconds)).await;
+        tokio::time::sleep(Duration::from_hours(settings.reshard_interval.get())).await;
 
         let connection = client.gateway().authed().await?.model().await?;
         let discord_token = crate::utility::secret::discord_token()?.to_string();
@@ -322,7 +320,7 @@ impl Instance {
 
             tokio::pin!(shards);
 
-            let duration = Duration::from_secs(self.api.settings.status_interval.get().saturating_mul(60));
+            let duration = Duration::from_mins(self.api.settings.status_interval.get());
             let mut status_interval = tokio::time::interval_at((Instant::now() + duration).into(), duration);
 
             loop {

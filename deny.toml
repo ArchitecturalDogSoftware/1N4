@@ -17,14 +17,6 @@ allow = [
 
 # <https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html>
 [advisories]
-ignore = [
-    # Advisory: `dtolnay/paste` is unmaintained. This is fine to ignore because it's not abandoned, it's just finished:
-    #
-    # > For my own use cases I would use paste since it is 'finished' and does everything I need.
-    #
-    # <https://github.com/rustsec/advisory-db/pull/2215#issuecomment-2709315704>
-    "RUSTSEC-2024-0436",
-]
 
 # <https://embarkstudios.github.io/cargo-deny/checks/bans/cfg.html>
 [bans]
