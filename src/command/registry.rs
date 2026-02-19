@@ -227,7 +227,7 @@ macro_rules! define_command_modules {
             pub(in $crate::command) fn register(registry: &mut $crate::command::registry::CommandRegistry) -> ::anyhow::Result<()> {
                 $(registry.register(self::$command_module::entry())?;)*
 
-                Ok(())
+                ::std::result::Result::Ok(())
             }
         }
     };
@@ -253,7 +253,7 @@ macro_rules! define_command_modules {
 ///
 /// async fn on_command<'ap: 'ev, 'ev>(mut context: Context<'ap, 'ev, &'ev CommandData>) -> EventResult {
 ///     let resolver = CommandOptionResolver::new(context.state);
-///     
+///
 ///     context.text("AAAAAAAAAAAAAA", resolver.get_bool("ephemeral")?).await?;
 ///
 ///     crate::client::event::pass()

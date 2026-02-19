@@ -347,18 +347,18 @@ macro_rules! localize {
         $crate::thread::get($locale, $category, $key)
     };
     (async(in $locale:expr) $category:expr, $key:expr) => {
-        $crate::thread::get(Some($locale), $category, $key)
+        $crate::thread::get(::std::option::Option::Some($locale), $category, $key)
     };
     (async $category:expr, $key:expr) => {
-        $crate::thread::get(None, $category, $key)
+        $crate::thread::get(::std::option::Option::None, $category, $key)
     };
     ((try in $locale:expr) $category:expr, $key:expr) => {
         $crate::thread::blocking_get($locale, $category, $key)
     };
     ((in $locale:expr) $category:expr, $key:expr) => {
-        $crate::thread::blocking_get(Some($locale), $category, $key)
+        $crate::thread::blocking_get(::std::option::Option::Some($locale), $category, $key)
     };
     ($category:expr, $key:expr) => {
-        $crate::thread::blocking_get(None, $category, $key)
+        $crate::thread::blocking_get(::std::option::Option::None, $category, $key)
     };
 }

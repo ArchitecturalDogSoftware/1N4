@@ -188,12 +188,12 @@ macro_rules! define_commands {
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::application_command::CommandData>,
             resolver: $crate::command::resolver::CommandOptionResolver<'ev>,
         ) -> $crate::client::event::EventResult {
-            $(if let Ok(resolver) = resolver.subcommand(self::command::$name::NAME) {
+            $(if let ::std::result::Result::Ok(resolver) = resolver.subcommand(self::command::$name::NAME) {
                 return self::command::$name::callback(entry, context, resolver).await;
             })else*
 
-            $(if let Ok(resolver) = resolver.subcommand_group(self::command::$group::NAME) {
-                $(if let Ok(resolver) = resolver.subcommand(self::command::$group::$group_name::NAME) {
+            $(if let ::std::result::Result::Ok(resolver) = resolver.subcommand_group(self::command::$group::NAME) {
+                $(if let ::std::result::Result::Ok(resolver) = resolver.subcommand(self::command::$group::$group_name::NAME) {
                     return self::command::$group::$group_name::callback(entry, context, resolver).await;
                 })*
             })else*

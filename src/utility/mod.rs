@@ -108,9 +108,9 @@ macro_rules! define_categories {
         #[expect(clippy::allow_attributes, reason = "false-positive relating to macro generation")]
         #[allow(missing_docs, reason = "the generated variable names should be self-describing")]
         pub mod category {
-            pub const LIST: &[&str] = &[$(self::$name),*];
+            pub const LIST: &[&::std::primitive::str] = &[$(self::$name),*];
 
-            $(pub const $name: &str = $value;)*
+            $(pub const $name: &::std::primitive::str = $value;)*
         }
     };
 }

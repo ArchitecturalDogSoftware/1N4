@@ -520,7 +520,7 @@ macro_rules! create_response {
     })) => {
         $client.create_response($id, $token, &::twilight_model::http::interaction::InteractionResponse {
             kind: $kind,
-            data: Some(::twilight_util::builder::InteractionResponseDataBuilder::new()
+            data: ::std::option::Option::Some(::twilight_util::builder::InteractionResponseDataBuilder::new()
                 $(.flags($flags))?
                 $(.attachments($attachments))?
                 $(.choices($choices))?
