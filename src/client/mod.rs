@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use ina_logging::{debug, error, warn};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tokio_stream::{StreamExt, StreamMap};

@@ -20,7 +20,7 @@ use anyhow::bail;
 use directories::BaseDirs;
 use ina_localizing::localize;
 use ina_logging::{debug, error, info, warn};
-use rand::{Rng, rng};
+use rand::{RngExt, rng};
 use time::{Duration, OffsetDateTime};
 use twilight_gateway::{Event, ShardId};
 use twilight_mention::Mention;
