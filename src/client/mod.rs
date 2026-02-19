@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2024-2026 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -93,9 +93,9 @@ pub struct StatusDefinition {
 
 impl Default for StatusDefinition {
     fn default() -> Self {
-        let status = if cfg!(debug_assertions) { Status::Idle } else { Status::Online };
+        const STATUS: Status = if cfg!(debug_assertions) { Status::Idle } else { Status::Online };
 
-        Self { status, activity: None, content: None, link: None }
+        Self { status: STATUS, activity: None, content: None, link: None }
     }
 }
 
@@ -143,7 +143,10 @@ impl Instance {
     /// This function will return an error if an [`Instance`] cannot be created.
     pub async fn new(settings: Settings) -> Result<Self> {
         // If this fails, it means that the provider was already set, meaning that we can safely ignore it.
-        _ = rustls::crypto::ring::default_provider().install_default();
+        // Just in case this *does* cause an issue one day, we output a warning log.
+        if rustls::crypto::ring::default_provider().install_default().is_err() {
+            warn!(async "cryptographic provider has already been set").await?;
+        }
 
         let discord_token = crate::utility::secret::discord_token()?;
         let client = Client::new(discord_token.to_string());
