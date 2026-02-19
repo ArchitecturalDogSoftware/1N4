@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroU32;
+use std::num::NonZero;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
@@ -195,7 +195,7 @@ impl Instance {
     ///
     /// This function will return an error if the shards could not be created.
     pub async fn new_shards(client: &Client, config: Config, settings: &Settings) -> Result<Box<[Shard]>> {
-        Ok(if let Some(count) = settings.shards.map(NonZeroU32::get) {
+        Ok(if let Some(count) = settings.shards.map(NonZero::get) {
             twilight_gateway::create_iterator(0 .. count, count, config, |_, b| b.build()).collect()
         } else {
             twilight_gateway::create_recommended(client, config, |_, b| b.build()).await?.collect()

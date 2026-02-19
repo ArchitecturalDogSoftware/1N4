@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::{NonZeroU64, NonZeroUsize};
+use std::num::NonZero;
 use std::path::PathBuf;
 
 use clap::Args;
@@ -44,25 +44,25 @@ pub struct Settings {
     /// Default: `8`
     #[arg(id = "LOG_QUEUE_LEN", long = "log-queue-capacity")]
     #[option(default = self::default_queue_capacity())]
-    pub queue_capacity: NonZeroUsize,
+    pub queue_capacity: NonZero<usize>,
     /// The duration in milliseconds that the logger's queue should retain entries for before flushing.
     ///
     /// Default: `10`
     #[arg(id = "LOG_QUEUE_MS", long = "log-queue-duration")]
     #[option(default = self::default_queue_duration())]
-    pub queue_duration: NonZeroU64,
+    pub queue_duration: NonZero<u64>,
 }
 
 /// Returns the default queue capacity.
-fn default_queue_capacity() -> NonZeroUsize {
-    let Some(capacity) = NonZeroUsize::new(8) else { unreachable!("the default capacity must be non-zero") };
+fn default_queue_capacity() -> NonZero<usize> {
+    let Some(capacity) = NonZero::new(8) else { unreachable!("the default capacity must be non-zero") };
 
     capacity
 }
 
 /// Returns the default queue duration.
-fn default_queue_duration() -> NonZeroU64 {
-    let Some(duration) = NonZeroU64::new(10) else { unreachable!("the default duration must be non-zero") };
+fn default_queue_duration() -> NonZero<u64> {
+    let Some(duration) = NonZero::new(10) else { unreachable!("the default duration must be non-zero") };
 
     duration
 }

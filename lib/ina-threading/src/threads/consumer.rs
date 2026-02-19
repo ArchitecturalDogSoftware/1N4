@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroUsize;
+use std::num::NonZero;
 
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -39,11 +39,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::{Handle, SenderHandle};
     /// # use ina_threading::threads::consumer::Consumer;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let thread = Consumer::spawn("worker", capacity, |mut r| {
     ///     assert_eq!(r.blocking_recv(), Some(123));
     /// })?;
@@ -58,7 +58,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    pub fn spawn<N, F>(name: N, capacity: NonZero<usize>, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce(Receiver<S>) -> T + Send + 'static,
@@ -75,11 +75,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::{Handle, SenderHandle};
     /// # use ina_threading::threads::consumer::Consumer;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let thread = Consumer::spawn_with_runtime("worker", capacity, |mut r| async move {
     ///     assert_eq!(r.recv().await, Some(123));
     /// })?;
@@ -94,7 +94,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZero<usize>, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: FnOnce(Receiver<S>) -> O + Send + 'static,

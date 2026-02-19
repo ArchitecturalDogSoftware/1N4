@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Display;
-use std::num::NonZeroU16;
+use std::num::NonZero;
 
 use time::macros::datetime;
 use time::{Duration, OffsetDateTime};
@@ -224,7 +224,7 @@ pub struct UserTagDisplay<'us> {
     /// The user's username.
     user: &'us str,
     /// The user's discriminator tag.
-    tag: Option<NonZeroU16>,
+    tag: Option<NonZero<u16>>,
 }
 
 impl Display for UserTagDisplay<'_> {
@@ -261,7 +261,7 @@ impl UserExt for CurrentUser {
     }
 
     fn display_tag(&self) -> UserTagDisplay<'_> {
-        UserTagDisplay { user: &self.name, tag: NonZeroU16::new(self.discriminator) }
+        UserTagDisplay { user: &self.name, tag: NonZero::new(self.discriminator) }
     }
 
     fn icon_hash(&self) -> Option<ImageHash> {
@@ -279,7 +279,7 @@ impl UserExt for Member {
     }
 
     fn display_tag(&self) -> UserTagDisplay<'_> {
-        UserTagDisplay { user: &self.user.name, tag: NonZeroU16::new(self.user.discriminator) }
+        UserTagDisplay { user: &self.user.name, tag: NonZero::new(self.user.discriminator) }
     }
 
     fn icon_hash(&self) -> Option<ImageHash> {
@@ -303,7 +303,7 @@ impl UserExt for PartialMember {
     fn display_tag(&self) -> UserTagDisplay<'_> {
         UserTagDisplay {
             user: self.user.as_ref().map_or("unknown", |u| &(*u.name)),
-            tag: self.user.as_ref().and_then(|u| NonZeroU16::new(u.discriminator)),
+            tag: self.user.as_ref().and_then(|u| NonZero::new(u.discriminator)),
         }
     }
 
@@ -322,7 +322,7 @@ impl UserExt for PartialUser {
     }
 
     fn display_tag(&self) -> UserTagDisplay<'_> {
-        UserTagDisplay { user: &self.username, tag: NonZeroU16::new(self.discriminator) }
+        UserTagDisplay { user: &self.username, tag: NonZero::new(self.discriminator) }
     }
 
     fn icon_hash(&self) -> Option<ImageHash> {
@@ -340,7 +340,7 @@ impl UserExt for User {
     }
 
     fn display_tag(&self) -> UserTagDisplay<'_> {
-        UserTagDisplay { user: &self.name, tag: NonZeroU16::new(self.discriminator) }
+        UserTagDisplay { user: &self.name, tag: NonZero::new(self.discriminator) }
     }
 
     fn icon_hash(&self) -> Option<ImageHash> {

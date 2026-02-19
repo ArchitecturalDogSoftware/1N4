@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroUsize;
+use std::num::NonZero;
 use std::path::PathBuf;
 
 use clap::Args;
@@ -51,12 +51,12 @@ pub struct Settings {
     /// Default: `8`
     #[arg(id = "DATA_QUEUE_CAPACITY", long = "data-queue-capacity")]
     #[option(default = self::default_queue_capacity())]
-    pub queue_capacity: NonZeroUsize,
+    pub queue_capacity: NonZero<usize>,
 }
 
 /// Returns the default queue capacity.
-fn default_queue_capacity() -> NonZeroUsize {
-    let Some(capacity) = NonZeroUsize::new(8) else { unreachable!("the default capacity must be non-zero") };
+fn default_queue_capacity() -> NonZero<usize> {
+    let Some(capacity) = NonZero::new(8) else { unreachable!("the default capacity must be non-zero") };
 
     capacity
 }

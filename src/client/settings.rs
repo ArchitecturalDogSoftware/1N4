@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Copyright © 2024 Jaxydog
+// Copyright © 2024-2026 Jaxydog
 // Copyright © 2025 RemasteredArch
 //
 // This file is part of 1N4.
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::{NonZeroU32, NonZeroU64};
+use std::num::NonZero;
 use std::path::PathBuf;
 
 use clap::Args;
@@ -46,7 +46,7 @@ pub struct Settings {
     /// Default: `30`
     #[arg(short = 'S', long = "status-interval")]
     #[option(default = self::default_status_interval())]
-    pub status_interval: NonZeroU64,
+    pub status_interval: NonZero<u64>,
 
     /// The location of the directory holding attachment overrides for the `/help` command.
     ///
@@ -65,13 +65,13 @@ pub struct Settings {
     /// <https://discord.com/developers/docs/events/gateway#get-gateway-bot>)
     #[arg(short = 's', long = "shards")]
     #[option(default)]
-    pub shards: Option<NonZeroU32>,
+    pub shards: Option<NonZero<u32>>,
     /// The interval at which to reshard in hours.
     ///
     /// Default: `8`
     #[arg(short = 'r', long = "reshard-interval")]
     #[option(default = self::default_reshard_interval())]
-    pub reshard_interval: NonZeroU64,
+    pub reshard_interval: NonZero<u64>,
 
     /// Whether to skip command patching on bot startup.
     ///
@@ -108,8 +108,8 @@ fn default_status_file() -> PathBuf {
 }
 
 /// Returns the default re-sharding interval.
-fn default_reshard_interval() -> NonZeroU64 {
-    let Some(interval) = NonZeroU64::new(8) else { unreachable!("the default interval must be non-zero") };
+fn default_reshard_interval() -> NonZero<u64> {
+    let Some(interval) = NonZero::new(8) else { unreachable!("the default interval must be non-zero") };
 
     interval
 }
@@ -120,8 +120,8 @@ fn default_help_attachments_directory() -> PathBuf {
 }
 
 /// Returns the default status change interval.
-fn default_status_interval() -> NonZeroU64 {
-    let Some(interval) = NonZeroU64::new(30) else { unreachable!("the default interval must be non-zero") };
+fn default_status_interval() -> NonZero<u64> {
+    let Some(interval) = NonZero::new(30) else { unreachable!("the default interval must be non-zero") };
 
     interval
 }

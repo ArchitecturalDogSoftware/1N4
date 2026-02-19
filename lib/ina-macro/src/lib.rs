@@ -241,11 +241,11 @@ pub fn stored(input: TokenStream) -> TokenStream {
 ///     /// The number of shards to spawn.
 ///     #[arg(short = 's', long = "shards")]
 ///     #[option(default)]
-///     pub shards: Option<NonZeroU32>,
+///     pub shards: Option<NonZero<u32>>,
 ///     /// The interval at which to reshard in hours.
 ///     #[arg(short = 'r', long = "reshard-interval")]
 ///     #[option(default = self::default_reshard_interval())]
-///     pub reshard_interval: NonZeroU64,
+///     pub reshard_interval: NonZero<u64>,
 ///
 ///     /// Disables all logger output.
 ///     #[arg(short = 'q', long = "quiet")]
@@ -254,8 +254,8 @@ pub fn stored(input: TokenStream) -> TokenStream {
 /// }
 ///
 /// /// Returns the default re-sharding interval.
-/// fn default_reshard_interval() -> NonZeroU64 {
-///     let Some(interval) = NonZeroU64::new(8) else { unreachable!("the default interval must be non-zero") };
+/// fn default_reshard_interval() -> NonZero<u64> {
+///     let Some(interval) = NonZero::new(8) else { unreachable!("the default interval must be non-zero") };
 ///
 ///     interval
 /// }

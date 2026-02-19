@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::collections::BTreeMap;
-use std::num::NonZeroUsize;
+use std::num::NonZero;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -84,11 +84,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::Invoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = Invoker::spawn("worker", capacity, |n| {
     ///     assert_eq!(n, 123);
     ///     456
@@ -105,7 +105,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    pub fn spawn<N, F>(name: N, capacity: NonZero<usize>, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: Fn(S) -> R + Send + 'static,
@@ -133,11 +133,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::Invoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = Invoker::spawn_with_runtime("worker", capacity, |n| async move {
     ///     assert_eq!(n, 123);
     ///
@@ -157,7 +157,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZeroUsize, f: F) -> Result<Self>
+    pub fn spawn_with_runtime<N, F, O>(name: N, capacity: NonZero<usize>, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: Fn(S) -> O + Send + 'static,
@@ -186,12 +186,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::Invoker;
     /// # #[tokio::main]
     /// # async fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| a + b)?;
     ///
     /// let response = thread.call((2, 2)).await.expect("the channel should not be closed");
@@ -241,11 +241,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::Invoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| a + b)?;
     ///
     /// let response = thread.blocking_call((2, 2)).expect("the channel should not be closed");
@@ -296,12 +296,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::Invoker;
     /// # #[tokio::main]
     /// # async fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| {
     ///     println!("{a} + {b} = {}", a + b);
     /// })?;
@@ -325,11 +325,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::Invoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = Invoker::spawn("worker", capacity, |(a, b)| {
     ///     println!("{a} + {b} = {}", a + b);
     /// })?;
@@ -435,11 +435,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::StatefulInvoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
     ///     // `args` carries both the value and the thread's state.
     ///     args.value + *args.state
@@ -457,7 +457,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn<N, F, U>(name: N, capacity: NonZeroUsize, state: U, f: F) -> Result<Self>
+    pub fn spawn<N, F, U>(name: N, capacity: NonZero<usize>, state: U, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: Fn(Stateful<T, S>) -> R + Send + 'static,
@@ -473,11 +473,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::StatefulInvoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread =
     ///     StatefulInvoker::spawn_with_runtime("worker", capacity, 2, |args| async move {
     ///         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -497,7 +497,7 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread fails to spawn.
-    pub fn spawn_with_runtime<N, F, O, U>(name: N, capacity: NonZeroUsize, state: U, f: F) -> Result<Self>
+    pub fn spawn_with_runtime<N, F, O, U>(name: N, capacity: NonZero<usize>, state: U, f: F) -> Result<Self>
     where
         N: AsRef<str>,
         F: Fn(Stateful<T, S>) -> O + Send + 'static,
@@ -512,12 +512,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::StatefulInvoker;
     /// # #[tokio::main]
     /// # async fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
     ///     // `args` carries both the value and the thread's state.
     ///     args.value + *args.state
@@ -548,11 +548,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::StatefulInvoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
     ///     // `args` carries both the value and the thread's state.
     ///     args.value + *args.state
@@ -584,12 +584,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::StatefulInvoker;
     /// # #[tokio::main]
     /// # async fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
     ///     println!("{} + {} = {}", args.value, args.state, args.value + *args.state);
     /// })?;
@@ -613,11 +613,11 @@ where
     /// # Examples
     ///
     /// ```
-    /// # use std::num::NonZeroUsize;
+    /// # use std::num::NonZero;
     /// # use ina_threading::Handle;
     /// # use ina_threading::threads::invoker::StatefulInvoker;
     /// # fn main() -> ina_threading::Result<()> {
-    /// let capacity = NonZeroUsize::new(1).unwrap();
+    /// let capacity = NonZero::<usize>::new(1).unwrap();
     /// let mut thread = StatefulInvoker::spawn("worker", capacity, 2, |args| {
     ///     println!("{} + {} = {}", args.value, args.state, args.value + *args.state);
     /// })?;

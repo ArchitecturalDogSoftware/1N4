@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use std::fmt::Display;
-use std::num::NonZeroUsize;
+use std::num::NonZero;
 use std::ops::Deref;
 use std::path::PathBuf;
 
@@ -63,7 +63,7 @@ pub struct Settings {
     /// Default: `8`
     #[arg(id = "LANG_QUEUE_CAPACITY", long = "lang-queue-capacity")]
     #[option(default = self::default_queue_capacity())]
-    pub queue_capacity: NonZeroUsize,
+    pub queue_capacity: NonZero<usize>,
 
     /// The amount of depth at which to search for a translation key in language files with inherited translations.
     ///
@@ -111,8 +111,8 @@ impl Display for MissingBehavior {
 }
 
 /// Returns the default queue capacity.
-fn default_queue_capacity() -> NonZeroUsize {
-    let Some(capacity) = NonZeroUsize::new(8) else { unreachable!("the default capacity must be non-zero") };
+fn default_queue_capacity() -> NonZero<usize> {
+    let Some(capacity) = NonZero::new(8) else { unreachable!("the default capacity must be non-zero") };
 
     capacity
 }

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License along with 1N4. If not, see
 // <https://www.gnu.org/licenses/>.
 
-use std::num::NonZeroU64;
+use std::num::NonZero;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -36,7 +36,7 @@ fn get(key: &str) -> Result<Arc<str>> {
 ///
 /// This function will return an error if the environment variable is not defined, or if it is an invalid identifier.
 fn get_id<T>(key: &str) -> Result<Id<T>> {
-    Ok(std::env::var(key)?.parse::<NonZeroU64>()?.into())
+    Ok(std::env::var(key)?.parse::<NonZero<u64>>()?.into())
 }
 
 /// Returns the Discord token environment variable, if present.
