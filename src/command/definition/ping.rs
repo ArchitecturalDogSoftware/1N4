@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use ina_localizing::localize;
-use ina_logging::debug;
+use tracing::debug;
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
@@ -76,7 +76,7 @@ async fn on_command<'ap: 'ev, 'ev>(
         .components(Some(&[component.into()]))
         .await?;
 
-    debug!(async "received ping command: response delayed by {delay}").await?;
+    debug!("received ping command: response delayed by {delay}");
 
     crate::client::event::pass()
 }

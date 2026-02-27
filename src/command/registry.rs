@@ -19,8 +19,8 @@ use std::ops::{Deref, DerefMut};
 use std::sync::LazyLock;
 
 use anyhow::{Result, ensure};
-use ina_logging::info;
 use tokio::sync::RwLock;
+use tracing::info;
 use twilight_model::application::command::Command;
 use twilight_model::id::Id;
 use twilight_model::id::marker::GuildMarker;
@@ -189,7 +189,9 @@ pub async fn initialize() -> Result<()> {
 
     drop(registry);
 
-    info!(async "initialized command registry").await.map_err(Into::into)
+    info!("initialized command registry");
+
+    Ok(())
 }
 
 /// Creates a module that contains command definitions.

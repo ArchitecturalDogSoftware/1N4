@@ -19,6 +19,7 @@ use std::sync::Arc;
 use ina_threading::statics::Static;
 use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
 use tokio::sync::RwLock;
+use tracing::error;
 
 use crate::locale::Locale;
 use crate::settings::Settings;
@@ -140,14 +141,8 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
 
             match state.get(locale, &category, &key) {
                 Ok(text) => {
-                    if text.is_missing() && ina_logging::thread::is_started().await {
-                        let Text::Missing(category, key) = &text else {
-                            unreachable!("the text is guaranteed to be missing at this point");
-                        };
-
-                        // This is error is intentionally ignored because it's better to return the text regardless of
-                        // whether this log fails.
-                        _ = ina_logging::error!(async "missing text for key '{category}::{key}'").await;
+                    if text.is_missing() {
+                        error!("missing text for key '{category}::{key}'");
                     }
 
                     Response::Text(text)

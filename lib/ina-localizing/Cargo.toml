@@ -20,13 +20,13 @@ default = []
 
 [dependencies]
 clap = { workspace = true, features = ["cargo", "derive", "env"] }
-ina-logging.workspace = true
 ina-macro.workspace = true
 ina-threading.workspace = true
 serde = { workspace = true, features = ["derive", "rc"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["fs", "sync"] }
 toml.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 # `macros` and `rt-multi-threaded` allow the use of the `#[tokio::main]` macro in documentation tests.

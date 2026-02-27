@@ -18,9 +18,10 @@
 use std::num::NonZero;
 use std::path::PathBuf;
 
-use clap::Args;
+use clap::{Args, ValueEnum};
 use ina_macro::optional;
 use serde::{Deserialize, Serialize};
+use supports_color::Stream;
 
 /// The bot's settings.
 #[non_exhaustive]
@@ -80,6 +81,12 @@ pub struct Settings {
     #[option(default)]
     pub skip_command_patch: bool,
 
+    /// Whether to output color during logging.
+    ///
+    /// Default: `true` if color is supported by standard output.
+    #[arg(long = "color")]
+    #[option(default)]
+    pub color: ColorChoice,
     /// Disables all logger output.
     ///
     /// Equivalent to `--disable-file-logging` and `--disable-console-logging`.
@@ -100,6 +107,34 @@ pub struct Settings {
     #[arg(long = "disable-console-logging")]
     #[option(default)]
     pub disable_console_logging: bool,
+    /// The logger's file output directory.
+    ///
+    /// Default: `./log`
+    #[arg(id = "LOG_DIR", long = "log-directory")]
+    #[option(default = self::default_log_directory())]
+    pub log_directory: PathBuf,
+}
+
+/// Determines whether color should be output during logging.
+#[derive(Clone, Copy, Debug, Default, Hash, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+pub enum ColorChoice {
+    /// Automatically output color if it is supported by the terminal's standard output stream.
+    #[default]
+    Auto,
+    /// Always output color.
+    Always,
+    /// Never output color.
+    Never,
+}
+
+impl ColorChoice {
+    /// Returns `true` if color should be supported on the given stream.
+    #[must_use]
+    pub fn is_supported_on(self, stream: Stream) -> bool {
+        use supports_color::on_cached;
+
+        (matches!(self, Self::Auto) && on_cached(stream).is_some_and(|c| c.has_basic)) || matches!(self, Self::Always)
+    }
 }
 
 /// Returns the default status file location.
@@ -124,4 +159,9 @@ fn default_status_interval() -> NonZero<u64> {
     let Some(interval) = NonZero::new(30) else { unreachable!("the default interval must be non-zero") };
 
     interval
+}
+
+/// Returns the default log directory.
+fn default_log_directory() -> PathBuf {
+    std::env::current_dir().map_or_else(|_| PathBuf::from("./log/"), |v| v.join("log"))
 }

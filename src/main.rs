@@ -17,14 +17,19 @@
 
 //! Your resident M41D Unit, here to help with your server.
 
+use std::fs::File;
 use std::process::ExitCode;
 
 use anyhow::Result;
 use clap::Parser;
-use ina_logging::endpoint::{FileEndpoint, TerminalEndpoint};
-use ina_logging::{error, info};
 use ina_macro::optional;
 use serde::Serialize;
+use time::OffsetDateTime;
+use time::format_description::FormatItem;
+use time::macros::format_description;
+use tracing::info;
+use tracing_subscriber::filter::{EnvFilter, LevelFilter};
+use tracing_subscriber::fmt::writer::Tee;
 
 use crate::client::Instance;
 
@@ -56,10 +61,6 @@ pub struct Arguments {
     #[option(flatten)]
     #[serde(rename = "localizer")]
     pub lang_settings: ina_localizing::settings::Settings,
-    /// The logging thread's settings.
-    #[option(flatten)]
-    #[serde(rename = "logger")]
-    pub log_settings: ina_logging::settings::Settings,
 }
 
 /// The application's main entry-point.
@@ -85,34 +86,23 @@ pub fn main() -> Result<ExitCode> {
 
     let arguments = get_config();
 
-    ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
-    if !arguments.bot_settings.disable_console_logging {
-        ina_logging::thread::blocking_endpoint(TerminalEndpoint::new())?;
-    }
-    if !arguments.bot_settings.disable_file_logging {
-        ina_logging::thread::blocking_endpoint(FileEndpoint::new())?;
-    }
-    ina_logging::thread::blocking_setup()?;
+    self::initialize_logger(&arguments)?;
 
-    info!("initialized logging thread")?;
+    info!("initialized logging subscriber");
 
     #[cfg(feature = "dotenv")]
     {
         dotenvy::dotenv()?;
 
-        info!("loaded environment variables")?;
+        info!("loaded environment variables");
     }
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     let code = runtime.block_on(self::async_main(arguments))?;
 
-    info!("exited asynchronous runtime")?;
+    info!("exited asynchronous runtime");
 
     drop(runtime);
-
-    info!("closing logging thread")?;
-
-    ina_logging::thread::blocking_close();
 
     Ok(code)
 }
@@ -123,50 +113,62 @@ pub fn main() -> Result<ExitCode> {
 ///
 /// This function will return an error if the program's execution fails.
 pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
-    info!(async "entered asynchronous runtime").await?;
+    info!("entered asynchronous runtime");
 
     ina_localizing::thread::start(arguments.lang_settings).await?;
 
-    info!(async "initialized localization thread").await?;
+    info!("initialized localization thread");
 
     let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
 
-    info!(async "loaded {loaded_locales} localization locales").await?;
+    info!("loaded {loaded_locales} localization locales");
 
     ina_storage::format::encryption::set_password_resolver(|| {
         crate::utility::secret::encryption_key().map(|v| v.to_string()).ok()
     });
     ina_storage::thread::start(arguments.data_settings).await?;
 
-    info!(async "initialized storage thread").await?;
+    info!("initialized storage thread");
 
     let instance = Instance::new(arguments.bot_settings).await?;
 
-    info!(async "initialized client instance").await?;
+    info!("initialized client instance");
 
     tokio::pin! {
         let process = instance.run();
         let terminate = tokio::signal::ctrl_c();
     }
 
-    info!(async "starting client process").await?;
+    info!("starting client process");
 
     let code = tokio::select! {
         // Exit code of 130 for ^C is standard; 128 (to mark a signal) + 2 (the code for the ^C interrupt).
-        _ = terminate => info!(async "received termination signal").await.map(|()| ExitCode::from(130)),
+        _ = terminate => {
+            info!("received termination signal");
+
+            ExitCode::from(130)
+        }
         result = process => match result {
-            Ok(()) => info!(async "stopping client process").await.map(|()| ExitCode::SUCCESS),
-            Err(error) => error!(async "unhandled error encountered: {error}").await.map(|()| ExitCode::FAILURE),
+            Ok(()) => {
+                info!("stopping client process");
+
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                tracing::error!("unhandled error encountered: {error}");
+
+                ExitCode::FAILURE
+            }
         },
-    }?;
+    };
 
     ina_storage::thread::close().await;
 
-    info!(async "closed storage thread").await?;
+    info!("closed storage thread");
 
     ina_localizing::thread::close().await;
 
-    info!(async "closed localization thread").await?;
+    info!("closed localization thread");
 
     Ok(code)
 }
@@ -185,4 +187,50 @@ fn get_config() -> Arguments {
     args.bot_settings.quiet = args.bot_settings.disable_file_logging && args.bot_settings.disable_console_logging;
 
     args
+}
+
+/// Initializes the logging subscriber.
+///
+/// # Errors
+///
+/// This function will return an error if the log directory or output file could not be created.
+fn initialize_logger(arguments: &Arguments) -> Result<()> {
+    const DEFAULT_FILTER: LevelFilter = if cfg!(debug_assertions) { LevelFilter::DEBUG } else { LevelFilter::INFO };
+    const FILE_NAME_FORMAT: &[FormatItem<'static>] = format_description!(
+        version = 2,
+        "[year repr:last_two][month padding:zero repr:numerical][day padding:zero]-[hour padding:zero][minute \
+         padding:zero][second padding:zero]-[subsecond digits:6]"
+    );
+
+    let filter = EnvFilter::builder()
+        .with_env_var("INA_LOG_LEVEL")
+        .with_default_directive(DEFAULT_FILTER.into())
+        .from_env_lossy();
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_ansi(arguments.bot_settings.color.is_supported_on(supports_color::Stream::Stdout));
+
+    if !arguments.bot_settings.disable_file_logging {
+        let current_time = OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc());
+
+        let Ok(file_name) = current_time.format(FILE_NAME_FORMAT) else {
+            unreachable!("the program will not compile if this format description is invalid");
+        };
+
+        let file_path = arguments.bot_settings.log_directory.join(file_name).with_extension("log");
+
+        std::fs::create_dir_all(&arguments.bot_settings.log_directory)?;
+
+        let file = File::options().create(true).append(true).open(file_path)?;
+
+        if arguments.bot_settings.disable_console_logging {
+            subscriber.with_writer(file).init();
+        } else {
+            subscriber.with_writer(Tee::new(std::io::stdout, file)).init();
+        }
+    } else if !arguments.bot_settings.disable_console_logging {
+        subscriber.with_writer(std::io::stdout).init();
+    }
+
+    Ok(())
 }

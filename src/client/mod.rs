@@ -18,11 +18,11 @@ use std::num::NonZero;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use ina_logging::{debug, error, warn};
 use rand::{RngExt, rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tokio_stream::{StreamExt, StreamMap};
+use tracing::{debug, error, warn};
 use twilight_gateway::{Config, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::Client;
 use twilight_model::gateway::OpCode;
@@ -110,7 +110,7 @@ macro_rules! match_join_result {
     ($result:expr, $type:literal, $exit:expr) => {
         match $result {
             // Just keep polling if instructed to pass.
-            Ok(Ok(EventOutput::Pass)) => {},
+            Ok(Ok(EventOutput::Pass)) => {}
             // If we should exit, return early.
             Ok(Ok(EventOutput::Exit)) => return Ok($exit),
             // If the task returns an error, return it.
@@ -118,7 +118,7 @@ macro_rules! match_join_result {
             // If the task fails to join from a panic, indicate an error.
             Err(error) if error.is_panic() => return Err(error.into()),
             // If the task fails to join from a panic, indicate an error.
-            Err(error) => error!(async "{} task failed to join: {error}", $type).await?,
+            Err(error) => error!("{} task failed to join: {error}", $type),
         }
     };
 }
@@ -145,7 +145,7 @@ impl Instance {
         // If this fails, it means that the provider was already set, meaning that we can safely ignore it.
         // Just in case this *does* cause an issue one day, we output a warning log.
         if rustls::crypto::ring::default_provider().install_default().is_err() {
-            warn!(async "cryptographic provider has already been set").await?;
+            warn!("cryptographic provider has already been set");
         }
 
         let discord_token = crate::utility::secret::discord_token()?;
@@ -286,7 +286,7 @@ impl Instance {
                 () = &mut reshard_timeout, if identified_count >= (identified.len() * 3) / 4 => break,
                 Some((shard_id, result)) = shard_stream.next() => {
                     if let Err(error) = result {
-                        warn!(async "failed to identify shard: {error}").await?;
+                        warn!("failed to identify shard: {error}");
 
                         continue;
                     }
@@ -351,7 +351,7 @@ impl Instance {
                             sender.command(&presence)?;
                         }
 
-                        debug!(async "updated client presence").await?;
+                        debug!("updated client presence");
                     }
                     // If a task finishes and indicates that we should exit, return early.
                     Some(result) = tasks.join_next() => match_join_result!(result, "shard", ()),
@@ -377,7 +377,7 @@ impl Instance {
                     // If an event is given, handle it.
                     Some(Ok(event)) => drop(tasks.spawn(self::event::on_event(api.clone(), event, shard.id()))),
                     // If an error occurs, log it.
-                    Some(Err(error)) => warn!(async "error receiving event: {error}").await?,
+                    Some(Err(error)) => warn!("error receiving event: {error}"),
                     // If no events are left, gracefully exit.
                     None => break,
                 },

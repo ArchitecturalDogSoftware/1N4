@@ -24,12 +24,12 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 
-use ina_logging::warn;
 use ina_threading::threads::invoker::{CallError, Stateful};
 use serde::{Deserialize, Serialize};
 use text::Text;
 use thread::{Request, Response};
 use tokio::sync::RwLock;
+use tracing::warn;
 
 use self::locale::Locale;
 use self::settings::{MissingBehavior, Settings};
@@ -80,9 +80,6 @@ pub enum Error {
     /// An error from calling a function on the thread.
     #[error(transparent)]
     ThreadCall(#[from] CallError<Stateful<RwLock<Localizer>, Request>, Response>),
-    /// An error from interacting with the logging system.
-    #[error(transparent)]
-    Logging(#[from] ina_logging::Error),
 }
 
 /// A value that stores and retrieves translated text.
@@ -199,7 +196,7 @@ impl Localizer {
             if let Some(locale) = name.to_str().and_then(|v| v.parse().ok()) {
                 locales.push(locale);
             } else {
-                warn!(async "invalid locale file name: {}", path.to_string_lossy()).await?;
+                warn!("invalid locale file name: {}", path.to_string_lossy());
             }
         }
 

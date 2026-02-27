@@ -19,7 +19,7 @@ use std::collections::HashSet;
 use anyhow::Result;
 use ina_localizing::locale::Locale;
 use ina_localizing::localize;
-use ina_logging::{info, warn};
+use tracing::{info, warn};
 use twilight_model::application::command::{
     CommandOptionChoice, CommandOptionChoiceValue, CommandOptionType, CommandType,
 };
@@ -82,14 +82,14 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
         Err(error) => return Err(error.into()),
     };
 
-    info!(async "reloading localization thread").await?;
+    info!("reloading localization thread");
 
     // Do we want to clear here? It may cause concurrent commands to fail to localize.
     ina_localizing::thread::clear(None::<[_; 0]>).await?;
 
     let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
 
-    info!(async "loaded {loaded_locales} localization locales").await?;
+    info!("loaded {loaded_locales} localization locales");
 
     let title = localize!(async(try in locale) category::UI, "localizer-reloaded").await?;
     let locales = localize!(async(try in locale) category::UI, "localizer-locales").await?;
@@ -168,7 +168,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
             self::on_key_autocomplete(locale, category, current).await
         }
         option => {
-            warn!(async "unknown option '{option}'").await?;
+            warn!("unknown option '{option}'");
 
             Ok(Box::new([]))
         }
