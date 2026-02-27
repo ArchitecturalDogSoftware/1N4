@@ -18,6 +18,7 @@ use std::fmt::{Debug, Display};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use tracing::trace;
 use twilight_validate::component::COMPONENT_CUSTOM_ID_LENGTH;
 
 /// An error that may be returned when interacting with custom identifiers.
@@ -66,6 +67,8 @@ impl CustomId {
     pub fn new(command: impl AsRef<str>, variant: impl AsRef<str>) -> Result<Self, Error> {
         let this = Self { command: command.as_ref().into(), variant: variant.as_ref().into(), storage: Vec::new() };
 
+        trace!(command = %this.command, variant = %this.variant, "created new custom identifier");
+
         this.ensure_valid().map(move |()| this)
     }
 
@@ -110,6 +113,13 @@ impl CustomId {
     /// This function will return an error if the new identifier would be considered invalid.
     pub fn push_str(&mut self, data: impl AsRef<str>) -> Result<(), Error> {
         self.storage.push(data.as_ref().into());
+
+        trace!(
+            command = %self.command,
+            variant = %self.variant,
+            data = self.storage.last().map(|s| &(**s)),
+            "appended data to custom identifier"
+        );
 
         self.ensure_valid().inspect_err(|_| drop(self.storage.pop()))
     }

@@ -88,19 +88,21 @@ pub fn main() -> Result<ExitCode> {
 
     self::initialize_logger(&arguments)?;
 
+    let _span = tracing::trace_span!("main").entered();
+
     info!("initialized logging subscriber");
 
     #[cfg(feature = "dotenv")]
     {
-        dotenvy::dotenv()?;
-
-        info!("loaded environment variables");
+        let path = dotenvy::dotenv()?;
+        info!(?path, "loaded environment variables from file");
     }
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-    let code = runtime.block_on(self::async_main(arguments))?;
+    info!(id = %runtime.handle().id(), workers = runtime.metrics().num_workers(), "spawned asynchronous runtime");
 
-    info!("exited asynchronous runtime");
+    let code = runtime.block_on(self::async_main(arguments))?;
+    info!(?code, "exited asynchronous runtime");
 
     drop(runtime);
 
@@ -112,26 +114,24 @@ pub fn main() -> Result<ExitCode> {
 /// # Errors
 ///
 /// This function will return an error if the program's execution fails.
+#[tracing::instrument(level = "trace", name = "rt", skip_all)]
 pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
-    info!("entered asynchronous runtime");
+    let runtime = tokio::runtime::Handle::current();
+    info!(id = %runtime.id(), workers = runtime.metrics().num_workers(), "entered asynchronous runtime");
 
     ina_localizing::thread::start(arguments.lang_settings).await?;
-
     info!("initialized localization thread");
 
-    let loaded_locales = ina_localizing::thread::load(None::<[_; 0]>).await?;
-
-    info!("loaded {loaded_locales} localization locales");
+    let count = ina_localizing::thread::load(None::<[_; 0]>).await?;
+    info!(count, "loaded localizer locales");
 
     ina_storage::format::encryption::set_password_resolver(|| {
         crate::utility::secret::encryption_key().map(|v| v.to_string()).ok()
     });
     ina_storage::thread::start(arguments.data_settings).await?;
-
     info!("initialized storage thread");
 
     let instance = Instance::new(arguments.bot_settings).await?;
-
     info!("initialized client instance");
 
     tokio::pin! {
@@ -150,12 +150,12 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
         }
         result = process => match result {
             Ok(()) => {
-                info!("stopping client process");
+                info!("client process shut down naturally");
 
                 ExitCode::SUCCESS
             }
             Err(error) => {
-                tracing::error!("unhandled error encountered: {error}");
+                tracing::error!(%error, "unhandled error encountered");
 
                 ExitCode::FAILURE
             }
@@ -163,11 +163,9 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
     };
 
     ina_storage::thread::close().await;
-
     info!("closed storage thread");
 
     ina_localizing::thread::close().await;
-
     info!("closed localization thread");
 
     Ok(code)
@@ -207,6 +205,7 @@ fn initialize_logger(arguments: &Arguments) -> Result<()> {
         .with_default_directive(DEFAULT_FILTER.into())
         .from_env_lossy();
     let subscriber = tracing_subscriber::fmt()
+        .with_thread_names(true)
         .with_env_filter(filter)
         .with_ansi(arguments.bot_settings.color.is_supported_on(supports_color::Stream::Stdout));
 

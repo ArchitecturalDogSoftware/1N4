@@ -22,7 +22,7 @@ use rand::{RngExt, rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tokio_stream::{StreamExt, StreamMap};
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, trace, warn};
 use twilight_gateway::{Config, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::Client;
 use twilight_model::gateway::OpCode;
@@ -118,7 +118,7 @@ macro_rules! match_join_result {
             // If the task fails to join from a panic, indicate an error.
             Err(error) if error.is_panic() => return Err(error.into()),
             // If the task fails to join from a panic, indicate an error.
-            Err(error) => error!("{} task failed to join: {error}", $type),
+            Err(error) => error!(kind = %$type, %error, "task failed to join"),
         }
     };
 }
@@ -154,6 +154,8 @@ impl Instance {
         let config = Self::new_config(discord_token.to_string(), status.as_ref())?;
         let shards = Self::new_shards(&client, config, &settings).await?;
 
+        debug!(shards = shards.len(), "created new client instance");
+
         Ok(Self { api: Api::new(settings, client), shards, status })
     }
 
@@ -162,16 +164,25 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if the [`StatusList`] could not be deserialized.
+    #[tracing::instrument(level = "trace", name = "status", skip_all, fields(path = ?settings.status_file))]
     pub async fn new_status(settings: &Settings) -> Result<Option<StatusList>> {
         let path = &(*settings.status_file);
 
         if !tokio::fs::try_exists(path).await? {
+            error!("unable to locate status file");
+
             return Ok(None);
         }
 
         let data = tokio::fs::read_to_string(path).await?;
+        trace!("read status file");
 
-        Ok(Some(toml::from_str(&data)?))
+        let data = toml::from_str::<StatusList>(&data)?;
+        trace!("parsed status file");
+
+        debug!(count = data.testing.len() + data.release.len(), "loaded status entries");
+
+        Ok(Some(data))
     }
 
     /// Creates a new [`Config`].
@@ -186,6 +197,8 @@ impl Instance {
             Self::get_status(&StatusDefinition::default())?
         };
 
+        debug!(intents = self::INTENTS.bits(), "created new discord api configuration");
+
         Ok(ConfigBuilder::new(token, self::INTENTS).presence(payload).build())
     }
 
@@ -195,11 +208,19 @@ impl Instance {
     ///
     /// This function will return an error if the shards could not be created.
     pub async fn new_shards(client: &Client, config: Config, settings: &Settings) -> Result<Box<[Shard]>> {
-        Ok(if let Some(count) = settings.shards.map(NonZero::get) {
+        let shards: Box<[_]> = if let Some(count) = settings.shards.map(NonZero::get) {
             twilight_gateway::create_iterator(0 .. count, count, config, |_, b| b.build()).collect()
         } else {
             twilight_gateway::create_recommended(client, config, |_, b| b.build()).await?.collect()
-        })
+        };
+
+        if settings.shards.is_some() {
+            debug!(count = shards.len(), "created client shards (user-specified)");
+        } else {
+            debug!(count = shards.len(), "created client shards (recommended)");
+        }
+
+        Ok(shards)
     }
 
     /// Builds the given status definition into a payload.
@@ -259,9 +280,12 @@ impl Instance {
         tokio::time::sleep(Duration::from_hours(settings.reshard_interval.get())).await;
 
         let connection = client.gateway().authed().await?.model().await?;
+        trace!("retrieved client gateway connection information");
+
         let discord_token = crate::utility::secret::discord_token()?.to_string();
         let config = Self::new_config(discord_token, status)?;
         let mut shards = Self::new_shards(client, config, settings).await?;
+        trace!("created new shards");
 
         let reshard_timeout = tokio::time::sleep(Self::get_shard_timeout(&connection));
 
@@ -283,10 +307,14 @@ impl Instance {
 
             tokio::select! {
                 // Exit early if we time out and at least 75% of the shards are identified.
-                () = &mut reshard_timeout, if identified_count >= (identified.len() * 3) / 4 => break,
+                () = &mut reshard_timeout, if identified_count >= (identified.len() * 3) / 4 => {
+                    warn!("not all shards were identified before the computed timeout");
+
+                    break
+                },
                 Some((shard_id, result)) = shard_stream.next() => {
                     if let Err(error) = result {
-                        warn!("failed to identify shard: {error}");
+                        warn!(%error, "failed to identify shard");
 
                         continue;
                     }
@@ -300,6 +328,8 @@ impl Instance {
             }
         }
 
+        info!("resharded client connection");
+
         Ok(shards)
     }
 
@@ -308,6 +338,7 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if the instance encounters an unhandled exception.
+    #[tracing::instrument(level = "trace", name = "client", skip_all)]
     pub async fn run(mut self) -> Result<()> {
         loop {
             let mut senders = Vec::with_capacity(self.shards.len());
@@ -318,6 +349,7 @@ impl Instance {
 
                 tasks.spawn(Self::run_shard(self.api.clone(), shard));
             }
+            trace!("spawned initial process shards");
 
             let shards = Self::try_reshard(&self.api.client, &self.api.settings, self.status.as_ref());
 
@@ -365,8 +397,11 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if the shard's task fails.
+    #[tracing::instrument(level = "trace", name = "shard", skip_all, fields(id = shard.id().number()))]
     pub(crate) async fn run_shard(api: Api, mut shard: Shard) -> EventResult {
         use twilight_gateway::StreamExt;
+
+        trace!("spawned shard process");
 
         let mut tasks = JoinSet::new();
 
@@ -377,9 +412,13 @@ impl Instance {
                     // If an event is given, handle it.
                     Some(Ok(event)) => drop(tasks.spawn(self::event::on_event(api.clone(), event, shard.id()))),
                     // If an error occurs, log it.
-                    Some(Err(error)) => warn!("error receiving event: {error}"),
+                    Some(Err(error)) => warn!(%error, "error receiving event"),
                     // If no events are left, gracefully exit.
-                    None => break,
+                    None => {
+                        trace!("no events remaining");
+
+                        break;
+                    },
                 },
                 // If a task finishes and indicates that we should exit, return early.
                 Some(result) = tasks.join_next() => match_join_result!(result, "event", EventOutput::Exit),
@@ -390,6 +429,8 @@ impl Instance {
         while let Some(result) = tasks.join_next().await {
             match_join_result!(result, "event", EventOutput::Exit);
         }
+
+        debug!("stopped shard process");
 
         self::event::pass()
     }

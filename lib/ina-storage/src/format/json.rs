@@ -18,6 +18,7 @@ use std::ffi::OsStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 use super::{DataDecode, DataEncode, DataFormat};
 
@@ -35,7 +36,7 @@ impl DataEncode for Json {
     type Error = serde_json::Error;
 
     fn encode<T: Serialize>(&self, value: &T) -> Result<Arc<[u8]>, Self::Error> {
-        serde_json::to_vec_pretty(value).map(Into::into)
+        serde_json::to_vec_pretty(value).inspect(|_| trace!("converted value to json")).map(Into::into)
     }
 }
 
@@ -43,6 +44,6 @@ impl DataDecode for Json {
     type Error = serde_json::Error;
 
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {
-        serde_json::from_slice(bytes)
+        serde_json::from_slice(bytes).inspect(|_| trace!("converted json to value"))
     }
 }

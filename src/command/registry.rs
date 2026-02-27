@@ -20,7 +20,7 @@ use std::sync::LazyLock;
 
 use anyhow::{Result, ensure};
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{debug, error, info};
 use twilight_model::application::command::Command;
 use twilight_model::id::Id;
 use twilight_model::id::marker::GuildMarker;
@@ -74,10 +74,13 @@ impl CommandRegistry {
     /// # Errors
     ///
     /// This function will return an error if a command with the same name was already registered.
+    #[tracing::instrument(level = "trace", skip_all, fields(command = %command.name))]
     pub fn register(&mut self, command: CommandEntry) -> Result<()> {
         ensure!(!self.contains(command.name), "command '{}' is already registered", command.name);
 
         self.inner.insert(command.name, command);
+
+        debug!("registered command entry");
 
         Ok(())
     }
@@ -96,6 +99,12 @@ impl CommandRegistry {
         for entry in self.iter() {
             let command = entry.factory.build(entry, guild_id).await;
             let Some(command) = command.transpose() else { continue };
+
+            if command.is_ok() {
+                debug!(name = %entry.name, "built command model");
+            } else {
+                error!(name = %entry.name, "failed to build command model");
+            }
 
             buffer.push(command?);
         }
@@ -187,9 +196,9 @@ pub async fn initialize() -> Result<()> {
 
     super::definition::register(&mut registry)?;
 
-    drop(registry);
+    info!(count = registry.iter().count(), "initialized command registry");
 
-    info!("initialized command registry");
+    drop(registry);
 
     Ok(())
 }
@@ -336,7 +345,15 @@ macro_rules! define_entry {
                     resolver: $crate::command::resolver::CommandOptionResolver<'ev>,
                 ) -> $crate::client::event::EventResult
                 {
-                    $command_callback(entry, context, resolver).await
+                    let result = $command_callback(entry, context, resolver).await;
+
+                    if result.is_ok() {
+                        ::tracing::debug!(name = $name, "executed callback for command");
+                    } else {
+                        ::tracing::error!(name = $name, "failed to execute callback for command");
+                    }
+
+                    result
                 }
             }
         )?
@@ -351,7 +368,15 @@ macro_rules! define_entry {
                     custom_id: $crate::utility::types::custom_id::CustomId,
                 ) -> $crate::client::event::EventResult
                 {
-                    $component_callback(entry, context, custom_id).await
+                    let result = $component_callback(entry, context, custom_id).await;
+
+                    if result.is_ok() {
+                        ::tracing::debug!(name = $name, "executed component callback for command");
+                    } else {
+                        ::tracing::error!(name = $name, "failed to execute component callback for command");
+                    }
+
+                    result
                 }
             }
         )?
@@ -367,7 +392,15 @@ macro_rules! define_entry {
                     resolver: $crate::command::resolver::ModalComponentResolver<'ev>,
                 ) -> $crate::client::event::EventResult
                 {
-                    $modal_callback(entry, context, custom_id, resolver).await
+                    let result = $modal_callback(entry, context, custom_id).await;
+
+                    if result.is_ok() {
+                        ::tracing::debug!(name = $name, "executed modal callback for command");
+                    } else {
+                        ::tracing::error!(name = $name, "failed to execute modal callback for command");
+                    }
+
+                    result
                 }
             }
         )?
@@ -385,7 +418,15 @@ macro_rules! define_entry {
                     kind: ::twilight_model::application::command::CommandOptionType,
                 ) -> ::anyhow::Result<::std::boxed::Box<[::twilight_model::application::command::CommandOptionChoice]>>
                 {
-                    $autocomplete_callback(entry, context, resolver, option, current, kind).await
+                    let result = $autocomplete_callback(entry, context, resolver, option, current, kind).await;
+
+                    if result.is_ok() {
+                        ::tracing::debug!(name = $name, "executed autocomplete callback for command");
+                    } else {
+                        ::tracing::error!(name = $name, "failed to execute autocomplete callback for command");
+                    }
+
+                    result
                 }
             }
         )?

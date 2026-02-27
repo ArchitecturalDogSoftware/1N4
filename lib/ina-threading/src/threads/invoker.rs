@@ -21,6 +21,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::{trace, trace_span, warn};
 
 use super::exchanger::Exchanger;
 use crate::{Handle, ReceiverHandle, Result, SenderHandle};
@@ -110,12 +111,22 @@ where
         N: AsRef<str>,
         F: Fn(S) -> R + Send + 'static,
     {
-        let f = move |sender: Sender<Tracked<R>>, mut receiver: Receiver<Tracked<S>>| loop {
-            let Some(received) = receiver.blocking_recv() else { return Ok(()) };
-            let response = Tracked { nonce: received.nonce, value: f(received.value) };
+        let f = move |sender: Sender<Tracked<R>>, mut receiver: Receiver<Tracked<S>>| {
+            let _span = trace_span!("invoker").entered();
 
-            if received.nonce.is_some() {
-                sender.blocking_send(response).map_err(CallError::SendFrom)?;
+            loop {
+                let Some(received) = receiver.blocking_recv() else { return Ok(()) };
+                trace!(nonce = received.nonce, "received input value");
+                let span = trace_span!("fn", nonce = received.nonce).entered();
+                trace!("started execution");
+                let response = Tracked { nonce: received.nonce, value: f(received.value) };
+                trace!("finished execution");
+                drop(span);
+
+                if received.nonce.is_some() {
+                    sender.blocking_send(response).map_err(CallError::SendFrom)?;
+                    trace!(nonce = received.nonce, "sent return value");
+                }
             }
         };
 
@@ -164,12 +175,22 @@ where
         O: Future<Output = R> + Send,
     {
         let f = move |sender: Sender<Tracked<R>>, mut receiver: Receiver<Tracked<S>>| async move {
+            let span = trace_span!("invoker");
+            let _span = span.enter();
+
             loop {
                 let Some(received) = receiver.recv().await else { return Ok(()) };
+                trace!(nonce = received.nonce, "received input value");
+                let span = trace_span!("fn", nonce = received.nonce);
+                let span = span.enter();
+                trace!("started execution");
                 let response = Tracked { nonce: received.nonce, value: f(received.value).await };
+                trace!("finished execution");
+                drop(span);
 
                 if received.nonce.is_some() {
                     sender.send(response).await.map_err(CallError::SendFrom)?;
+                    trace!(nonce = received.nonce, "sent return value");
                 }
             }
         };
@@ -210,28 +231,52 @@ where
     /// # Errors
     ///
     /// This function will return an error if either of the thread's sender or receiver channels are closed.
+    #[tracing::instrument(
+        level = "trace",
+        name = "invoke",
+        skip_all,
+        fields(name = %self.thread_name(), nonce = tracing::field::Empty)
+    )]
     pub async fn call(&mut self, value: S) -> Result<R, CallError<S, R>> {
         let nonce = self.sequence.fetch_add(1, Ordering::AcqRel);
+        tracing::Span::current().record("nonce", nonce);
         let value = Tracked { nonce: Some(nonce), value };
+        trace!("created tracked value");
 
         self.as_sender().send(value).await.map_err(CallError::SendInto)?;
+        trace!("sent input value");
+
+        let span = trace_span!("poll");
+        let _span = span.enter();
 
         loop {
             if let Some(completed) = self.completed.remove(&nonce) {
+                trace!("found return value stored by separate task");
+
                 return Ok(completed);
             }
 
             match self.as_receiver_mut().recv().await {
                 // If the value was returned by the task triggered above, return it.
-                Some(Tracked { nonce: Some(completed_nonce), value }) if completed_nonce == nonce => return Ok(value),
+                Some(Tracked { nonce: Some(completed_nonce), value }) if completed_nonce == nonce => {
+                    trace!("received return value");
+
+                    return Ok(value);
+                }
                 // If the value was returned by another task, store it so that it can still be consumed.
                 Some(Tracked { nonce: Some(completed_nonce), value }) => {
+                    trace!(found = completed_nonce, "found return value with mis-matched nonce");
+
                     // A panic here would require that enough tasks ([`usize::MAX`] to be exact) are triggered to cause
                     // a task to receive the same sequence ID as another pending task.
                     assert!(self.completed.insert(completed_nonce, value).is_none());
                 }
                 Some(Tracked { nonce: None, value: _ }) => unreachable!("values with no nonce should not be returned"),
-                None => return Err(CallError::Closed),
+                None => {
+                    warn!("invoker thread closed while polling");
+
+                    return Err(CallError::Closed);
+                }
             }
         }
     }
@@ -265,28 +310,51 @@ where
     /// # Errors
     ///
     /// This function will return an error if either of the thread's sender or receiver channels are closed.
+    #[tracing::instrument(
+        level = "trace",
+        name = "invoke",
+        skip_all,
+        fields(name = %self.thread_name(), nonce = tracing::field::Empty)
+    )]
     pub fn blocking_call(&mut self, value: S) -> Result<R, CallError<S, R>> {
         let nonce = self.sequence.fetch_add(1, Ordering::AcqRel);
+        tracing::Span::current().record("nonce", nonce);
         let value = Tracked { nonce: Some(nonce), value };
+        trace!("created tracked value");
 
         self.as_sender().blocking_send(value).map_err(CallError::SendInto)?;
+        trace!("sent input value");
+
+        let _span = trace_span!("poll").entered();
 
         loop {
             if let Some(completed) = self.completed.remove(&nonce) {
+                trace!("found return value stored by separate task");
+
                 return Ok(completed);
             }
 
             match self.as_receiver_mut().blocking_recv() {
                 // If the value was returned by the task triggered above, return it.
-                Some(Tracked { nonce: Some(completed_nonce), value }) if completed_nonce == nonce => return Ok(value),
+                Some(Tracked { nonce: Some(completed_nonce), value }) if completed_nonce == nonce => {
+                    trace!("received return value");
+
+                    return Ok(value);
+                }
                 // If the value was returned by another task, store it so that it can still be consumed.
                 Some(Tracked { nonce: Some(completed_nonce), value }) => {
+                    trace!(found = completed_nonce, "found return value with mis-matched nonce");
+
                     // A panic here would require that enough tasks ([`usize::MAX`] to be exact) are triggered to cause
                     // a task to receive the same sequence ID as another pending task.
                     assert!(self.completed.insert(completed_nonce, value).is_none());
                 }
                 Some(Tracked { nonce: None, value: _ }) => unreachable!("values with no nonce should not be returned"),
-                None => return Err(CallError::Closed),
+                None => {
+                    warn!("invoker thread closed while polling");
+
+                    return Err(CallError::Closed);
+                }
             }
         }
     }
@@ -316,8 +384,13 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread's receiving channel is closed.
+    #[tracing::instrument(level = "trace", name = "invoke", skip_all, fields(name = %self.thread_name()))]
     pub async fn call_and_forget(&mut self, value: S) -> Result<(), CallError<S, R>> {
-        self.as_sender().send(Tracked { nonce: None, value }).await.map_err(CallError::SendInto)
+        let result = self.as_sender().send(Tracked { nonce: None, value }).await;
+
+        trace!("sent input value without waiting for return");
+
+        result.map_err(CallError::SendInto)
     }
 
     /// Invokes the thread, executing the method but ignoring the return value.
@@ -348,8 +421,13 @@ where
     /// # Errors
     ///
     /// This function will return an error if the thread's receiving channel is closed.
+    #[tracing::instrument(level = "trace", name = "invoke", skip_all, fields(name = %self.thread_name()))]
     pub fn blocking_call_and_forget(&mut self, value: S) -> Result<(), CallError<S, R>> {
-        self.as_sender().blocking_send(Tracked { nonce: None, value }).map_err(CallError::SendInto)
+        let result = self.as_sender().blocking_send(Tracked { nonce: None, value });
+
+        trace!("sent input value without waiting for return");
+
+        result.map_err(CallError::SendInto)
     }
 }
 
@@ -540,7 +618,10 @@ where
     ///
     /// This function will return an error if either of the thread's sender or receiver channels are closed.
     pub async fn call(&mut self, value: S) -> Result<R, CallError<Stateful<T, S>, R>> {
-        self.invoker.call(Stateful { state: Arc::clone(&self.state), value }).await
+        let stateful_value = Stateful { state: Arc::clone(&self.state), value };
+        trace!("bundled value and shared thread state");
+
+        self.invoker.call(stateful_value).await
     }
 
     /// Invokes the thread, blocking the current thread until the response of the inner function is available.
@@ -576,7 +657,10 @@ where
     ///
     /// This function will return an error if either of the thread's sender or receiver channels are closed.
     pub fn blocking_call(&mut self, value: S) -> Result<R, CallError<Stateful<T, S>, R>> {
-        self.invoker.blocking_call(Stateful { state: Arc::clone(&self.state), value })
+        let stateful_value = Stateful { state: Arc::clone(&self.state), value };
+        trace!("bundled value and shared thread state");
+
+        self.invoker.blocking_call(stateful_value)
     }
 
     /// Invokes the thread, executing the method but ignoring the return value.
@@ -605,7 +689,10 @@ where
     ///
     /// This function will return an error if the thread's receiving channel is closed.
     pub async fn call_and_forget(&mut self, value: S) -> Result<(), CallError<Stateful<T, S>, R>> {
-        self.invoker.call_and_forget(Stateful { state: Arc::clone(&self.state), value }).await
+        let stateful_value = Stateful { state: Arc::clone(&self.state), value };
+        trace!("bundled value and shared thread state");
+
+        self.invoker.call_and_forget(stateful_value).await
     }
 
     /// Invokes the thread, executing the method but ignoring the return value.
@@ -637,7 +724,10 @@ where
     ///
     /// This function will return an error if the thread's receiving channel is closed.
     pub fn blocking_call_and_forget(&mut self, value: S) -> Result<(), CallError<Stateful<T, S>, R>> {
-        self.invoker.blocking_call_and_forget(Stateful { state: Arc::clone(&self.state), value })
+        let stateful_value = Stateful { state: Arc::clone(&self.state), value };
+        trace!("bundled value and shared thread state");
+
+        self.invoker.blocking_call_and_forget(stateful_value)
     }
 }
 

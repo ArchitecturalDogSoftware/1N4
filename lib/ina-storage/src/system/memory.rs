@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::{Arc, LazyLock};
 
 use tokio::sync::RwLock;
+use tracing::trace;
 
 use super::{DataReader, DataSystem, DataWriter};
 
@@ -65,11 +66,11 @@ impl DataReader for MemorySystem {
     type Error = Error;
 
     fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        Ok(self.inner.contains_key(path))
+        Ok(self.inner.contains_key(path)).inspect(|_| trace!("checked for data"))
     }
 
     async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        Ok(self.inner.contains_key(path))
+        self.blocking_exists(path)
     }
 
     fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
@@ -77,7 +78,7 @@ impl DataReader for MemorySystem {
             return Err(Error::MissingPath(path.into()));
         };
 
-        Ok(value.len() as u64)
+        Ok(value.len() as u64).inspect(|_| trace!("fetching data size"))
     }
 
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
@@ -85,7 +86,11 @@ impl DataReader for MemorySystem {
     }
 
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        self.inner.get(path).cloned().ok_or_else(|| Error::MissingPath(path.into()))
+        self.inner
+            .get(path)
+            .cloned()
+            .inspect(|_| trace!("fetching data"))
+            .ok_or_else(|| Error::MissingPath(path.into()))
     }
 
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
@@ -98,6 +103,8 @@ impl DataWriter for MemorySystem {
 
     fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         self.inner.insert(path.into(), bytes.into());
+
+        trace!("wrote data");
 
         Ok(())
     }
@@ -113,6 +120,8 @@ impl DataWriter for MemorySystem {
 
         self.inner.insert(into.into(), value);
 
+        trace!("renamed data");
+
         Ok(())
     }
 
@@ -126,6 +135,8 @@ impl DataWriter for MemorySystem {
         }
 
         self.inner.remove(path);
+
+        trace!("removed data");
 
         Ok(())
     }

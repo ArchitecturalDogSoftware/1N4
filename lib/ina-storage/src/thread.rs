@@ -20,6 +20,7 @@ use std::sync::Arc;
 use ina_threading::statics::Static;
 use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
 use tokio::sync::RwLock;
+use tracing::trace_span;
 
 use crate::format::{DataDecode, DataEncode};
 use crate::settings::Settings;
@@ -131,17 +132,43 @@ pub fn blocking_close() {
 
 /// Runs the thread's process.
 async fn run(Stateful { state, value }: Stateful<RwLock<Storage>, Request>) -> Response {
+    let system = state.read().await.settings.system;
+
     match &value {
-        Request::Exists(path) => state.read().await.exists(path).await.map_or_else(Response::Error, Response::Exists),
-        Request::Size(path) => state.read().await.size(path).await.map_or_else(Response::Error, Response::Size),
-        Request::Read(path) => state.read().await.read(path).await.map_or_else(Response::Error, Response::Read),
+        Request::Exists(path) => {
+            let span = trace_span!("exists", ?system, ?path);
+            let _span = span.enter();
+
+            state.read().await.exists(path).await.map_or_else(Response::Error, Response::Exists)
+        }
+        Request::Size(path) => {
+            let span = trace_span!("size", ?system, ?path);
+            let _span = span.enter();
+
+            state.read().await.size(path).await.map_or_else(Response::Error, Response::Size)
+        }
+        Request::Read(path) => {
+            let span = trace_span!("read", ?system, ?path);
+            let _span = span.enter();
+
+            state.read().await.read(path).await.map_or_else(Response::Error, Response::Read)
+        }
         Request::Write(path, bytes) => {
+            let span = trace_span!("write", ?system, ?path);
+            let _span = span.enter();
+
             state.write().await.write(path, bytes).await.map_or_else(Response::Error, |()| Response::Acknowledge)
         }
         Request::Rename(from, into) => {
+            let span = trace_span!("rename", ?system, ?from, ?into);
+            let _span = span.enter();
+
             state.write().await.rename(from, into).await.map_or_else(Response::Error, |()| Response::Acknowledge)
         }
         Request::Delete(path) => {
+            let span = trace_span!("delete", ?system, ?path);
+            let _span = span.enter();
+
             state.write().await.delete(path).await.map_or_else(Response::Error, |()| Response::Acknowledge)
         }
     }
