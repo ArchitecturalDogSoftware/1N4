@@ -27,7 +27,7 @@ use serde::Serialize;
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
-use tracing::info;
+use tracing::{debug, info};
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 use tracing_subscriber::fmt::writer::Tee;
 
@@ -88,8 +88,6 @@ pub fn main() -> Result<ExitCode> {
 
     self::initialize_logger(&arguments)?;
 
-    let _span = tracing::trace_span!("main").entered();
-
     info!("initialized logging subscriber");
 
     #[cfg(feature = "dotenv")]
@@ -105,6 +103,7 @@ pub fn main() -> Result<ExitCode> {
     info!(?code, "exited asynchronous runtime");
 
     drop(runtime);
+    debug!("exiting program");
 
     Ok(code)
 }
@@ -114,7 +113,7 @@ pub fn main() -> Result<ExitCode> {
 /// # Errors
 ///
 /// This function will return an error if the program's execution fails.
-#[tracing::instrument(level = "trace", name = "rt", skip_all)]
+#[tracing::instrument(level = "trace", name = "rt_m", skip_all)]
 pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
     let runtime = tokio::runtime::Handle::current();
     info!(id = %runtime.id(), workers = runtime.metrics().num_workers(), "entered asynchronous runtime");

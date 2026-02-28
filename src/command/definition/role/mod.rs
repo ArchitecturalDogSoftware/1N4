@@ -101,6 +101,8 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     };
 
     if icon.as_emoji().is_err() {
+        debug!("an invalid icon was provided");
+
         let title = localize!(async(try in locale) category::UI, "role-invalid-icon").await?;
 
         context.failure_message(title, None::<&str>).await?;
@@ -123,7 +125,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
 
     let selectors = SelectorList::async_api().read((guild_id, user_id)).await;
     let mut selectors = selectors.unwrap_or_else(|_| SelectorList::new(guild_id, user_id));
-    trace!("loaded stored role selectors");
+    debug!("loaded stored role selectors");
 
     if selectors.inner.iter().any(|s| &s.id == role_id) {
         debug!("target role is already contained within the list");
@@ -147,9 +149,9 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     }
 
     selectors.inner.push(Selector { id: *role_id, name, icon: icon.into() });
-    trace!("created new selector");
+    debug!("created new selector");
     selectors.as_async_api().write().await?;
-    trace!("wrote role selector file");
+    debug!("wrote role selector file");
 
     let text = localize!(async(try in locale) category::UI, "role-selector-added").await?;
 
@@ -207,7 +209,7 @@ async fn on_delete_command<'ap: 'ev, 'ev>(
     };
 
     let components = selectors.build(entry, component::remove::NAME, false)?;
-    trace!("created message components");
+    debug!("created message components");
 
     crate::follow_up_response!(context, struct {
         components: &components,
@@ -267,7 +269,7 @@ async fn on_preview_command<'ap: 'ev, 'ev>(
     };
 
     let components = selectors.build(entry, component::select::NAME, true)?;
-    trace!("created message components");
+    debug!("created message components");
 
     context.components(components, Visibility::Ephemeral).await?;
     debug!("completed interaction");
@@ -326,10 +328,10 @@ async fn on_finish_command<'ap: 'ev, 'ev>(
     };
 
     let components = selectors.build(entry, component::select::NAME, false)?;
-    trace!("created message components");
+    debug!("created message components");
 
     context.api.client.create_message(channel_id).flags(MessageFlags::IS_COMPONENTS_V2).components(&components).await?;
-    trace!("created message");
+    debug!("created message");
     selectors.as_async_api().delete().await?;
     debug!("removed role selector file");
 
@@ -370,7 +372,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
     };
 
     let mut member = context.api.client.guild_member(guild_id, user_id).await?.model().await?;
-    trace!("resolved member from user id");
+    debug!("resolved member from user id");
 
     member.roles.dedup(); // Do we even need to deduplicate here?
     member.roles.sort_unstable();

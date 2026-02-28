@@ -348,9 +348,9 @@ macro_rules! define_entry {
                     let result = $command_callback(entry, context, resolver).await;
 
                     if result.is_ok() {
-                        ::tracing::debug!(name = $name, "executed callback for command");
+                        ::tracing::debug!(name = %$name, "executed callback for command");
                     } else {
-                        ::tracing::error!(name = $name, "failed to execute callback for command");
+                        ::tracing::error!(name = %$name, "failed to execute callback for command");
                     }
 
                     result
@@ -371,9 +371,9 @@ macro_rules! define_entry {
                     let result = $component_callback(entry, context, custom_id).await;
 
                     if result.is_ok() {
-                        ::tracing::debug!(name = $name, "executed component callback for command");
+                        ::tracing::debug!(name = %$name, "executed component callback for command");
                     } else {
-                        ::tracing::error!(name = $name, "failed to execute component callback for command");
+                        ::tracing::error!(name = %$name, "failed to execute component callback for command");
                     }
 
                     result
@@ -395,9 +395,9 @@ macro_rules! define_entry {
                     let result = $modal_callback(entry, context, custom_id).await;
 
                     if result.is_ok() {
-                        ::tracing::debug!(name = $name, "executed modal callback for command");
+                        ::tracing::debug!(name = %$name, "executed modal callback for command");
                     } else {
-                        ::tracing::error!(name = $name, "failed to execute modal callback for command");
+                        ::tracing::error!(name = %$name, "failed to execute modal callback for command");
                     }
 
                     result
@@ -421,9 +421,9 @@ macro_rules! define_entry {
                     let result = $autocomplete_callback(entry, context, resolver, option, current, kind).await;
 
                     if result.is_ok() {
-                        ::tracing::debug!(name = $name, "executed autocomplete callback for command");
+                        ::tracing::debug!(name = %$name, "executed autocomplete callback for command");
                     } else {
-                        ::tracing::error!(name = $name, "failed to execute autocomplete callback for command");
+                        ::tracing::error!(name = %$name, "failed to execute autocomplete callback for command");
                     }
 
                     result

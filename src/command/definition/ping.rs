@@ -61,7 +61,7 @@ async fn on_command<'ap: 'ev, 'ev>(
     trace!("created message components");
 
     context.components([component], Visibility::Ephemeral).await?;
-    trace!("created initial message");
+    debug!("created initial message");
 
     let response = context.client().response(&context.interaction.token).await?.model().await?;
     let delay = response.id.creation_date() - context.interaction.id.creation_date();
@@ -78,7 +78,7 @@ async fn on_command<'ap: 'ev, 'ev>(
         .flags(MessageFlags::IS_COMPONENTS_V2)
         .components(Some(&[component.into()]))
         .await?;
-    trace!("updated initial message");
+    debug!("updated initial message");
 
     debug!(%delay, "finished running ping command");
 

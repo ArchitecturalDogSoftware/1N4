@@ -22,7 +22,7 @@ use rand::{RngExt, rng};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
 use tokio_stream::{StreamExt, StreamMap};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{Instrument, debug, error, info, trace, trace_span, warn};
 use twilight_gateway::{Config, ConfigBuilder, EventTypeFlags, Intents, Shard};
 use twilight_http::Client;
 use twilight_model::gateway::OpCode;
@@ -110,13 +110,22 @@ macro_rules! match_join_result {
     ($result:expr, $type:literal, $exit:expr) => {
         match $result {
             // Just keep polling if instructed to pass.
-            Ok(Ok(EventOutput::Pass)) => {}
+            Ok(Ok(EventOutput::Pass)) => trace!("received pass signal from event"),
             // If we should exit, return early.
-            Ok(Ok(EventOutput::Exit)) => return Ok($exit),
+            Ok(Ok(EventOutput::Exit)) => {
+                trace!("received exit signal from event");
+                return Ok($exit)
+            }
             // If the task returns an error, return it.
-            Ok(Err(error)) => return Err(error),
+            Ok(Err(error)) => {
+                warn!("received error from event");
+                return Err(error)
+            }
             // If the task fails to join from a panic, indicate an error.
-            Err(error) if error.is_panic() => return Err(error.into()),
+            Err(error) if error.is_panic() => {
+                error!("received panic from event");
+                return Err(error.into())
+            }
             // If the task fails to join from a panic, indicate an error.
             Err(error) => error!(kind = %$type, %error, "task failed to join"),
         }
@@ -141,18 +150,24 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if an [`Instance`] cannot be created.
+    #[tracing::instrument(level = "debug", name = "new_client", skip_all)]
     pub async fn new(settings: Settings) -> Result<Self> {
         // If this fails, it means that the provider was already set, meaning that we can safely ignore it.
         // Just in case this *does* cause an issue one day, we output a warning log.
         if rustls::crypto::ring::default_provider().install_default().is_err() {
             warn!("cryptographic provider has already been set");
         }
+        debug!("installed default cryptographic provider");
 
         let discord_token = crate::utility::secret::discord_token()?;
         let client = Client::new(discord_token.to_string());
+        trace!("created twilight http client");
         let status = Self::new_status(&settings).await?;
+        trace!(count = status.as_ref().map_or(0, |l| l.testing.len() + l.release.len()), "created status list");
         let config = Self::new_config(discord_token.to_string(), status.as_ref())?;
+        trace!("created discord shard configuration");
         let shards = Self::new_shards(&client, config, &settings).await?;
+        trace!(count = shards.len(), "created discord shard(s)");
 
         debug!(shards = shards.len(), "created new client instance");
 
@@ -164,18 +179,17 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if the [`StatusList`] could not be deserialized.
-    #[tracing::instrument(level = "trace", name = "status", skip_all, fields(path = ?settings.status_file))]
     pub async fn new_status(settings: &Settings) -> Result<Option<StatusList>> {
         let path = &(*settings.status_file);
 
         if !tokio::fs::try_exists(path).await? {
-            error!("unable to locate status file");
+            error!(?path, "unable to locate status file");
 
             return Ok(None);
         }
 
         let data = tokio::fs::read_to_string(path).await?;
-        trace!("read status file");
+        trace!(?path, "read status file");
 
         let data = toml::from_str::<StatusList>(&data)?;
         trace!("parsed status file");
@@ -194,6 +208,8 @@ impl Instance {
         let payload = if let Some(status) = status {
             Self::get_status(status.random())?
         } else {
+            warn!("status file failed to load, using default status");
+
             Self::get_status(&StatusDefinition::default())?
         };
 
@@ -211,6 +227,7 @@ impl Instance {
         let shards: Box<[_]> = if let Some(count) = settings.shards.map(NonZero::get) {
             twilight_gateway::create_iterator(0 .. count, count, config, |_, b| b.build()).collect()
         } else {
+            debug!("shard count was not specified at the command-line, using discord recommended count");
             twilight_gateway::create_recommended(client, config, |_, b| b.build()).await?.collect()
         };
 
@@ -243,7 +260,11 @@ impl Instance {
                 MinimalActivity { kind, name: text.to_string(), url: Some(link.to_string()) }
             }
             // Any invalid combinations default.
-            _ => MinimalActivity { kind: ActivityType::Custom, name: String::new(), url: None },
+            _ => {
+                warn!(?definition, "an invalid status definition was provided");
+
+                MinimalActivity { kind: ActivityType::Custom, name: String::new(), url: None }
+            }
         };
 
         UpdatePresencePayload::new(vec![activity.into()], false, None, definition.status).map_err(Into::into)
@@ -278,6 +299,7 @@ impl Instance {
         status: Option<&StatusList>,
     ) -> Result<Box<[Shard]>> {
         tokio::time::sleep(Duration::from_hours(settings.reshard_interval.get())).await;
+        debug!("started reshard process");
 
         let connection = client.gateway().authed().await?.model().await?;
         trace!("retrieved client gateway connection information");
@@ -297,6 +319,7 @@ impl Instance {
             std::task::Poll::Ready(())
         })
         .await;
+        trace!("started identification timeout");
 
         // Attempt to identify early to make the swap cleaner.
         let mut identified = vec![false; shards.len()].into_boxed_slice();
@@ -314,7 +337,7 @@ impl Instance {
                 },
                 Some((shard_id, result)) = shard_stream.next() => {
                     if let Err(error) = result {
-                        warn!(%error, "failed to identify shard");
+                        error!(%error, "failed to identify shard");
 
                         continue;
                     }
@@ -324,6 +347,7 @@ impl Instance {
                     };
 
                     identified[shard_id.number() as usize] = shard.state().is_identified();
+                    trace!(id = shard_id.number(), "identified shard");
                 }
             }
         }
@@ -343,13 +367,14 @@ impl Instance {
         loop {
             let mut senders = Vec::with_capacity(self.shards.len());
             let mut tasks = JoinSet::new();
+            debug!("started primary client loop");
 
             for shard in self.shards {
                 senders.push(shard.sender());
 
                 tasks.spawn(Self::run_shard(self.api.clone(), shard));
             }
-            trace!("spawned initial process shards");
+            trace!("spawned shard processes");
 
             let shards = Self::try_reshard(&self.api.client, &self.api.settings, self.status.as_ref());
 
@@ -363,6 +388,7 @@ impl Instance {
                     // If the reshard is complete, restart the process loop.
                     shards = shards.as_mut() => {
                         self.shards = shards?;
+                        debug!("finished reshard, restarting primary client loop");
 
                         break;
                     }
@@ -371,8 +397,11 @@ impl Instance {
                         let payload = if let Some(ref status) = self.status {
                             Self::get_status(status.random())?
                         } else {
+                            warn!("status file failed to load, using default status");
+
                             Self::get_status(&StatusDefinition::default())?
                         };
+                        trace!("determined new client presence");
 
                         let presence = UpdatePresence {
                             op: OpCode::PresenceUpdate,
@@ -382,7 +411,6 @@ impl Instance {
                         for sender in senders.iter().filter(|c| !c.is_closed()) {
                             sender.command(&presence)?;
                         }
-
                         debug!("updated client presence");
                     }
                     // If a task finishes and indicates that we should exit, return early.
@@ -397,7 +425,7 @@ impl Instance {
     /// # Errors
     ///
     /// This function will return an error if the shard's task fails.
-    #[tracing::instrument(level = "trace", name = "shard", skip_all, fields(id = shard.id().number()))]
+    #[tracing::instrument(level = "debug", name = "shard", skip_all, fields(id = shard.id().number()))]
     pub(crate) async fn run_shard(api: Api, mut shard: Shard) -> EventResult {
         use twilight_gateway::StreamExt;
 
@@ -410,12 +438,16 @@ impl Instance {
                 // If an event is given, handle it.
                 event = shard.next_event(EventTypeFlags::all()) => match event {
                     // If an event is given, handle it.
-                    Some(Ok(event)) => drop(tasks.spawn(self::event::on_event(api.clone(), event, shard.id()))),
+                    Some(Ok(event)) => {
+                        let span = trace_span!("task");
+                        tasks.spawn(self::event::on_event(api.clone(), event, shard.id()).instrument(span));
+                        trace!("spawned child task to handle incoming event");
+                    },
                     // If an error occurs, log it.
-                    Some(Err(error)) => warn!(%error, "error receiving event"),
+                    Some(Err(error)) => error!(%error, "error receiving event"),
                     // If no events are left, gracefully exit.
                     None => {
-                        trace!("no events remaining");
+                        trace!("no events remaining, exiting shard loop");
 
                         break;
                     },
@@ -424,12 +456,13 @@ impl Instance {
                 Some(result) = tasks.join_next() => match_join_result!(result, "event", EventOutput::Exit),
             }
         }
+        debug!("exited shard loop");
 
         // Wait for all tasks to join naturally.
         while let Some(result) = tasks.join_next().await {
             match_join_result!(result, "event", EventOutput::Exit);
+            trace!("joined child task");
         }
-
         debug!("stopped shard process");
 
         self::event::pass()

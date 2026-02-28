@@ -97,7 +97,7 @@ async fn on_reload_command<'ap: 'ev, 'ev>(
     let list = ina_localizing::thread::list().await?;
     let list = list.iter().map(|l| format!("`{l}`"));
     let locales = format!("{locales}:\n> {}", list.collect::<Box<[_]>>().join(", "));
-    debug!("formatted message content");
+    trace!("formatted message content");
 
     context.success_message(title, Some(locales)).await?;
     debug!("completed interaction");
@@ -125,10 +125,12 @@ async fn on_localize_command<'ap: 'ev, 'ev>(
 
     let category = resolver.string("category")?;
     let key = resolver.string("key")?;
-    debug!(category, key, "resolved target translation key");
+    trace!(category, key, "resolved target translation key");
 
     let translated = if let Ok(locale_str) = resolver.string("locale") {
         let Ok(locale) = locale_str.parse::<Locale>() else {
+            debug!("invalid locale provided");
+
             let title = localize!(async(try in locale) category::UI, "localize-unknown").await?;
 
             context.failure_message(title, Some(format!("`{locale_str}`"))).await?;
@@ -189,7 +191,7 @@ async fn on_autocomplete<'ap: 'ev, 'ev>(
 /// This function will return an error if the auto-completion could not be executed.
 async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoice]>> {
     let mut locales = ina_localizing::thread::list().await?.to_vec();
-    trace!("fetched loaded locale list");
+    debug!("fetched loaded locale list");
 
     locales.retain(|l| fuzzy_contains(Strictness::Firm { ignore_casing: true }, l.to_string(), current));
     trace!(count = locales.len(), "found matching locales");
@@ -199,7 +201,7 @@ async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoic
         name_localizations: None,
         value: CommandOptionChoiceValue::String(locale.to_string()),
     });
-    trace!("finalized locale choices");
+    debug!("finalized locale choices");
 
     Ok(choices.collect())
 }
@@ -211,7 +213,7 @@ async fn on_locale_autocomplete(current: &str) -> Result<Box<[CommandOptionChoic
 /// This function will return an error if the auto-completion could not be executed.
 fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
     let mut categories: HashSet<String> = category::LIST.iter().copied().map(Into::into).collect();
-    trace!("fetched category list");
+    debug!("fetched category list");
 
     if !current.is_empty() {
         categories.retain(|c| fuzzy_contains(Strictness::Firm { ignore_casing: true }, c, current));
@@ -231,7 +233,7 @@ fn on_category_autocomplete(current: &str) -> Box<[CommandOptionChoice]> {
         name_localizations: None,
         value: CommandOptionChoiceValue::String(category),
     });
-    trace!("finalized category choices");
+    debug!("finalized category choices");
 
     choices.collect()
 }
@@ -249,9 +251,11 @@ async fn on_key_autocomplete(
     let mut keys = if let Some(category) = category {
         ina_localizing::thread::keys(locale, category).await?.into_vec()
     } else {
+        trace!("skipped thread invocation for invalid category");
+
         vec![]
     };
-    trace!("fetched key list");
+    debug!("fetched key list");
 
     if !current.is_empty() {
         keys.retain(|c| fuzzy_contains(Strictness::Firm { ignore_casing: true }, c, current));
@@ -271,7 +275,7 @@ async fn on_key_autocomplete(
         name_localizations: None,
         value: CommandOptionChoiceValue::String(key.to_string()),
     });
-    trace!("finalized key choices");
+    debug!("finalized key choices");
 
     Ok(choices.collect())
 }

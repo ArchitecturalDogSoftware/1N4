@@ -75,12 +75,15 @@ impl Storage {
     /// Creates a new [`Storage`].
     #[must_use]
     pub fn new(settings: Settings) -> Self {
-        debug!(
-            system = ?settings.system,
-            directory = ?settings.directory,
-            caching = cfg!(feature = "caching"),
-            "created new storage instance"
-        );
+        if settings.system == System::Memory {
+            debug!(caching = cfg!(feature = "caching"), "created new memory-based storage instance");
+        } else {
+            debug!(
+                path = ?settings.directory,
+                caching = cfg!(feature = "caching"),
+                "created new file-based storage instance"
+            );
+        }
 
         #[cfg(feature = "caching")]
         {
@@ -142,6 +145,7 @@ macro_rules! system_call {
 impl DataReader for Storage {
     type Error = anyhow::Error;
 
+    #[tracing::instrument(level = "debug", name = "exists", skip(self))]
     fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -156,6 +160,7 @@ impl DataReader for Storage {
             .inspect(|_| debug!("checked whether data exists"))
     }
 
+    #[tracing::instrument(level = "debug", name = "exists", skip(self))]
     async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -170,6 +175,7 @@ impl DataReader for Storage {
             .inspect(|_| debug!("checked whether data exists"))
     }
 
+    #[tracing::instrument(level = "debug", name = "size", skip(self))]
     fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -184,6 +190,7 @@ impl DataReader for Storage {
             .inspect(|_| debug!("fetched size of data"))
     }
 
+    #[tracing::instrument(level = "debug", name = "size", skip(self))]
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -202,6 +209,7 @@ impl DataReader for Storage {
             .inspect(|_| debug!("fetched size of data"))
     }
 
+    #[tracing::instrument(level = "debug", name = "read", skip(self))]
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -231,6 +239,7 @@ impl DataReader for Storage {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "read", skip(self))]
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -267,6 +276,7 @@ impl DataReader for Storage {
 impl DataWriter for Storage {
     type Error = anyhow::Error;
 
+    #[tracing::instrument(level = "debug", name = "write", skip(self, bytes))]
     fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -287,6 +297,7 @@ impl DataWriter for Storage {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "write", skip(self, bytes))]
     async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -311,6 +322,7 @@ impl DataWriter for Storage {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "rename", skip(self))]
     fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         let combined_from = self.settings.directory.join(from);
         let combined_into = self.settings.directory.join(into);
@@ -339,6 +351,7 @@ impl DataWriter for Storage {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "rename", skip(self))]
     async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
         let combined_from = self.settings.directory.join(from);
         let combined_into = self.settings.directory.join(into);
@@ -369,6 +382,7 @@ impl DataWriter for Storage {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "delete", skip(self))]
     fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
         let combined_path = self.settings.directory.join(path);
 
@@ -389,9 +403,8 @@ impl DataWriter for Storage {
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "delete", skip(self))]
     async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        debug!("deleting data");
-
         let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]

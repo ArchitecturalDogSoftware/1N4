@@ -78,7 +78,7 @@ impl DataReader for MemorySystem {
             return Err(Error::MissingPath(path.into()));
         };
 
-        Ok(value.len() as u64).inspect(|_| trace!("fetching data size"))
+        Ok(value.len() as u64).inspect(|_| trace!("fetched data size"))
     }
 
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
@@ -86,11 +86,7 @@ impl DataReader for MemorySystem {
     }
 
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        self.inner
-            .get(path)
-            .cloned()
-            .inspect(|_| trace!("fetching data"))
-            .ok_or_else(|| Error::MissingPath(path.into()))
+        self.inner.get(path).cloned().inspect(|_| trace!("fetched data")).ok_or_else(|| Error::MissingPath(path.into()))
     }
 
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {

@@ -19,7 +19,7 @@
 use std::thread::{Builder, JoinHandle};
 
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::debug;
+use tracing::{Instrument, debug, trace_span};
 
 /// Defines wrappers for join-on-drop threads.
 pub mod joining;
@@ -180,7 +180,7 @@ where
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
             debug!(id = %runtime.handle().id(), "initialized single-thread asynchronous runtime");
 
-            let result = runtime.block_on(f());
+            let result = runtime.block_on(f().instrument(trace_span!("rt_s")));
             debug!(id = %runtime.handle().id(), "exiting asynchronous runtime");
 
             result

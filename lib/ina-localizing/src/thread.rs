@@ -19,7 +19,7 @@ use std::sync::Arc;
 use ina_threading::statics::Static;
 use ina_threading::threads::invoker::{Stateful, StatefulInvoker};
 use tokio::sync::RwLock;
-use tracing::{error, trace_span};
+use tracing::error;
 
 use crate::locale::Locale;
 use crate::settings::Settings;
@@ -91,6 +91,7 @@ fn create(settings: Settings) -> Result<LocalizationThreadInner> {
 /// # Errors
 ///
 /// This function will return an error if the thread fails to spawn.
+#[tracing::instrument(level = "trace", name = "new_thread", skip_all)]
 pub async fn start(settings: Settings) -> Result<()> {
     THREAD.async_api().initialize(self::create(settings)?).await;
 
@@ -106,6 +107,7 @@ pub async fn start(settings: Settings) -> Result<()> {
 /// # Errors
 ///
 /// This function will return an error if the thread fails to spawn.
+#[tracing::instrument(level = "trace", name = "new_thread", skip_all)]
 pub fn blocking_start(settings: Settings) -> Result<()> {
     THREAD.sync_api().initialize(self::create(settings)?);
 
@@ -139,8 +141,6 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
             let state = state.read().await;
             let locale = locale.unwrap_or_else(|| state.settings.default_locale);
 
-            let _span = trace_span!("get", %locale, %category, %key).entered();
-
             match state.get(locale, &category, &key) {
                 Ok(text) => {
                     if text.is_missing() {
@@ -155,21 +155,15 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
         Request::Has(locales) => {
             let state = state.read().await;
 
-            let _span = trace_span!("has", count = locales.len()).entered();
-
             Response::Has(locales.iter().all(|l| state.has_locale(l)))
         }
         Request::List => {
             let state = state.read().await;
 
-            let _span = trace_span!("list").entered();
-
             Response::List(state.locales().collect())
         }
         Request::Clear(locales) => {
             let mut state = state.write().await;
-
-            let _span = trace_span!("clear", all = locales.is_none()).entered();
 
             state.clear_locales(locales);
 
@@ -194,8 +188,6 @@ async fn run(Stateful { state, value }: Stateful<RwLock<Localizer>, Request>) ->
         Request::Keys(locale, category) => {
             let state = state.read().await;
             let locale = locale.unwrap_or_else(|| state.default_locale());
-
-            let _span = trace_span!("keys", %locale, %category).entered();
 
             Response::Keys(state.keys(&locale, &category).map_or_else(Box::default, |v| v.cloned().collect()))
         }

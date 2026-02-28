@@ -98,14 +98,16 @@ async fn on_command<'ap: 'ev, 'ev>(
     let section = SectionBuilder::new(ThumbnailBuilder::new(UnfurledMediaItem::url(avatar_url)).try_build()?)
         .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
         .component(TextDisplayBuilder::new(header).try_build()?);
-    trace!("finished header section");
+    debug!("created header section");
 
     let mut container = ContainerBuilder::new()
         .accent_color(Some(crate::utility::color::BRANDING.rgb()))
         .component(section.try_build()?)
-        .component(SeparatorBuilder::new().try_build()?)
-        .component(self::create_command_section(context, locale, None).await?);
+        .component(SeparatorBuilder::new().try_build()?);
     debug!("created primary content container");
+
+    container = container.component(self::create_command_section(context, locale, None).await?);
+    debug!("added global command entries");
 
     if let Some(guild_id) = context.interaction.guild_id {
         container = container.component(self::create_command_section(context, locale, Some(guild_id)).await?);
@@ -118,18 +120,24 @@ async fn on_command<'ap: 'ev, 'ev>(
         .label(localize!(async(try in locale) category::UI_BUTTON, "help-view").await?.to_string())
         .custom_id(CustomId::new(command_name, "build_information")?)
         .try_build()?;
+    trace!("created build information button");
     let source_code_button = ButtonBuilder::new(ButtonStyle::Link)
         .url(env!("CARGO_PKG_REPOSITORY"))
         .label(localize!(async(try in locale) category::UI_BUTTON, "help-open").await?.to_string())
         .try_build()?;
+    trace!("created source code button");
     let licenses_button = self::attachment_button::licenses::button(locale, command_name).await?;
+    trace!("created licenses button");
     let privacy_policy_button = self::attachment_button::privacy_policy::button(locale, command_name).await?;
+    trace!("created privacy policy button");
     let security_policy_button = self::attachment_button::security_policy::button(locale, command_name).await?;
-    trace!("created embedded buttons");
+    trace!("created security policy button");
+
+    debug!("created all embedded buttons");
 
     let footer = localize!(async(try in locale) category::UI, "help-footer").await?.to_string();
     let footer = footer.split('\n').map(|s| format!("-# {s}")).collect::<Vec<_>>().join("\n");
-    trace!("created footer content");
+    debug!("created footer content");
 
     container = container
         .component(SeparatorBuilder::new().try_build()?)
@@ -140,7 +148,7 @@ async fn on_command<'ap: 'ev, 'ev>(
         .component(self::create_button_section(locale, "security-policy", security_policy_button).await?)
         .component(SeparatorBuilder::new().try_build()?)
         .component(TextDisplayBuilder::new(footer.replace("%V", env!("CARGO_PKG_VERSION"))).try_build()?);
-    trace!("finished message components");
+    trace!("combined all message components");
 
     context.components([container.try_build()?], Visibility::Ephemeral).await?;
     debug!("completed interaction");
@@ -185,7 +193,7 @@ async fn on_build_information_component<'ap: 'ev, 'ev>(
         .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
         .component(SeparatorBuilder::new().try_build()?)
         .component(TextDisplayBuilder::new(buffer).try_build()?);
-    trace!("created message components");
+    debug!("created message components");
 
     context.components([container.try_build()?], Visibility::Ephemeral).await?;
     debug!("completed interaction");
@@ -198,7 +206,7 @@ async fn on_build_information_component<'ap: 'ev, 'ev>(
 /// # Errors
 ///
 /// This function will return an error if a command entry could not be created.
-#[tracing::instrument(level = "trace", name = "section", skip(context, locale))]
+#[tracing::instrument(level = "trace", name = "section", skip_all, fields(guild = guild_id.map(Id::get)))]
 async fn create_command_section<'ap: 'ev, 'ev>(
     context: Context<'ap, 'ev, &'ev CommandData>,
     locale: Option<Locale>,
@@ -215,7 +223,7 @@ async fn create_command_section<'ap: 'ev, 'ev>(
             context.client().global_commands().await?.model().await?,
         )
     };
-    trace!("resolved command section header");
+    trace!("determined command section header");
 
     // TODO: See if there's any way to reliably trim commands that the calling user doesn't have access to.
 
@@ -225,6 +233,7 @@ async fn create_command_section<'ap: 'ev, 'ev>(
         let missing_text = localize!(async(try in locale) category::UI, "help-missing").await?;
 
         write!(&mut section_content, "> *{missing_text}*")?;
+        trace!("wrote missing entries text to content buffer");
     } else {
         commands.sort_unstable_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
 
@@ -236,7 +245,7 @@ async fn create_command_section<'ap: 'ev, 'ev>(
             trace!(%name, "wrote command listing to section content buffer");
         }
     }
-    trace!("finished section body");
+    debug!("finished section body");
 
     Ok(TextDisplayBuilder::new(section_content).try_build()?.into())
 }
@@ -271,10 +280,10 @@ async fn create_command_entry(locale: Option<Locale>, command: Command) -> Resul
         let localized_name = localize!(async(try in locale) category::COMMAND, localized_name_key).await?;
 
         write!(&mut content, "- `/{localized_name}`")?;
-        trace!("wrote code-block-style command name to buffer");
+        debug!("wrote code-block-style command name to buffer");
     } else {
         write!(&mut content, "- </{}:{command_id}>", command.name)?;
-        trace!("wrote clickable command name to buffer");
+        debug!("wrote clickable command name to buffer");
     }
 
     if command.contexts.is_some_and(|context| context.contains(&InteractionContextType::BotDm)) {
@@ -288,14 +297,14 @@ async fn create_command_entry(locale: Option<Locale>, command: Command) -> Resul
 
     if !command_flags.is_empty() {
         write!(&mut content, " - *{}*", command_flags.join(", "))?;
-        trace!("wrote command flags to buffer");
+        debug!("wrote command flags to buffer");
     }
 
     let localized_description_key = format!("{}-description", command.name);
     let localized_description = localize!(async(try in locale) category::COMMAND, localized_description_key).await?;
 
     write!(&mut content, "\n> {localized_description}")?;
-    trace!("wrote command description to buffer");
+    debug!("wrote command description to buffer");
 
     Ok(Some(content))
 }
@@ -311,8 +320,7 @@ async fn create_button_section(locale: Option<Locale>, key: &str, button: Button
 
     let text_display = TextDisplayBuilder::new(format!("{text}\n-# {description}")).try_build()?;
     let section = SectionBuilder::new(button).component(text_display).try_build()?;
-
-    trace!("created embedded button display");
+    debug!("created embedded button display");
 
     Ok(section.into())
 }

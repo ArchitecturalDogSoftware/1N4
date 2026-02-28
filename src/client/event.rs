@@ -73,13 +73,21 @@ pub const fn exit() -> EventResult {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-#[tracing::instrument(level = "trace", name = "shard", skip_all, fields(id = %shard_id.number()))]
 pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult {
     api.cache.update(&event);
+    trace!("updated event cache");
 
     let result: EventResult = match event {
-        Event::Ready(event) => self::on_ready(api, event, shard_id).await,
-        Event::InteractionCreate(event) => Box::pin(self::on_interaction(api, *event)).await,
+        Event::Ready(event) => {
+            debug!("received ready event");
+
+            self::on_ready(api, event, shard_id).await
+        }
+        Event::InteractionCreate(event) => {
+            debug!(id = %event.id, "received interaction event");
+
+            Box::pin(self::on_interaction(api, *event)).await
+        }
         Event::Resumed => {
             info!("successfully resumed");
 
@@ -134,7 +142,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-#[tracing::instrument(level = "trace", name = "ready", skip_all)]
+#[tracing::instrument(level = "debug", name = "ready", skip_all)]
 pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult {
     info!("connected to gateway");
 
@@ -154,18 +162,21 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
     }
 
     let client = api.client.interaction(event.application.id);
+    trace!("created interaction response client");
 
     if let Ok(guild_id) = crate::utility::secret::development_guild_id() {
         let list = registry().await.build_and_collect::<Box<[_]>>(Some(guild_id)).await?;
-        let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
+        trace!(guild = %guild_id, "resolved development guild commands");
 
+        let list = client.set_guild_commands(guild_id, &list).await?.model().await?;
         info!(commands = list.len(), "patched server commands");
     }
 
     if cfg!(not(debug_assertions)) {
         let list = registry().await.build_and_collect::<Box<[_]>>(None).await?;
-        let list = client.set_global_commands(&list).await?.model().await?;
+        trace!("resolved global commands");
 
+        let list = client.set_global_commands(&list).await?.model().await?;
         info!(commands = list.len(), "patched global commands");
     }
 
@@ -177,7 +188,7 @@ pub async fn on_ready(api: Api, event: Ready, shard_id: ShardId) -> EventResult 
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-#[tracing::instrument(level = "trace", name = "event", skip_all, fields(id = %event.id))]
+#[tracing::instrument(level = "debug", name = "event", skip_all, fields(id = %event.id))]
 pub async fn on_interaction(api: Api, event: InteractionCreate) -> EventResult {
     const TIME_WARN_THRESHOLD: Duration = Duration::seconds(1);
 
@@ -186,11 +197,31 @@ pub async fn on_interaction(api: Api, event: InteractionCreate) -> EventResult {
     let start_time = OffsetDateTime::now_utc();
 
     let result: EventResult = match event.kind {
-        InteractionType::ApplicationCommand => self::on_command(api.as_ref(), &event).await,
-        InteractionType::MessageComponent => self::on_component(api.as_ref(), &event).await,
-        InteractionType::ModalSubmit => self::on_modal(api.as_ref(), &event).await,
-        InteractionType::ApplicationCommandAutocomplete => self::on_autocomplete(api.as_ref(), &event).await,
-        _ => self::pass(),
+        InteractionType::ApplicationCommand => {
+            trace!("matched event type as application command");
+
+            self::on_command(api.as_ref(), &event).await
+        }
+        InteractionType::MessageComponent => {
+            trace!("matched event type as message component");
+
+            self::on_component(api.as_ref(), &event).await
+        }
+        InteractionType::ModalSubmit => {
+            trace!("matched event type as modal submission");
+
+            self::on_modal(api.as_ref(), &event).await
+        }
+        InteractionType::ApplicationCommandAutocomplete => {
+            trace!("matched event type as autocompletion");
+
+            self::on_autocomplete(api.as_ref(), &event).await
+        }
+        kind => {
+            debug!(?kind, "received unsupported event type");
+
+            self::pass()
+        }
     };
 
     let elapsed_time = OffsetDateTime::now_utc() - start_time;
@@ -219,7 +250,7 @@ pub async fn on_interaction(api: Api, event: InteractionCreate) -> EventResult {
 ///
 /// This function will return an error if the event could not be handled.
 #[tracing::instrument(
-    level = "trace",
+    level = "debug",
     name = "command",
     skip_all,
     fields(name = %match event.data {
@@ -233,13 +264,19 @@ pub async fn on_command(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     };
 
     let registry = registry().await;
+    trace!("received access to static command registry");
 
     let Some(command) = registry.command(&data.name) else {
+        warn!(name = %data.name, "received unrecognized command");
+
         bail!("missing command entry for '{}'", data.name);
     };
+    trace!(name = %data.name, "resolved recognized command");
+
     let Some(ref callable) = command.callbacks.command else {
         bail!("missing command callback for '{}'", data.name);
     };
+    trace!("resolved command callback");
 
     let resolver = CommandOptionResolver::new(data);
 
@@ -251,29 +288,28 @@ pub async fn on_command(api: ApiRef<'_>, event: &Interaction) -> EventResult {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-#[tracing::instrument(
-    level = "trace",
-    name = "component",
-    skip_all,
-    fields(id = %match event.data {
-        Some(InteractionData::MessageComponent(ref data)) => data.custom_id.escape_debug(),
-        _ => unreachable!("the given event must always be a component"),
-    })
-)]
+#[tracing::instrument(level = "debug", name = "component", skip_all, fields(name = tracing::field::Empty))]
 pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(InteractionData::MessageComponent(ref data)) = event.data else {
         bail!("missing component data");
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
+    tracing::record_all!(tracing::Span::current(), name = %data_id.command());
     let registry = registry().await;
+    trace!("received access to static command registry");
 
     let Some(command) = registry.command(data_id.command()) else {
+        warn!(name = %data_id.command(), "received unrecognized command");
+
         bail!("missing command entry for '{}'", data_id.command());
     };
+    trace!(name = %data_id.command(), "resolved recognized command");
+
     let Some(ref callable) = command.callbacks.component else {
         bail!("missing component callback for '{}'", data_id.command());
     };
+    trace!("resolved component callback");
 
     callable.on_component(command, Context::new(api, event, data), data_id).await
 }
@@ -283,29 +319,28 @@ pub async fn on_component(api: ApiRef<'_>, event: &Interaction) -> EventResult {
 /// # Errors
 ///
 /// This function will return an error if the event could not be handled.
-#[tracing::instrument(
-    level = "trace",
-    name = "modal",
-    skip_all,
-    fields(id = %match event.data {
-        Some(InteractionData::ModalSubmit(ref data)) => data.custom_id.escape_default(),
-        _ => unreachable!("the given event must always be a modal"),
-    })
-)]
+#[tracing::instrument(level = "debug", name = "modal", skip_all, fields(name = tracing::field::Empty))]
 pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(InteractionData::ModalSubmit(ref data)) = event.data else {
         bail!("missing modal data");
     };
 
     let data_id = data.custom_id.parse::<CustomId>()?;
+    tracing::record_all!(tracing::Span::current(), name = %data_id.command());
     let registry = registry().await;
+    trace!("received access to static command registry");
 
     let Some(command) = registry.command(data_id.command()) else {
+        warn!(name = %data_id.command(), "received unrecognized command");
+
         bail!("missing command entry for '{}'", data_id.command());
     };
+    trace!(name = %data_id.command(), "resolved recognized command");
+
     let Some(ref callback) = command.callbacks.modal else {
         bail!("missing component callback for '{}'", data_id.command());
     };
+    trace!("resolved modal callback");
 
     let resolver = ModalComponentResolver::new(data);
 
@@ -318,7 +353,7 @@ pub async fn on_modal(api: ApiRef<'_>, event: &Interaction) -> EventResult {
 ///
 /// This function will return an error if the event could not be handled.
 #[tracing::instrument(
-    level = "trace",
+    level = "debug",
     name = "autocomplete",
     skip_all,
     fields(name = %match event.data {
@@ -332,30 +367,42 @@ pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResul
     };
 
     let registry = registry().await;
+    trace!("received access to static command registry");
 
     let Some(command) = registry.command(&data.name) else {
+        warn!(name = %data.name, "received unrecognized command");
+
         bail!("missing command entry for '{}'", data.name);
     };
+    trace!(name = %data.name, "resolved recognized command");
+
     let Some(ref callback) = command.callbacks.autocomplete else {
         bail!("missing autocomplete callback for '{}'", data.name);
     };
+    trace!("resolved autocomplete callback");
+
     let Some((name, text, kind)) = find_focused_option(&data.options) else {
+        warn!("unable to resolve focused option");
+
         bail!("missing focused option for '{}'", data.name);
     };
+    trace!(%name, ?kind, text, "resolved focused option");
 
     let context = Context::new(api, event, &(**data));
     let resolver = CommandOptionResolver::new(data);
     let mut choices = callback.on_autocomplete(command, context, resolver, name, text, kind).await?.to_vec();
+    trace!(count = choices.len(), "determined initial choices");
 
     choices.dedup_by_key(|c| c.value.clone());
     choices.sort_unstable_by_key(|c| c.name.clone());
-    debug!(choices = choices.len(), "cleaned up choice list");
+    debug!(count = choices.len(), "cleaned up choice list");
 
     crate::create_response!(api.client, event, struct {
         kind: InteractionResponseType::ApplicationCommandAutocompleteResult,
         choices: choices.into_iter().take(10),
     })
     .await?;
+    debug!("completed interaction");
 
     self::pass()
 }
@@ -365,8 +412,10 @@ pub async fn on_autocomplete(api: ApiRef<'_>, event: &Interaction) -> EventResul
 /// # Errors
 ///
 /// This function will return an error if the logger fails to output an error log.
-#[tracing::instrument(level = "trace", name = "error", skip_all)]
+#[tracing::instrument(level = "debug", name = "error", skip_all)]
 pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
+    debug!("received interaction error");
+
     if let Err(error) = self::on_error_notify_channel(api, event, error).await {
         error!(%error, "failed to output error to channel");
     }
@@ -374,6 +423,8 @@ pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Erro
     if let Err(error) = self::on_error_inform_user(api, event).await {
         error!(%error, "failed to inform interaction user of error");
     }
+
+    debug!("handled error");
 
     self::pass()
 }
@@ -383,16 +434,19 @@ pub async fn on_error(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Erro
 /// # Errors
 ///
 /// This function will return an error if the channel could not be notified.
+#[tracing::instrument(level = "trace", name = "notify_devs", skip_all)]
 pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error: &anyhow::Error) -> EventResult {
     let Ok(channel_id) = crate::utility::secret::development_channel_id() else {
         warn!("skipped channel error notification as no channel has been configured");
 
         return self::pass();
     };
+    trace!("determined development channel identifier");
 
     let titles = localize!(async category::UI, "error-titles").await?.to_string();
     let titles = titles.lines().collect::<Box<[_]>>();
     let index = rng().random_range(0 .. titles.len());
+    trace!("randomized container title");
 
     let mut container = ContainerBuilder::new().accent_color(Some(crate::utility::color::FAILURE.rgb()));
 
@@ -405,26 +459,30 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 
         container = container.component(section);
     } else {
+        debug!("failed to resolve event author");
+
         container = container
             .component(TextDisplayBuilder::new(format!("### {}", titles[index])).try_build()?)
             .component(TextDisplayBuilder::new(format!("`{}`", event.display_label())).try_build()?);
     }
+    trace!("added primary container section");
 
     container = container
         .component(SeparatorBuilder::new().divider(true).try_build()?)
         .component(TextDisplayBuilder::new(format!("```json\n{error}\n```")).try_build()?);
-
     trace!("created error display container");
 
     let attachment = (error.backtrace().status() == BacktraceStatus::Captured).then(|| {
         let errors = error.chain().enumerate().map(|(i, v)| format!("{} {v}", "-".repeat(i + 1))).collect::<Box<[_]>>();
         let mut lines = error.backtrace().to_string().lines().map(str::to_string).collect::<Box<[_]>>();
+        debug!("captured error backtrace");
 
         if let Some(home_dir) = BaseDirs::new().map(|v| v.home_dir().to_path_buf()) {
             let home_dir = home_dir.to_string_lossy();
 
             lines.iter_mut().for_each(|v| *v = v.replace(&(*home_dir), "$HOME"));
         }
+        trace!("anonymized file paths");
 
         let backtrace = format!("{}\n\n{}", errors.join("\n"), lines.join("\n"));
 
@@ -443,6 +501,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
         .await?
         .model()
         .await?;
+    debug!("sent initial message");
 
     if let Some(attachment) = attachment {
         api.client
@@ -451,6 +510,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
             .reply(message.id)
             .attachments(&[attachment])
             .await?;
+        debug!("replied with error backtrace");
     }
 
     debug!("sent developer error notification");
@@ -463,6 +523,7 @@ pub async fn on_error_notify_channel(api: ApiRef<'_>, event: &Interaction, error
 /// # Errors
 ///
 /// This function will return an error if the author could not be notified.
+#[tracing::instrument(level = "trace", name = "notify_user", skip_all)]
 pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> EventResult {
     let Some(user) = event.author() else {
         info!("skipped user error notification as no author is present");
@@ -488,7 +549,6 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
         flags: MessageFlags::EPHEMERAL,
     })
     .await;
-
     trace!("attempted to mark error message as ephemeral");
 
     let title = localize!(async(try in locale) category::UI, "error-inform-title").await?;
@@ -497,7 +557,6 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
         .accent_color(Some(crate::utility::color::FAILURE.rgb()))
         .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
         .component(TextDisplayBuilder::new(format!("{description}:\n`{}`", event.display_label())).try_build()?);
-
     trace!("created error display container");
 
     crate::follow_up_response!(api.client, event, struct {
@@ -505,7 +564,6 @@ pub async fn on_error_inform_user(api: ApiRef<'_>, event: &Interaction) -> Event
         components: &[component.try_build()?.into()],
     })
     .await?;
-
     debug!("sent user error notification");
 
     self::pass()

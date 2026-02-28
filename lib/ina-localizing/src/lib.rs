@@ -112,23 +112,26 @@ impl Localizer {
     }
 
     /// Returns the loaded locales of this [`Localizer`].
+    #[tracing::instrument(level = "debug", name = "list", skip_all)]
     pub fn locales(&self) -> impl Iterator<Item = Locale> + '_ {
         let result = self.languages.keys().copied();
-        trace!("fetched list of loaded locales");
+        debug!("fetched list of loaded locales");
 
         result
     }
 
     /// Returns whether this [`Localizer`] has loaded the given locale.
     #[must_use]
+    #[tracing::instrument(level = "debug", name = "exists", skip_all, fields(%locale))]
     pub fn has_locale(&self, locale: &Locale) -> bool {
         let result = self.languages.contains_key(locale);
-        trace!("checked whether locale was loaded");
+        debug!("checked whether locale was loaded");
 
         result
     }
 
     /// Clears the specified locales if they have been loaded, clearing all locales if given [`None`].
+    #[tracing::instrument(level = "debug", name = "clear", skip_all, fields(all = locales.is_none()))]
     pub fn clear_locales(&mut self, locales: Option<impl IntoIterator<Item = Locale>>) {
         if let Some(locales) = locales.map(|l| l.into_iter().collect::<HashSet<_>>()) {
             self.languages.retain(|l, _| !locales.contains(l));
@@ -144,19 +147,18 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if the file does not exist or the operation fails.
-    #[tracing::instrument(level = "trace", name = "load", skip_all, fields(%locale, path = tracing::field::Empty))]
+    #[tracing::instrument(level = "debug", name = "load", skip_all, fields(%locale))]
     pub async fn load_locale(&mut self, locale: Locale) -> Result<()> {
         let path = self.settings.directory.join(locale.to_string()).with_extension("toml");
-        tracing::record_all!(tracing::Span::current(), ?path);
 
         if !tokio::fs::try_exists(&path).await? {
-            error!("unable to locate language file");
+            error!(?path, "unable to locate language file");
 
             return Err(Error::MissingFile(locale));
         }
 
         let text = tokio::fs::read_to_string(&path).await?;
-        trace!("read language file");
+        trace!(?path, "read language file");
 
         let language = toml::from_str(&text)?;
         trace!("parsed language file");
@@ -195,7 +197,7 @@ impl Localizer {
     /// # Errors
     ///
     /// This function will return an error if the directory is missing or any of the operations fail.
-    #[tracing::instrument(level = "trace", name = "scan", skip_all, fields(root = ?self.settings.directory))]
+    #[tracing::instrument(level = "debug", name = "scan", skip_all)]
     pub async fn load_directory(&mut self) -> Result<usize> {
         let path = &(*self.settings.directory);
 
@@ -206,7 +208,7 @@ impl Localizer {
         }
 
         let mut iterator = tokio::fs::read_dir(path).await?;
-        trace!(?path, "accessed language directory");
+        debug!(?path, "accessed language directory");
 
         let mut locales = Vec::new();
 
@@ -216,22 +218,22 @@ impl Localizer {
             trace!(?path, "accessed file metadata");
 
             if !metadata.is_file() {
-                debug!(?path, "ignoring non-file entry in language directory");
+                debug!("ignoring non-file entry in language directory");
 
                 continue;
             }
 
             let Some(name) = path.file_stem() else {
-                debug!(?path, "ignoring improperly-named entry in language directory");
+                debug!("ignoring improperly-named entry in language directory");
 
                 continue;
             };
 
             if let Some(locale) = name.to_str().and_then(|v| v.parse().ok()) {
                 locales.push(locale);
-                trace!(?path, %locale, "queued locale for loading");
+                debug!(%locale, "queued locale for loading");
             } else {
-                warn!(?path, "invalid locale file name");
+                warn!(?name, "invalid locale file name");
             }
         }
 
@@ -240,13 +242,14 @@ impl Localizer {
 
     /// Returns an iterator over the keys within a specified locale's category.
     #[must_use]
+    #[tracing::instrument(level = "debug", skip_all, fields(%locale, %category))]
     pub fn keys<'tx: 'fc, 'fc>(
         &'tx self,
         locale: &Locale,
         category: &'fc str,
     ) -> Option<Keys<'tx, Arc<str>, Arc<str>>> {
         let result = self.languages.get(locale).and_then(|l| l.keys(category));
-        trace!("fetched list of loaded category keys");
+        debug!("fetched list of loaded category keys");
 
         result
     }
@@ -257,13 +260,13 @@ impl Localizer {
     ///
     /// This function will return an error if the text is not found and the configured behavior specifies to return an
     /// error.
-    // #[tracing::instrument(level = "trace", name = "localize", skip_all, fields(%locale, %category, %key))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%locale, %category, %key))]
     pub fn get<'tx: 'fc, 'fc>(&'tx self, locale: Locale, category: &'fc str, key: &'fc str) -> Result<Text> {
         let Some(language) = self.languages.get(&locale) else {
-            trace!(%locale, "language for specified locale is not loaded");
+            debug!("language for specified locale is not loaded");
 
             return if self.settings.default_locale == locale {
-                warn!(%locale, "the configured default locale has not been loaded");
+                warn!("the configured default locale has not been loaded");
 
                 self.settings.miss_behavior.call(category, key)
             } else {
@@ -328,29 +331,32 @@ impl Language {
 
         // Only continue if the resolved text is missing.
         let (Ok(Text::Missing(..)) | Err(Error::MissingText(..))) = text else {
-            trace!(?behavior, "translation retrieved");
+            debug!("translation retrieved");
 
             return text;
         };
 
         // Resolve the parent language.
         let Some(ref locale) = self.inherit else {
-            trace!(?behavior, "no parent locale is available, returning missing translation");
+            debug!(?behavior, "no parent locale is available, returning missing translation");
 
             return text;
         };
         let Some(parent) = languages.get(locale) else {
-            trace!(?behavior, parent = %locale, "parent locale is not loaded, returning missing translation");
+            debug!(?behavior, parent = %locale, "parent locale is not loaded, returning missing translation");
 
             return text;
         };
 
-        let span = trace_span!("parent", %locale);
+        debug!(parent = %locale, "searching parent for translation");
 
         // Convert `Present` variants to `Inherit` variants.
-        match span.in_scope(|| parent.get_recursive(category, key, behavior, languages, max_depth - 1)) {
+        match trace_span!("parent", %locale).in_scope(|| {
+            //
+            parent.get_recursive(category, key, behavior, languages, max_depth - 1)
+        }) {
             Ok(Text::Present(value)) => {
-                trace!(parent = %locale, "translation retrieved from parent locale");
+                debug!(parent = %locale, "translation retrieved from parent locale");
 
                 Ok(Text::Inherit(*locale, value))
             }
