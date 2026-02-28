@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Copyright © 2025 RemasteredArch
+// Copyright © 2026 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -21,7 +22,8 @@
 //! [build script]: <https://doc.rust-lang.org/cargo/reference/build-scripts.html>
 
 use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::io::{BufWriter, Write};
+use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use fig::{Cfg, CheckedCfg};
@@ -102,25 +104,35 @@ fn generate_build_information(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::i
     Ok(())
 }
 
-/// Fetches the current commit directly hash from the `.git` directory at `root_dir`.
+/// Fetches the current commit hash from the `.git` directory at `root_dir`.
+///
+/// This function will spawn a process that runs the command `git rev-parse HEAD`.
+///
+/// If the current hash cannot be resolved, the placeholder string `"<unknown>"` will be returned instead.
 fn get_current_commit(root_dir: &Utf8Path) -> std::io::Result<String> {
-    let git_dir = root_dir.join(".git");
+    const UNKNOWN: &str = "<unknown>";
 
-    let mut head_ref = String::new();
-    File::open(git_dir.join("HEAD"))?.read_to_string(&mut head_ref)?;
-    // Trim the trailing line ending in the file.
-    let head_ref = head_ref.trim_ascii_end();
+    let command_output = Command::new("git").current_dir(root_dir).args(["rev-parse", "HEAD"]).output()?;
 
-    // Assumes that the contents of `.git/HEAD` will always be either `refs/heads/BRANCH_NAME` or the commit hash.
-    let Some(current_branch_path) = head_ref.strip_prefix("ref: ") else {
-        return Ok(head_ref.to_string());
-    };
+    if !command_output.status.success() {
+        // The standard error output stream is probably always UTF-8? If it isn't, we should change this conversion.
+        let error = String::from_utf8_lossy(&command_output.stderr);
 
-    let mut current_commit = String::new();
-    File::open(git_dir.join(current_branch_path))?.read_to_string(&mut current_commit)?;
+        println!("cargo::warning=Unable to resolve current commit hash: {error}");
 
-    // Trim the trailing line ending in the file.
-    Ok(current_commit.trim_ascii_end().to_string())
+        return Ok(UNKNOWN.to_owned());
+    }
+
+    // The command should probably ever output valid UTF-8, since all commit hashes consist solely of ASCII characters.
+    // Of course, I don't know that for sure, so we'll use a checked function to be safe.
+    match String::from_utf8(command_output.stdout) {
+        Ok(commit_hash) => Ok(commit_hash.trim().to_owned()),
+        Err(error) => {
+            println!("cargo::warning=Failed to parse current commit hash: {error}");
+
+            Ok(UNKNOWN.to_owned())
+        }
+    }
 }
 
 /// Generates a Markdown file that contains the declared licenses and their full texts of 1N4 and
