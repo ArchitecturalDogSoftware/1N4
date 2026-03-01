@@ -120,4 +120,5 @@ twilight-validate = "~0.17"
 [build-dependencies]
 camino = "1.1.10"
 fig = { git = "https://github.com/Jaxydog/fig" }
+git2 = { version = "~0.20", default-features = false }
 license_page = { git = "https://github.com/RemasteredArch/license_page" }

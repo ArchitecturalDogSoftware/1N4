@@ -23,10 +23,10 @@
 
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use fig::{Cfg, CheckedCfg};
+use git2::{Oid, Repository};
 use license_page::CrateList;
 use license_page::opt::{GetLicensesOpt, ToMarkdownPageOpt};
 
@@ -70,7 +70,13 @@ fn main() -> std::io::Result<()> {
 fn generate_build_information(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::io::Result<()> {
     let mut out = BufWriter::new(File::create(out_dir.join("build_info.rs"))?);
 
-    let current_commit = get_current_commit(root_dir)?;
+    let current_commit = match get_current_commit(root_dir) {
+        Ok(current_commit) => current_commit,
+        Err(error) => {
+            println!("cargo::error=Failed to resolve current commit hash: {error}");
+            return Ok(()); // `cargo::error` will cause the script to fail, so we can safely exit early.
+        }
+    };
     writeln!(
         out,
         r#"/// The current Git commit hash 1N4 was built at.
@@ -105,34 +111,8 @@ fn generate_build_information(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::i
 }
 
 /// Fetches the current commit hash from the `.git` directory at `root_dir`.
-///
-/// This function will spawn a process that runs the command `git rev-parse HEAD`.
-///
-/// If the current hash cannot be resolved, the placeholder string `"<unknown>"` will be returned instead.
-fn get_current_commit(root_dir: &Utf8Path) -> std::io::Result<String> {
-    const UNKNOWN: &str = "<unknown>";
-
-    let command_output = Command::new("git").current_dir(root_dir).args(["rev-parse", "HEAD"]).output()?;
-
-    if !command_output.status.success() {
-        // The standard error output stream is probably always UTF-8? If it isn't, we should change this conversion.
-        let error = String::from_utf8_lossy(&command_output.stderr);
-
-        println!("cargo::warning=Unable to resolve current commit hash: {error}");
-
-        return Ok(UNKNOWN.to_owned());
-    }
-
-    // The command should probably ever output valid UTF-8, since all commit hashes consist solely of ASCII characters.
-    // Of course, I don't know that for sure, so we'll use a checked function to be safe.
-    match String::from_utf8(command_output.stdout) {
-        Ok(commit_hash) => Ok(commit_hash.trim().to_owned()),
-        Err(error) => {
-            println!("cargo::warning=Failed to parse current commit hash: {error}");
-
-            Ok(UNKNOWN.to_owned())
-        }
-    }
+fn get_current_commit(root_dir: &Utf8Path) -> Result<Oid, git2::Error> {
+    Ok(Repository::open(root_dir)?.head()?.peel_to_commit()?.id())
 }
 
 /// Generates a Markdown file that contains the declared licenses and their full texts of 1N4 and
