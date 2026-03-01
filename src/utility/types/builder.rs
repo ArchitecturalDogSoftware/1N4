@@ -51,6 +51,28 @@ pub trait ValidatedBuilder {
     fn try_build(self) -> Result<Self::Output, Self::Error>;
 }
 
+/// Always considers the given component valid.
+///
+/// This macro can be removed by passing the `INA_COMPONENT_VALIDATION=strict` environment variable during
+/// compilation.
+#[cfg(ina_component_validation = "relaxed")]
+macro_rules! builder_validation_placeholder {
+    ($type:path) => {
+        |_| Ok(())
+    };
+}
+
+/// Fails with a compile error.
+///
+/// This macro can be removed by passing the `INA_COMPONENT_VALIDATION=relaxed` environment variable during
+/// compilation.
+#[cfg(ina_component_validation = "strict")]
+macro_rules! builder_validation_placeholder {
+    ($type:path) => {
+        compile_error!(concat!("the builder must be validated for '", stringify!($type), "'"))
+    };
+}
+
 /// Implements [`ValidatedBuilder`] for various types.
 ///
 /// # Examples
@@ -61,7 +83,7 @@ pub trait ValidatedBuilder {
 /// }
 /// ```
 macro_rules! define_validated_builders {
-    ($($type:path => $output:path : $function:path $([ $($args:expr), +$(,)? ])?;)*) => {
+    ($($type:path => $output:path : $function:expr $(=> [ $($args:expr), +$(,)? ])?;)*) => {
         $(
             impl ValidatedBuilder for $type {
                 type Output = $output;
@@ -83,46 +105,21 @@ macro_rules! define_validated_builders {
 }
 
 define_validated_builders! {
-    ActionRowBuilder => ActionRow : twilight_validate::component::action_row [true];
+    ActionRowBuilder => ActionRow : twilight_validate::component::action_row => [true];
     ButtonBuilder => Button : twilight_validate::component::button;
-    FileDisplayBuilder => FileDisplay : never_validate;
+    FileDisplayBuilder => FileDisplay : builder_validation_placeholder!(FileDisplayBuilder);
     FileUploadBuilder => FileUpload : twilight_validate::component::file_upload;
     ContainerBuilder => Container : twilight_validate::component::container;
     LabelBuilder => Label : twilight_validate::component::label;
     MediaGalleryBuilder => MediaGallery : twilight_validate::component::media_gallery;
     MediaGalleryItemBuilder => MediaGalleryItem : twilight_validate::component::media_gallery_item;
     SectionBuilder => Section : twilight_validate::component::section;
-    SelectMenuBuilder => SelectMenu : twilight_validate::component::select_menu [false];
-    SelectMenuOptionBuilder => SelectMenuOption : never_validate;
-    SeparatorBuilder => Separator : never_validate;
+    SelectMenuBuilder => SelectMenu : twilight_validate::component::select_menu => [false];
+    SelectMenuOptionBuilder => SelectMenuOption : builder_validation_placeholder!(SelectMenuOptionBuilder);
+    SeparatorBuilder => Separator : builder_validation_placeholder!(SeparatorBuilder);
     TextDisplayBuilder => TextDisplay : twilight_validate::component::text_display;
-    TextInputBuilder => TextInput : twilight_validate::component::text_input [false];
+    TextInputBuilder => TextInput : twilight_validate::component::text_input => [false];
     ThumbnailBuilder => Thumbnail : twilight_validate::component::thumbnail;
-}
-
-/// Always considers the given component valid.
-///
-/// This function can be removed by passing the `INA_COMPONENT_VALIDATION=strict` environment variable during
-/// compilation.
-///
-/// # Errors
-///
-/// This function will never return an error.
-#[cfg(ina_component_validation = "relaxed")]
-#[inline]
-pub const fn never_validate<T, E>(_: &T) -> Result<(), E> {
-    Ok(())
-}
-
-/// This function fails with a compile error.
-///
-/// # Errors
-///
-/// This function will never return an error.
-#[cfg(ina_component_validation = "strict")]
-#[inline]
-pub const fn never_validate<T, E>(_: &T) -> Result<(), E> {
-    compile_error!("the component builder must be validated");
 }
 
 /// Builds a [`MediaGallery`].
