@@ -17,7 +17,13 @@
 
 //! `build.rs`: 1N4's [build script].
 //!
-//! Currently, [`self::generate_license_page`] is all that this is used for.
+//! The majority of this script is used to generate the information displayed within the build information message and
+//! the license attachment, both accessible through the buttons on the `/help` command embed.
+//!
+//! This script also sets the following configuration flags (usable via the `cfg` macro):
+//! - `ina_component_validation` to either `"relaxed"` or `"strict"`
+//!   - This controls whether or not component builders should cause a compilation error if they are not validated.
+//!   - This can be configured through the `INA_COMPONENT_VALIDATION` environment variable.
 //!
 //! [build script]: <https://doc.rust-lang.org/cargo/reference/build-scripts.html>
 
@@ -110,7 +116,7 @@ fn generate_build_information(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::i
     Ok(())
 }
 
-/// Fetches the current commit hash from the `.git` directory at `root_dir`.
+/// Fetches the current commit hash from a tracked Git directory within `root_dir`.
 fn get_current_commit(root_dir: &Utf8Path) -> Result<Oid, git2::Error> {
     Ok(Repository::open(root_dir)?.head()?.peel_to_commit()?.id())
 }
