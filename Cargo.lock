@@ -621,7 +621,7 @@ checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 [[package]]
 name = "fig"
 version = "0.1.0"
-source = "git+https://github.com/Jaxydog/fig#fec2a09922e1008b17e2acafcf8233707bfdf36d"
+source = "git+https://github.com/Jaxydog/fig#2202032c385312e5b6c47e9f4a48a48cdeaf79f3"
 dependencies = [
  "unicode-ident",
 ]
