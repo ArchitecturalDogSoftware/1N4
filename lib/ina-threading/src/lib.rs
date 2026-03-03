@@ -219,6 +219,7 @@ where
 /// Sets the asynchronous runtime timeout for any spawned threads to the given value.
 pub async fn set_runtime_timeout(duration: Duration) {
     *self::RUNTIME_TIMEOUT.write().await = duration;
+    debug!(seconds = duration.as_secs_f64(), "updated timeout duration");
 }
 
 /// Sets the asynchronous runtime timeout for any spawned threads to the given value.
@@ -228,4 +229,5 @@ pub async fn set_runtime_timeout(duration: Duration) {
 /// This function will panic if it is called from within an asynchronous runtime.
 pub fn blocking_set_runtime_timeout(duration: Duration) {
     *self::RUNTIME_TIMEOUT.blocking_write() = duration;
+    debug!(seconds = duration.as_secs_f64(), "updated timeout duration");
 }

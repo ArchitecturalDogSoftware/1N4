@@ -88,11 +88,10 @@ pub fn main() -> Result<ExitCode> {
     let arguments = get_config();
 
     self::initialize_logger(&arguments)?;
+    info!("initialized logging subscriber");
 
     let timeout = Duration::from_secs(arguments.bot_settings.shutdown_timeout.get());
     ina_threading::blocking_set_runtime_timeout(timeout);
-
-    info!("initialized logging subscriber");
 
     #[cfg(feature = "dotenv")]
     {
@@ -101,13 +100,16 @@ pub fn main() -> Result<ExitCode> {
     }
 
     let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
-    info!(id = %runtime.handle().id(), workers = runtime.metrics().num_workers(), "spawned asynchronous runtime");
+    let id = runtime.handle().id();
+    debug!(%id, workers = runtime.metrics().num_workers(), "spawned asynchronous runtime");
 
     let code = runtime.block_on(self::async_main(arguments))?;
-    info!(?code, "exited asynchronous runtime");
+    debug!(%id, "exited asynchronous runtime");
 
     runtime.shutdown_timeout(timeout);
-    debug!("exiting program");
+    debug!(%id, "shut down asynchronous runtime");
+
+    debug!(?code, "stopped with exit code");
 
     Ok(code)
 }
