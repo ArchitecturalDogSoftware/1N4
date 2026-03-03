@@ -19,6 +19,7 @@
 
 use std::fs::File;
 use std::process::ExitCode;
+use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
@@ -88,6 +89,9 @@ pub fn main() -> Result<ExitCode> {
 
     self::initialize_logger(&arguments)?;
 
+    let timeout = Duration::from_secs(arguments.bot_settings.shutdown_timeout.get());
+    ina_threading::blocking_set_runtime_timeout(timeout);
+
     info!("initialized logging subscriber");
 
     #[cfg(feature = "dotenv")]
@@ -102,7 +106,7 @@ pub fn main() -> Result<ExitCode> {
     let code = runtime.block_on(self::async_main(arguments))?;
     info!(?code, "exited asynchronous runtime");
 
-    drop(runtime);
+    runtime.shutdown_timeout(timeout);
     debug!("exiting program");
 
     Ok(code)

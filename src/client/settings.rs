@@ -113,6 +113,14 @@ pub struct Settings {
     #[arg(id = "LOG_DIR", long = "log-directory")]
     #[option(default = self::default_log_directory())]
     pub log_directory: PathBuf,
+
+    /// The number of seconds to wait for the program to gracefully shut down before forcefully
+    /// killing all running tasks.
+    ///
+    /// Default: `10`
+    #[arg(long = "shutdown-timeout")]
+    #[option(default = self::default_shutdown_timeout())]
+    pub shutdown_timeout: NonZero<u64>,
 }
 
 /// Determines whether color should be output during logging.
@@ -164,4 +172,11 @@ fn default_status_interval() -> NonZero<u64> {
 /// Returns the default log directory.
 fn default_log_directory() -> PathBuf {
     std::env::current_dir().map_or_else(|_| PathBuf::from("./log/"), |v| v.join("log"))
+}
+
+/// Returns the default runtime shutdown timeout.
+fn default_shutdown_timeout() -> NonZero<u64> {
+    let Some(interval) = NonZero::new(10) else { unreachable!("the default timeout must be non-zero") };
+
+    interval
 }

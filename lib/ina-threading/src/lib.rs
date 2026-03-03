@@ -17,7 +17,9 @@
 //! Provides concurrency solutions for 1N4.
 
 use std::thread::{Builder, JoinHandle};
+use std::time::Duration;
 
+use tokio::sync::RwLock;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{Instrument, debug, trace_span};
 
@@ -37,6 +39,9 @@ pub mod threads {
     /// Defines threads that can send values.
     pub mod producer;
 }
+
+/// The timeout duration for any spawned asynchronous runtimes.
+static RUNTIME_TIMEOUT: RwLock<Duration> = RwLock::const_new(Duration::from_secs(10));
 
 /// A result alias with a defaulted error type.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -178,10 +183,14 @@ where
             use tokio::runtime::Builder;
 
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
-            debug!(id = %runtime.handle().id(), "initialized single-thread asynchronous runtime");
+            let id = runtime.handle().id();
+            debug!(%id, "initialized single-thread asynchronous runtime");
 
             let result = runtime.block_on(f().instrument(trace_span!("rt_s")));
-            debug!(id = %runtime.handle().id(), "exiting asynchronous runtime");
+            debug!(%id, "exiting asynchronous runtime");
+
+            runtime.shutdown_timeout(*self::RUNTIME_TIMEOUT.blocking_read());
+            debug!(%id, "shut down asynchronous runtime");
 
             result
         })
@@ -205,4 +214,18 @@ where
     fn into_join_handle(self) -> JoinHandle<Self::Output> {
         self.inner
     }
+}
+
+/// Sets the asynchronous runtime timeout for any spawned threads to the given value.
+pub async fn set_runtime_timeout(duration: Duration) {
+    *self::RUNTIME_TIMEOUT.write().await = duration;
+}
+
+/// Sets the asynchronous runtime timeout for any spawned threads to the given value.
+///
+/// # Panics
+///
+/// This function will panic if it is called from within an asynchronous runtime.
+pub fn blocking_set_runtime_timeout(duration: Duration) {
+    *self::RUNTIME_TIMEOUT.blocking_write() = duration;
 }
