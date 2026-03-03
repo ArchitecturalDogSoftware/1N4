@@ -100,6 +100,14 @@ pub struct Settings {
     #[arg(long = "disable-console-logging")]
     #[option(default)]
     pub disable_console_logging: bool,
+
+    /// The number of seconds to wait for the program to gracefully shut down before forcefully
+    /// killing all running tasks.
+    ///
+    /// Default: `10`
+    #[arg(long = "shutdown-timeout")]
+    #[option(default = self::default_shutdown_timeout())]
+    pub shutdown_timeout: NonZero<u64>,
 }
 
 /// Returns the default status file location.
@@ -122,6 +130,13 @@ fn default_help_attachments_directory() -> PathBuf {
 /// Returns the default status change interval.
 fn default_status_interval() -> NonZero<u64> {
     let Some(interval) = NonZero::new(30) else { unreachable!("the default interval must be non-zero") };
+
+    interval
+}
+
+/// Returns the default runtime shutdown timeout.
+fn default_shutdown_timeout() -> NonZero<u64> {
+    let Some(interval) = NonZero::new(10) else { unreachable!("the default timeout must be non-zero") };
 
     interval
 }

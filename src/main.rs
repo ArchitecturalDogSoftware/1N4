@@ -18,6 +18,7 @@
 //! Your resident M41D Unit, here to help with your server.
 
 use std::process::ExitCode;
+use std::time::Duration;
 
 use anyhow::Result;
 use clap::Parser;
@@ -85,6 +86,9 @@ pub fn main() -> Result<ExitCode> {
 
     let arguments = get_config();
 
+    let timeout = Duration::from_secs(arguments.bot_settings.shutdown_timeout.get());
+    ina_threading::blocking_set_runtime_timeout(timeout);
+
     ina_logging::thread::blocking_start(arguments.log_settings.clone())?;
     if !arguments.bot_settings.disable_console_logging {
         ina_logging::thread::blocking_endpoint(TerminalEndpoint::new())?;
@@ -108,7 +112,7 @@ pub fn main() -> Result<ExitCode> {
 
     info!("exited asynchronous runtime")?;
 
-    drop(runtime);
+    runtime.shutdown_timeout(timeout);
 
     info!("closing logging thread")?;
 
