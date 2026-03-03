@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Copyright © 2025 RemasteredArch
+// Copyright © 2026 Jaxydog
 //
 // This file is part of 1N4.
 //
@@ -16,15 +17,22 @@
 
 //! `build.rs`: 1N4's [build script].
 //!
-//! Currently, [`self::generate_license_page`] is all that this is used for.
+//! The majority of this script is used to generate the information displayed within the build information message and
+//! the license attachment, both accessible through the buttons on the `/help` command embed.
+//!
+//! This script also sets the following configuration flags (usable via the `cfg` macro):
+//! - `ina_component_validation` to either `"relaxed"` or `"strict"`
+//!   - This controls whether or not component builders should cause a compilation error if they are not validated.
+//!   - This can be configured through the `INA_COMPONENT_VALIDATION` environment variable.
 //!
 //! [build script]: <https://doc.rust-lang.org/cargo/reference/build-scripts.html>
 
 use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::io::{BufWriter, Write};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use fig::{Cfg, CheckedCfg};
+use git2::{Oid, Repository};
 use license_page::CrateList;
 use license_page::opt::{GetLicensesOpt, ToMarkdownPageOpt};
 
@@ -68,7 +76,13 @@ fn main() -> std::io::Result<()> {
 fn generate_build_information(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::io::Result<()> {
     let mut out = BufWriter::new(File::create(out_dir.join("build_info.rs"))?);
 
-    let current_commit = get_current_commit(root_dir)?;
+    let current_commit = match get_current_commit(root_dir) {
+        Ok(current_commit) => current_commit,
+        Err(error) => {
+            println!("cargo::error=Failed to resolve current commit hash: {error}");
+            return Ok(()); // `cargo::error` will cause the script to fail, so we can safely exit early.
+        }
+    };
     writeln!(
         out,
         r#"/// The current Git commit hash 1N4 was built at.
@@ -102,25 +116,9 @@ fn generate_build_information(root_dir: &Utf8Path, out_dir: &Utf8Path) -> std::i
     Ok(())
 }
 
-/// Fetches the current commit directly hash from the `.git` directory at `root_dir`.
-fn get_current_commit(root_dir: &Utf8Path) -> std::io::Result<String> {
-    let git_dir = root_dir.join(".git");
-
-    let mut head_ref = String::new();
-    File::open(git_dir.join("HEAD"))?.read_to_string(&mut head_ref)?;
-    // Trim the trailing line ending in the file.
-    let head_ref = head_ref.trim_ascii_end();
-
-    // Assumes that the contents of `.git/HEAD` will always be either `refs/heads/BRANCH_NAME` or the commit hash.
-    let Some(current_branch_path) = head_ref.strip_prefix("ref: ") else {
-        return Ok(head_ref.to_string());
-    };
-
-    let mut current_commit = String::new();
-    File::open(git_dir.join(current_branch_path))?.read_to_string(&mut current_commit)?;
-
-    // Trim the trailing line ending in the file.
-    Ok(current_commit.trim_ascii_end().to_string())
+/// Fetches the current commit hash from a tracked Git directory within `root_dir`.
+fn get_current_commit(root_dir: &Utf8Path) -> Result<Oid, git2::Error> {
+    Ok(Repository::open(root_dir)?.head()?.peel_to_commit()?.id())
 }
 
 /// Generates a Markdown file that contains the declared licenses and their full texts of 1N4 and
