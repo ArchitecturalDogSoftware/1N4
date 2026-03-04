@@ -79,7 +79,7 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
 
     let result: EventResult = match event {
         Event::Ready(event) => {
-            debug!("received ready event");
+            debug!(version = event.version, user = %event.user.id, "received ready event");
 
             self::on_ready(api, event, shard_id).await
         }
@@ -93,28 +93,13 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
 
             self::pass()
         }
-        Event::GatewayHeartbeat => {
-            debug!("received heartbeat");
-
-            self::pass()
-        }
-        Event::GatewayHeartbeatAck => {
-            debug!("received heartbeat acknowledgement");
-
-            self::pass()
-        }
         Event::GatewayHello(event) => {
             debug!(heartbeat_ms = event.heartbeat_interval, "connecting to gateway");
 
             self::pass()
         }
-        Event::GatewayClose(None) => {
-            warn!("disconnected from gateway");
-
-            self::pass()
-        }
-        Event::GatewayClose(Some(frame)) => {
-            warn!(reason = %frame.reason, "disconnected from gateway");
+        Event::GatewayClose(reason) => {
+            warn!(reason = reason.map(|frame| tracing::field::display(frame.reason)), "disconnected from gateway");
 
             self::pass()
         }
@@ -123,7 +108,11 @@ pub async fn on_event(api: Api, event: Event, shard_id: ShardId) -> EventResult 
 
             self::pass()
         }
-        _ => self::pass(),
+        event => {
+            debug!(kind = ?event.kind(), "received gateway event");
+
+            self::pass()
+        }
     };
 
     match result {
