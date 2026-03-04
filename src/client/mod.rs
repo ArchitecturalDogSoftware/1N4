@@ -364,6 +364,8 @@ impl Instance {
     /// This function will return an error if the instance encounters an unhandled exception.
     #[tracing::instrument(level = "trace", name = "client", skip_all)]
     pub async fn run(mut self) -> Result<()> {
+        info!("started client process");
+
         loop {
             let mut senders = Vec::with_capacity(self.shards.len());
             let mut tasks = JoinSet::new();

@@ -144,8 +144,6 @@ pub async fn async_main(arguments: Arguments) -> Result<ExitCode> {
         let terminate = tokio::signal::ctrl_c();
     }
 
-    info!("starting client process");
-
     let code = tokio::select! {
         // Exit code of 130 for ^C is standard; 128 (to mark a signal) + 2 (the code for the ^C interrupt).
         _ = terminate => {
