@@ -17,6 +17,7 @@
 use std::num::NonZero;
 
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::trace;
 
 use crate::{Handle, ReceiverHandle, Result, SenderHandle, Thread};
 
@@ -70,7 +71,9 @@ where
         F: FnOnce(Sender<R>, Receiver<S>) -> T + Send + 'static,
     {
         let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        trace!(name = %name.as_ref(), capacity, "opened mpsc channel (client->thread)");
         let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        trace!(name = %name.as_ref(), capacity, "opened mpsc channel (thread->client)");
         let thread = Thread::spawn(name, move || f(thread_sender, thread_receiver))?;
 
         Ok(Self { thread, sender: local_sender, receiver: local_receiver })
@@ -112,7 +115,9 @@ where
         O: Future<Output = T> + Send,
     {
         let (local_sender, thread_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        trace!(name = %name.as_ref(), capacity, "opened mpsc channel (client->thread)");
         let (thread_sender, local_receiver) = tokio::sync::mpsc::channel(capacity.get());
+        trace!(name = %name.as_ref(), capacity, "opened mpsc channel (thread->client)");
         let thread = Thread::spawn_with_runtime(name, || f(thread_sender, thread_receiver))?;
 
         Ok(Self { thread, sender: local_sender, receiver: local_receiver })

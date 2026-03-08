@@ -24,6 +24,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, OsRng};
 use chacha20poly1305::{AeadCore, KeyInit, KeySizeUser, XChaCha20Poly1305};
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 use zeroize::{Zeroize, Zeroizing};
 
 use super::{DataDecode, DataEncode, DataFormat};
@@ -203,6 +204,8 @@ impl<F: Debug + DataFormat + 'static> DataEncode for Encrypt<F> {
         header.write_into(&mut output)?;
         output.extend_from_slice(&bytes);
 
+        trace!(bytes = bytes.len(), "encrypted bytes");
+
         Ok(output.into())
     }
 }
@@ -224,6 +227,8 @@ impl<F: Debug + DataFormat + 'static> DataDecode for Encrypt<F> {
             .decrypt((*header.nonce).into(), bytes)
             .map_err(Error::ChaCha20Poly1305)?;
 
+        trace!(bytes = bytes.len(), "decrypted bytes");
+
         self.inner.decode(&bytes).map_err(Error::Decode)
     }
 }
@@ -235,6 +240,8 @@ impl<F: Debug + DataFormat + 'static> DataDecode for Encrypt<F> {
 /// Panics if the resolver was already set.
 #[expect(clippy::expect_used, reason = "we should fail if the resolver is set multiple times")]
 pub fn set_password_resolver(f: fn() -> Option<String>) {
+    trace!("updated encryption password resolver");
+
     PASSWORD_RESOLVER.set(f).expect("the password resolver has already been set");
 }
 

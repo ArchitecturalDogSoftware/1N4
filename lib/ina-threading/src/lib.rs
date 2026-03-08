@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use tokio::sync::RwLock;
 use tokio::sync::mpsc::{Receiver, Sender};
+use tracing::{Instrument, debug, trace_span};
 
 /// Defines wrappers for join-on-drop threads.
 pub mod joining;
@@ -67,6 +68,11 @@ pub trait Handle {
 
     /// Returns the contained [`JoinHandle`], dropping this value.
     fn into_join_handle(self) -> JoinHandle<Self::Output>;
+
+    /// Returns the thread's configured name, if available.
+    fn thread_name(&self) -> &str {
+        self.as_join_handle().thread().name().unwrap_or("<anonymous>")
+    }
 }
 
 /// A [`Handle`] type where the running thread may receive values through a [`Sender<T>`].
@@ -137,8 +143,9 @@ where
         N: AsRef<str>,
         F: FnOnce() -> T + Send + 'static,
     {
-        let name = name.as_ref().replace('\0', r"\0");
-        let inner = Builder::new().name(name).spawn(f)?;
+        let filtered_name = name.as_ref().replace('\0', r"\0");
+        let inner = Builder::new().name(filtered_name).spawn(f)?;
+        debug!(name = %name.as_ref(), "spawned new thread");
 
         Ok(Self { inner })
     }
@@ -176,9 +183,14 @@ where
             use tokio::runtime::Builder;
 
             let runtime = Builder::new_current_thread().enable_all().build().expect("failed to spawn runtime");
-            let result = runtime.block_on(f());
+            let id = runtime.handle().id();
+            debug!(%id, "initialized single-thread asynchronous runtime");
+
+            let result = runtime.block_on(f().instrument(trace_span!("rt_s")));
+            debug!(%id, "exiting asynchronous runtime");
 
             runtime.shutdown_timeout(*self::RUNTIME_TIMEOUT.blocking_read());
+            debug!(%id, "shut down asynchronous runtime");
 
             result
         })
@@ -207,6 +219,7 @@ where
 /// Sets the asynchronous runtime timeout for any spawned threads to the given value.
 pub async fn set_runtime_timeout(duration: Duration) {
     *self::RUNTIME_TIMEOUT.write().await = duration;
+    debug!(seconds = duration.as_secs_f64(), "updated timeout duration");
 }
 
 /// Sets the asynchronous runtime timeout for any spawned threads to the given value.
@@ -216,4 +229,5 @@ pub async fn set_runtime_timeout(duration: Duration) {
 /// This function will panic if it is called from within an asynchronous runtime.
 pub fn blocking_set_runtime_timeout(duration: Duration) {
     *self::RUNTIME_TIMEOUT.blocking_write() = duration;
+    debug!(seconds = duration.as_secs_f64(), "updated timeout duration");
 }

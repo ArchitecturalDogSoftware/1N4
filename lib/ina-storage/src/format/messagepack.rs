@@ -18,6 +18,7 @@ use std::ffi::OsStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 use super::{DataDecode, DataEncode, DataFormat};
 
@@ -35,7 +36,7 @@ impl DataEncode for Messagepack {
     type Error = rmp_serde::encode::Error;
 
     fn encode<T: Serialize>(&self, value: &T) -> Result<Arc<[u8]>, Self::Error> {
-        rmp_serde::to_vec_named(value).map(Into::into)
+        rmp_serde::to_vec_named(value).inspect(|_| trace!("converted value to message-pack")).map(Into::into)
     }
 }
 
@@ -43,6 +44,6 @@ impl DataDecode for Messagepack {
     type Error = rmp_serde::decode::Error;
 
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {
-        rmp_serde::from_slice(bytes)
+        rmp_serde::from_slice(bytes).inspect(|_| trace!("converted message-pack to value"))
     }
 }

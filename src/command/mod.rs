@@ -189,12 +189,30 @@ macro_rules! define_commands {
             resolver: $crate::command::resolver::CommandOptionResolver<'ev>,
         ) -> $crate::client::event::EventResult {
             $(if let ::std::result::Result::Ok(resolver) = resolver.subcommand(self::command::$name::NAME) {
-                return self::command::$name::callback(entry, context, resolver).await;
+                use tracing::Instrument;
+
+                let span = ::tracing::trace_span!("sub", name = %self::command::$name::NAME);
+                let result = self::command::$name::callback(entry, context, resolver).instrument(span).await;
+
+                ::tracing::debug!(subcommand = %self::command::$name::NAME, "executed subcommand");
+
+                return result;
             })else*
 
             $(if let ::std::result::Result::Ok(resolver) = resolver.subcommand_group(self::command::$group::NAME) {
                 $(if let ::std::result::Result::Ok(resolver) = resolver.subcommand(self::command::$group::$group_name::NAME) {
-                    return self::command::$group::$group_name::callback(entry, context, resolver).await;
+                    use tracing::Instrument;
+
+                    let span = ::tracing::trace_span!("sub", group = %self::command::$group::NAME, name = %self::command::$group_name::NAME);
+                    let result = self::command::$group::$group_name::callback(entry, context, resolver).instrument(span).await;
+
+                    ::tracing::debug!(
+                        group = %self::command::$group::NAME,
+                        subcommand = %self::command::$group::$group_name::NAME,
+                        "executed grouped subcommand"
+                    );
+
+                    return result;
                 })*
             })else*
 
@@ -235,8 +253,17 @@ macro_rules! define_components {
             context: $crate::command::context::Context<'ap, 'ev, &'ev ::twilight_model::application::interaction::message_component::MessageComponentInteractionData>,
             custom_id: $crate::utility::types::custom_id::CustomId,
         ) -> $crate::client::event::EventResult {
+            use tracing::Instrument;
+
             match &**custom_id.variant() {
-                $(self::component::$name::NAME => self::component::$name::callback(entry, context, custom_id).await,)*
+                $(self::component::$name::NAME => {
+                    let span = ::tracing::trace_span!("sub", name = %self::component::$name::NAME);
+                    let result = self::component::$name::callback(entry, context, custom_id).instrument(span).await;
+
+                    ::tracing::debug!(name = %self::component::$name::NAME, "executed component");
+
+                    result
+                })*
                 _ => ::anyhow::bail!("unknown or missing component"),
             }
         }
@@ -276,8 +303,17 @@ macro_rules! define_modals {
             custom_id: $crate::utility::types::custom_id::CustomId,
             resolver: $crate::command::resolver::ModalComponentResolver<'ev>,
         ) -> $crate::client::event::EventResult {
+            use tracing::Instrument;
+
             match &**custom_id.variant() {
-                $(self::modal::$name::NAME => self::modal::$name::callback(entry, context, custom_id, resolver).await,)*
+                $(self::modal::$name::NAME => {
+                    let span = ::tracing::trace_span!("sub", name = %self::modal::$name::NAME);
+                    let result = self::modal::$name::callback(entry, context, custom_id, resolver).instrument(span).await;
+
+                    ::tracing::debug!(name = %self::modal::$name::NAME, "executed modal");
+
+                    result
+                })*
                 _ => ::anyhow::bail!("unknown or missing modal"),
             }
         }

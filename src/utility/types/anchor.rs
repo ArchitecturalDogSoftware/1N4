@@ -18,6 +18,7 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 use twilight_http::request::channel::message::UpdateMessage;
 use twilight_model::channel::Message;
 use twilight_model::id::Id;
@@ -40,17 +41,17 @@ pub struct Anchor {
 impl Anchor {
     /// Creates a new guild channel [`Anchor`].
     #[must_use]
-    pub const fn new_guild(
-        guild_id: Id<GuildMarker>,
-        channel_id: Id<ChannelMarker>,
-        message_id: Id<MessageMarker>,
-    ) -> Self {
+    pub fn new_guild(guild_id: Id<GuildMarker>, channel_id: Id<ChannelMarker>, message_id: Id<MessageMarker>) -> Self {
+        trace!(guild = %guild_id, channel = %channel_id, message = %message_id, "created new guild anchor");
+
         Self { guild_id: Some(guild_id), channel_id, message_id }
     }
 
     /// Creates a new private channel [`Anchor`].
     #[must_use]
-    pub const fn new_private(channel_id: Id<ChannelMarker>, message_id: Id<MessageMarker>) -> Self {
+    pub fn new_private(channel_id: Id<ChannelMarker>, message_id: Id<MessageMarker>) -> Self {
+        trace!(channel = %channel_id, message = %message_id, "created new private message anchor");
+
         Self { guild_id: None, channel_id, message_id }
     }
 
@@ -66,8 +67,16 @@ impl Anchor {
     /// This function will return an error if the message could not be fetched.
     pub async fn message(&mut self, api: ApiRef<'_>) -> Result<Message> {
         let Self { channel_id, message_id, .. } = self;
+        let result = api.client.message(*channel_id, *message_id).await?.model().await?;
 
-        Ok(api.client.message(*channel_id, *message_id).await?.model().await?)
+        trace!(
+            guild = self.guild_id.map(Id::get),
+            channel = %self.channel_id,
+            message = %self.message_id,
+            "fetched referenced message"
+        );
+
+        Ok(result)
     }
 
     /// Returns a message update future builder for the associated message.
@@ -87,6 +96,13 @@ impl Anchor {
 
         api.client.delete_message(*channel_id, *message_id).await?;
 
+        trace!(
+            guild = self.guild_id.map(Id::get),
+            channel = %self.channel_id,
+            message = %self.message_id,
+            "deleted referenced message"
+        );
+
         Ok(())
     }
 
@@ -97,6 +113,13 @@ impl Anchor {
     /// This function will return an error if the message could not be deleted.
     pub async fn delete_if_present(&mut self, api: ApiRef<'_>) -> Result<()> {
         if self.message(api).await.is_ok() {
+            trace!(
+                guild = self.guild_id.map(Id::get),
+                channel = %self.channel_id,
+                message = %self.message_id,
+                "validated that the referenced message exists"
+            );
+
             self.delete(api).await?;
         }
 

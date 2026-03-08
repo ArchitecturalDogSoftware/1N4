@@ -15,7 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use ina_localizing::localize;
-use ina_logging::debug;
+use tracing::{debug, trace};
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
@@ -58,8 +58,10 @@ async fn on_command<'ap: 'ev, 'ev>(
         .accent_color(Some(crate::utility::color::BACKDROP.rgb()))
         .component(TextDisplayBuilder::new(format!("### {title}")).try_build()?)
         .try_build()?;
+    trace!("created message components");
 
     context.components([component], Visibility::Ephemeral).await?;
+    debug!("created initial message");
 
     let response = context.client().response(&context.interaction.token).await?.model().await?;
     let delay = response.id.creation_date() - context.interaction.id.creation_date();
@@ -68,6 +70,7 @@ async fn on_command<'ap: 'ev, 'ev>(
         .accent_color(Some(crate::utility::color::BRANDING.rgb()))
         .component(TextDisplayBuilder::new(format!("### {title} ({delay})")).try_build()?)
         .try_build()?;
+    trace!("updated message components");
 
     context
         .client()
@@ -75,8 +78,9 @@ async fn on_command<'ap: 'ev, 'ev>(
         .flags(MessageFlags::IS_COMPONENTS_V2)
         .components(Some(&[component.into()]))
         .await?;
+    debug!("updated initial message");
 
-    debug!(async "received ping command: response delayed by {delay}").await?;
+    debug!(%delay, "finished running ping command");
 
     crate::client::event::pass()
 }

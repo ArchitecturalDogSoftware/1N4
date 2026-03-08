@@ -18,6 +18,7 @@ use std::fmt::Display;
 
 use anyhow::{Result, ensure};
 use ina_localizing::locale::Locale;
+use tracing::{debug, trace};
 use twilight_http::client::InteractionClient;
 use twilight_model::application::interaction::{Interaction, InteractionType};
 use twilight_model::channel::message::{Component, Embed, MessageFlags};
@@ -55,7 +56,9 @@ where
     T: Send,
 {
     /// Creates a new [`Context<T>`].
-    pub const fn new(api: ApiRef<'ar>, interaction: &'ev Interaction, data: T) -> Self {
+    pub fn new(api: ApiRef<'ar>, interaction: &'ev Interaction, data: T) -> Self {
+        trace!("created new interaction context");
+
         Self { api, interaction, data, state: ContextState::Pending, visibility: None }
     }
 
@@ -109,6 +112,8 @@ where
         self.state = ContextState::Deferred;
         self.visibility = Some(visibility);
 
+        trace!(?kind, ?visibility, "deferred interaction response");
+
         Ok(())
     }
 
@@ -138,7 +143,9 @@ where
     }
 
     /// Set [`Self`] as being [`ContextState::Completed`], marking the end of an interaction.
-    pub const fn complete(&mut self) {
+    pub fn complete(&mut self) {
+        debug!("context manually marked as completed");
+
         self.state = ContextState::Completed;
     }
 
@@ -176,6 +183,8 @@ where
         self.state = ContextState::Completed;
         self.visibility = Some(visibility);
 
+        trace!(?visibility, "completed interaction with message response");
+
         Ok(())
     }
 
@@ -212,6 +221,8 @@ where
 
         self.state = ContextState::Completed;
         self.visibility = Some(visibility);
+
+        trace!(?visibility, "completed interaction with embed response");
 
         Ok(())
     }
@@ -257,6 +268,8 @@ where
         self.state = ContextState::Completed;
         self.visibility = Some(visibility);
 
+        trace!(?visibility, "completed interaction with component response");
+
         Ok(())
     }
 
@@ -270,6 +283,8 @@ where
         ensure!(!self.is_completed(), "the interaction must not be completed");
         ensure!(!self.is_deferred(), "the interaction must not be deferred");
 
+        let modal_id = custom_id.clone();
+
         crate::create_response!(self, struct {
             kind: InteractionResponseType::Modal,
             components: components,
@@ -279,6 +294,8 @@ where
         .await?;
 
         self.state = ContextState::Completed;
+
+        trace!(id = %modal_id.escape_debug(), "completed interaction with modal response");
 
         Ok(())
     }
@@ -380,7 +397,7 @@ where
     /// This function will return an error if the value could not be converted.
     fn as_locale(&self) -> Result<Locale, Self::Error> {
         // Prefer the interaction-specified locale.
-        self.interaction
+        let locale = self.interaction
             .locale
             .as_deref()
             // Fall back to the author's locale.
@@ -390,7 +407,15 @@ where
             // Attempt to parse it into a valid locale value.
             .map(str::parse).transpose()?
             // Or fail and say that it's missing.
-            .ok_or(ina_localizing::Error::MissingLocale)
+            .ok_or(ina_localizing::Error::MissingLocale);
+
+        if let Ok(locale) = locale {
+            debug!(%locale, "detected preferred locale");
+        } else {
+            debug!("failed to detect preferred locale");
+        }
+
+        locale
     }
 }
 

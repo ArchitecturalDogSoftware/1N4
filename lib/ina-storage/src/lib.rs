@@ -26,6 +26,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "caching")]
 use tokio::sync::RwLock;
+use tracing::debug;
 
 use crate::settings::Settings;
 use crate::system::{DataReader, DataSystem, DataWriter};
@@ -73,6 +74,16 @@ impl Storage {
     /// Creates a new [`Storage`].
     #[must_use]
     pub fn new(settings: Settings) -> Self {
+        if settings.system == System::Memory {
+            debug!(caching = cfg!(feature = "caching"), "created new memory-based storage instance");
+        } else {
+            debug!(
+                path = ?settings.directory,
+                caching = cfg!(feature = "caching"),
+                "created new file-based storage instance"
+            );
+        }
+
         #[cfg(feature = "caching")]
         {
             Self { settings, cache: RwLock::new(HashMap::new()) }
@@ -133,101 +144,130 @@ macro_rules! system_call {
 impl DataReader for Storage {
     type Error = anyhow::Error;
 
+    #[tracing::instrument(level = "debug", name = "exists", skip(self))]
     fn blocking_exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
-        if self.cache.blocking_read().contains_key(&(*path)) {
+        if self.cache.blocking_read().contains_key(&(*combined_path)) {
+            debug!("data found in cache");
+
             return Ok(true);
         }
 
-        system_call!(match self.settings.system, ref => .blocking_exists(&path))
+        system_call!(match self.settings.system, ref => .blocking_exists(&combined_path))
+            .inspect(|_| debug!("checked whether data exists"))
     }
 
+    #[tracing::instrument(level = "debug", name = "exists", skip(self))]
     async fn exists(&self, path: &Path) -> Result<bool, Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
-        if self.cache.read().await.contains_key(&(*path)) {
+        if self.cache.read().await.contains_key(&(*combined_path)) {
+            debug!("data found in cache");
+
             return Ok(true);
         }
 
-        system_call!(match self.settings.system, async ref => .exists(&path))
+        system_call!(match self.settings.system, async ref => .exists(&combined_path))
+            .inspect(|_| debug!("checked whether data exists"))
     }
 
+    #[tracing::instrument(level = "debug", name = "size", skip(self))]
     fn blocking_size(&self, path: &Path) -> Result<u64, Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
-        if let Some(bytes) = self.cache.blocking_read().get(&(*path)) {
+        if let Some(bytes) = self.cache.blocking_read().get(&(*combined_path)) {
+            debug!("size found in cache");
+
             return Ok(bytes.len() as u64);
         }
 
-        system_call!(match self.settings.system, ref => .blocking_size(&path))
+        system_call!(match self.settings.system, ref => .blocking_size(&combined_path))
+            .inspect(|_| debug!("fetched size of data"))
     }
 
+    #[tracing::instrument(level = "debug", name = "size", skip(self))]
     async fn size(&self, path: &Path) -> Result<u64, Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
             let cache = self.cache.read().await;
 
-            if let Some(bytes) = cache.get(&(*path)) {
+            if let Some(bytes) = cache.get(&(*combined_path)) {
+                debug!("size found in cache");
+
                 return Ok(bytes.len() as u64);
             }
         }
 
-        system_call!(match self.settings.system, async ref => .size(&path))
+        system_call!(match self.settings.system, async ref => .size(&combined_path))
+            .inspect(|_| debug!("fetched size of data"))
     }
 
+    #[tracing::instrument(level = "debug", name = "read", skip(self))]
     fn blocking_read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
             let cache = self.cache.blocking_read();
 
-            if let Some(bytes) = cache.get(&(*path)).cloned() {
+            if let Some(bytes) = cache.get(&(*combined_path)).cloned() {
+                debug!("data found in cache");
+
                 return Ok(bytes);
             }
 
             drop(cache);
 
-            system_call!(match self.settings.system, ref => .blocking_read(&path)).inspect(|bytes| {
-                self.cache.blocking_write().insert(path.into_boxed_path(), Arc::clone(bytes));
+            system_call!(match self.settings.system, ref => .blocking_read(&combined_path)).inspect(|bytes| {
+                debug!("read data");
+
+                self.cache.blocking_write().insert(combined_path.into_boxed_path(), Arc::clone(bytes));
+
+                debug!("wrote data to cache");
             })
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, ref => .blocking_read(&path))
+            system_call!(match self.settings.system, ref => .blocking_read(&path)).inspect(|_| debug!("read data"))
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "read", skip(self))]
     async fn read(&self, path: &Path) -> Result<Arc<[u8]>, Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
             let cache = self.cache.read().await;
 
-            if let Some(bytes) = cache.get(&(*path)).cloned() {
+            if let Some(bytes) = cache.get(&(*combined_path)).cloned() {
+                debug!("data found in cache");
+
                 return Ok(bytes);
             }
 
             drop(cache);
 
-            let result = system_call!(match self.settings.system, async ref => .read(&path));
+            let result = system_call!(match self.settings.system, async ref => .read(&combined_path))
+                .inspect(|_| debug!("read data"));
 
             if let Ok(bytes) = result.as_ref().cloned() {
-                self.cache.write().await.insert(path.into_boxed_path(), bytes);
+                self.cache.write().await.insert(combined_path.into_boxed_path(), bytes);
+
+                debug!("wrote data to cache");
             }
 
             result
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, async ref => .read(&path))
+            system_call!(match self.settings.system, async ref => .read(&path)).inspect(|_| debug!("read data"))
         }
     }
 }
@@ -235,30 +275,41 @@ impl DataReader for Storage {
 impl DataWriter for Storage {
     type Error = anyhow::Error;
 
+    #[tracing::instrument(level = "debug", name = "write", skip(self, bytes))]
     fn blocking_write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            system_call!(match self.settings.system, mut => .blocking_write(&path, bytes)).inspect(|&()| {
-                self.cache.blocking_write().insert(path.into_boxed_path(), Arc::from(bytes));
+            system_call!(match self.settings.system, mut => .blocking_write(&combined_path, bytes)).inspect(|&()| {
+                debug!("wrote data");
+
+                self.cache.blocking_write().insert(combined_path.into_boxed_path(), Arc::from(bytes));
+
+                debug!("wrote data to cache");
             })
         }
         #[cfg(not(feature = "caching"))]
         {
             system_call!(match self.settings.system, mut => .blocking_write(&path, bytes))
+                .inspect(|()| debug!("wrote data"))
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "write", skip(self, bytes))]
     async fn write(&mut self, path: &Path, bytes: &[u8]) -> Result<(), Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            let result = system_call!(match self.settings.system, async mut => .write(&path, bytes));
+            let result = system_call!(match self.settings.system, async mut => .write(&combined_path, bytes));
 
             if result.is_ok() {
-                self.cache.write().await.insert(path.into_boxed_path(), Arc::from(bytes));
+                debug!("wrote data");
+
+                self.cache.write().await.insert(combined_path.into_boxed_path(), Arc::from(bytes));
+
+                debug!("wrote data to cache");
             }
 
             result
@@ -266,41 +317,59 @@ impl DataWriter for Storage {
         #[cfg(not(feature = "caching"))]
         {
             system_call!(match self.settings.system, async mut => .write(&path, bytes))
+                .inspect(|()| debug!("wrote data"))
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "rename", skip(self))]
     fn blocking_rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        let from = self.settings.directory.join(from);
-        let into = self.settings.directory.join(into);
+        let combined_from = self.settings.directory.join(from);
+        let combined_into = self.settings.directory.join(into);
 
         #[cfg(feature = "caching")]
         {
-            system_call!(match self.settings.system, mut => .blocking_rename(&from, &into)).inspect(|&()| {
-                let mut cache = self.cache.blocking_write();
-                let Some(value) = cache.remove(&(*from)) else { return };
+            system_call!(match self.settings.system, mut => .blocking_rename(&combined_from, &combined_into)).inspect(
+                |&()| {
+                    debug!("renamed data");
 
-                cache.insert(into.into_boxed_path(), value);
-            })
+                    let mut cache = self.cache.blocking_write();
+                    let Some(value) = cache.remove(&(*combined_from)) else { return };
+
+                    cache.insert(combined_into.into_boxed_path(), value);
+
+                    drop(cache);
+
+                    debug!("renamed data in cache");
+                },
+            )
         }
         #[cfg(not(feature = "caching"))]
         {
             system_call!(match self.settings.system, mut => .blocking_rename(&from, &into))
+                .inspect(|()| debug!("renamed data"))
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "rename", skip(self))]
     async fn rename(&mut self, from: &Path, into: &Path) -> Result<(), Self::Error> {
-        let from = self.settings.directory.join(from);
-        let into = self.settings.directory.join(into);
+        let combined_from = self.settings.directory.join(from);
+        let combined_into = self.settings.directory.join(into);
 
         #[cfg(feature = "caching")]
         {
-            let result = system_call!(match self.settings.system, async mut => .rename(&from, &into));
+            let result = system_call!(match self.settings.system, async mut => .rename(&combined_from, &combined_into));
 
             if result.is_ok() {
-                let mut cache = self.cache.write().await;
-                let Some(value) = cache.remove(&(*from)) else { return result };
+                debug!("renamed data");
 
-                cache.insert(into.into_boxed_path(), value);
+                let mut cache = self.cache.write().await;
+                let Some(value) = cache.remove(&(*combined_from)) else { return result };
+
+                cache.insert(combined_into.into_boxed_path(), value);
+
+                drop(cache);
+
+                debug!("renamed data in cache");
             }
 
             result
@@ -308,40 +377,52 @@ impl DataWriter for Storage {
         #[cfg(not(feature = "caching"))]
         {
             system_call!(match self.settings.system, async mut => .rename(&from, &into))
+                .inspect(|()| debug!("renamed data"))
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "delete", skip(self))]
     fn blocking_delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            system_call!(match self.settings.system, mut => .blocking_delete(&path)).inspect(|&()| {
-                self.cache.blocking_write().remove(&(*path));
+            system_call!(match self.settings.system, mut => .blocking_delete(&combined_path)).inspect(|&()| {
+                debug!("removed data");
+
+                self.cache.blocking_write().remove(&(*combined_path));
+
+                debug!("removed data from cache");
             })
         }
         #[cfg(not(feature = "caching"))]
         {
             system_call!(match self.settings.system, mut => .blocking_delete(&path))
+                .inspect(|()| debug!("removed data"))
         }
     }
 
+    #[tracing::instrument(level = "debug", name = "delete", skip(self))]
     async fn delete(&mut self, path: &Path) -> Result<(), Self::Error> {
-        let path = self.settings.directory.join(path);
+        let combined_path = self.settings.directory.join(path);
 
         #[cfg(feature = "caching")]
         {
-            let result = system_call!(match self.settings.system, async mut => .delete(&path));
+            let result = system_call!(match self.settings.system, async mut => .delete(&combined_path));
 
             if result.is_ok() {
-                self.cache.write().await.remove(&(*path));
+                debug!("removed data");
+
+                self.cache.write().await.remove(&(*combined_path));
+
+                debug!("removed data from cache");
             }
 
             result
         }
         #[cfg(not(feature = "caching"))]
         {
-            system_call!(match self.settings.system, async mut => .delete(&path))
+            system_call!(match self.settings.system, async mut => .delete(&path)).inspect(|()| debug!("removed data"))
         }
     }
 }
