@@ -15,7 +15,6 @@
 // <https://www.gnu.org/licenses/>.
 
 //! Provides data storage solutions for 1N4.
-#![feature(impl_trait_in_fn_trait_return)]
 
 #[cfg(feature = "caching")]
 use std::collections::HashMap;
