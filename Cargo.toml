@@ -62,20 +62,20 @@ rust.unsafe_code = "deny"
 clippy.undocumented_unsafe_blocks = "deny"
 
 [workspace.dependencies]
-anyhow = "~1.0"
-async-trait = "~0.1"
-clap = "~4.6"
+anyhow = "1.0"
+async-trait = "0.1"
+clap = "4.6"
 ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
 ina-logging = { version = "*", path = "./lib/ina-logging/" }
 ina-macro = { version = "*", path = "./lib/ina-macro/" }
 ina-threading = { version = "*", path = "./lib/ina-threading/" }
 ina-storage = { version = "*", path = "./lib/ina-storage/" }
-serde = "~1.0"
-time = "~0.3"
-thiserror = "~2.0"
-tokio = "~1.52"
-toml = "~1.1"
-tracing = "~0.1"
+serde = "1.0"
+time = "0.3"
+thiserror = "2.0"
+tokio = "1.52"
+toml = "1.1"
+tracing = "0.1"
 
 [lints]
 workspace = true
@@ -92,36 +92,36 @@ strip = "symbols"
 
 [dependencies]
 anyhow.workspace = true
-async-stream = "~0.3"
+async-stream = "0.3"
 async-trait.workspace = true
 clap = { workspace = true, features = ["cargo", "derive", "env", "wrap_help"] }
-directories = "~6.0"
-dotenvy = { version = "~0.15", optional = true }
+directories = "6.0"
+dotenvy = { version = "0.15", optional = true }
 ina-localizing.workspace = true
 ina-macro.workspace = true
 ina-threading.workspace = true
 ina-storage = { workspace = true, features = ["format-compression", "format-encryption", "format-messagepack"] }
-rand = { version = "~0.10", default-features = false, features = ["thread_rng"] }
-rustls = { version = "~0.23", default-features = false, features = ["ring"] }
+rand = { version = "0.10", default-features = false, features = ["thread_rng"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 serde = { workspace = true, features = ["derive"] }
-supports-color = "~3.0"
+supports-color = "3.0"
 thiserror.workspace = true
 time = { workspace = true, features = ["formatting", "local-offset", "macros", "serde"] }
 tokio = { workspace = true, features = ["full"] }
-tokio-stream = "~0.1"
+tokio-stream = "0.1"
 toml = { workspace = true, features = ["preserve_order"] }
 tracing.workspace = true
-tracing-subscriber = { version = "~0.3", features = ["env-filter", "local-time", "parking_lot", "time"] }
-twilight-cache-inmemory = "~0.17"
-twilight-gateway = "~0.17"
-twilight-http = "~0.17"
-twilight-mention = "~0.17"
-twilight-model = "~0.17"
-twilight-util = { version = "~0.17", features = ["full"] }
-twilight-validate = "~0.17"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "local-time", "parking_lot", "time"] }
+twilight-cache-inmemory = "0.17"
+twilight-gateway = "0.17"
+twilight-http = "0.17"
+twilight-mention = "0.17"
+twilight-model = "0.17"
+twilight-util = { version = "0.17", features = ["full"] }
+twilight-validate = "0.17"
 
 [build-dependencies]
-camino = "1.1.10"
+camino = "1.1"
 fig = { git = "https://github.com/Jaxydog/fig" }
-git2 = { version = "~0.20", default-features = false }
+git2 = { version = "0.20", default-features = false }
 license_page = { git = "https://github.com/RemasteredArch/license_page" }
