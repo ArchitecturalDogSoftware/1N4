@@ -347,7 +347,7 @@ macro_rules! define_entry {
                 {
                     let result = $command_callback(entry, context, resolver).await;
 
-                    if result.is_ok() {
+                    if ::std::result::Result::is_ok(&result) {
                         ::tracing::debug!(name = %$name, "executed callback for command");
                     } else {
                         ::tracing::error!(name = %$name, "failed to execute callback for command");

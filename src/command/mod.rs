@@ -209,7 +209,7 @@ macro_rules! define_commands {
                     ::tracing::debug!(
                         group = %self::command::$group::NAME,
                         subcommand = %self::command::$group::$group_name::NAME,
-                        "executed grouped subcommand"
+                        "executed grouped subcommand",
                     );
 
                     return result;

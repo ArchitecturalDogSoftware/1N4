@@ -118,7 +118,7 @@ impl CustomId {
             command = %self.command,
             variant = %self.variant,
             data = self.storage.last().map(|s| &(**s)),
-            "appended data to custom identifier"
+            "appended data to custom identifier",
         );
 
         self.ensure_valid().inspect_err(|_| drop(self.storage.pop()))

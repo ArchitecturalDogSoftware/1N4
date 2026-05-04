@@ -73,7 +73,7 @@ impl Anchor {
             guild = self.guild_id.map(Id::get),
             channel = %self.channel_id,
             message = %self.message_id,
-            "fetched referenced message"
+            "fetched referenced message",
         );
 
         Ok(result)
@@ -100,7 +100,7 @@ impl Anchor {
             guild = self.guild_id.map(Id::get),
             channel = %self.channel_id,
             message = %self.message_id,
-            "deleted referenced message"
+            "deleted referenced message",
         );
 
         Ok(())
@@ -117,7 +117,7 @@ impl Anchor {
                 guild = self.guild_id.map(Id::get),
                 channel = %self.channel_id,
                 message = %self.message_id,
-                "validated that the referenced message exists"
+                "validated that the referenced message exists",
             );
 
             self.delete(api).await?;

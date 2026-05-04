@@ -99,7 +99,7 @@ impl Localizer {
             default = %settings.default_locale,
             directory = ?settings.directory,
             on_miss = ?settings.miss_behavior,
-            "created new localizer interface"
+            "created new localizer interface",
         );
 
         Self { settings, languages: HashMap::new() }
@@ -352,8 +352,7 @@ impl Language {
 
         // Convert `Present` variants to `Inherit` variants.
         match trace_span!("parent", %locale).in_scope(|| {
-            //
-            parent.get_recursive(category, key, behavior, languages, max_depth - 1)
+            parent.get_recursive(category, key, behavior, languages, max_depth - 1) //
         }) {
             Ok(Text::Present(value)) => {
                 debug!(parent = %locale, "translation retrieved from parent locale");

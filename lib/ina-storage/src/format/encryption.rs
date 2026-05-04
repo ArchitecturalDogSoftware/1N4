@@ -240,9 +240,9 @@ impl<F: Debug + DataFormat + 'static> DataDecode for Encrypt<F> {
 /// Panics if the resolver was already set.
 #[expect(clippy::expect_used, reason = "we should fail if the resolver is set multiple times")]
 pub fn set_password_resolver(f: fn() -> Option<String>) {
-    trace!("updated encryption password resolver");
-
     PASSWORD_RESOLVER.set(f).expect("the password resolver has already been set");
+
+    trace!("updated encryption password resolver");
 }
 
 /// Returns a new [`Argon2`].

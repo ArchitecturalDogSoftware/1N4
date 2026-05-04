@@ -90,7 +90,7 @@ async fn on_create_command<'ap: 'ev, 'ev>(
     };
     let role_id = resolver.role_id("role")?;
     let icon = resolver.string("icon")?;
-    trace!("resolved role id and icon");
+    trace!("resolved role identifier and icon");
 
     context.defer(Visibility::Ephemeral).await?;
 
@@ -372,7 +372,7 @@ async fn on_select_component<'ap: 'ev, 'ev>(
     };
 
     let mut member = context.api.client.guild_member(guild_id, user_id).await?.model().await?;
-    debug!("resolved member from user id");
+    debug!("resolved member from user identifier");
 
     member.roles.dedup(); // Do we even need to deduplicate here?
     member.roles.sort_unstable();

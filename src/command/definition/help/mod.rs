@@ -288,11 +288,11 @@ async fn create_command_entry(locale: Option<Locale>, command: Command) -> Resul
 
     if command.contexts.is_some_and(|context| context.contains(&InteractionContextType::BotDm)) {
         command_flags.push(localize!(async(try in locale) category::UI, "help-tag-dms").await?.into());
-        trace!("added dms flag");
+        trace!("added DMs flag");
     }
     if command.nsfw.unwrap_or(false) {
         command_flags.push(localize!(async(try in locale) category::UI, "help-tag-nsfw").await?.into());
-        trace!("added nsfw flag");
+        trace!("added NSFW flag");
     }
 
     if !command_flags.is_empty() {

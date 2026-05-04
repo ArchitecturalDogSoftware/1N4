@@ -81,7 +81,7 @@ impl Storage {
             debug!(
                 path = ?settings.directory,
                 caching = cfg!(feature = "caching"),
-                "created new file-based storage instance"
+                "created new file-based storage instance",
             );
         }
 
