@@ -64,7 +64,7 @@ clippy.undocumented_unsafe_blocks = "deny"
 [workspace.dependencies]
 anyhow = "~1.0"
 async-trait = "~0.1"
-clap = "~4.5"
+clap = "~4.6"
 ina-localizing = { version = "*", path = "./lib/ina-localizing/" }
 ina-logging = { version = "*", path = "./lib/ina-logging/" }
 ina-macro = { version = "*", path = "./lib/ina-macro/" }
@@ -73,8 +73,8 @@ ina-storage = { version = "*", path = "./lib/ina-storage/" }
 serde = "~1.0"
 time = "~0.3"
 thiserror = "~2.0"
-tokio = "~1.49"
-toml = "~1.0"
+tokio = "~1.52"
+toml = "~1.1"
 tracing = "~0.1"
 
 [lints]
