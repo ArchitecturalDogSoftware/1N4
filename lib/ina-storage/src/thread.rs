@@ -88,6 +88,7 @@ fn create(settings: Settings) -> Result<StorageThreadInner> {
 /// # Errors
 ///
 /// This function will return an error if the thread fails to spawn.
+#[tracing::instrument(level = "trace", name = "new_thread", skip_all)]
 pub async fn start(settings: Settings) -> Result<()> {
     THREAD.async_api().initialize(self::create(settings)?).await;
 
@@ -103,6 +104,7 @@ pub async fn start(settings: Settings) -> Result<()> {
 /// # Errors
 ///
 /// This function will return an error if the thread fails to spawn.
+#[tracing::instrument(level = "trace", name = "new_thread", skip_all)]
 pub fn blocking_start(settings: Settings) -> Result<()> {
     THREAD.sync_api().initialize(self::create(settings)?);
 

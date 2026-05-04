@@ -18,6 +18,7 @@ use std::ffi::OsStr;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 use super::{DataDecode, DataEncode, DataFormat};
 
@@ -37,7 +38,7 @@ impl DataEncode for Postcard {
     fn encode<T: Serialize>(&self, value: &T) -> Result<Arc<[u8]>, Self::Error> {
         let buffer = Vec::with_capacity(std::mem::size_of_val(value) * 2);
 
-        postcard::to_extend(value, buffer).map(Into::into)
+        postcard::to_extend(value, buffer).inspect(|_| trace!("converted value to postcard")).map(Into::into)
     }
 }
 
@@ -45,6 +46,6 @@ impl DataDecode for Postcard {
     type Error = postcard::Error;
 
     fn decode<T: for<'de> Deserialize<'de>>(&self, bytes: &[u8]) -> Result<T, Self::Error> {
-        postcard::from_bytes(bytes)
+        postcard::from_bytes(bytes).inspect(|_| trace!("converted postcard to value"))
     }
 }

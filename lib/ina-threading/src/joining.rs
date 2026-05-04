@@ -16,6 +16,8 @@
 
 use std::ops::{Deref, DerefMut};
 
+use tracing::debug;
+
 use crate::Handle;
 
 /// A thread that is automatically joined when dropped.
@@ -108,6 +110,28 @@ where
     }
 }
 
+impl<H> Handle for Joining<H>
+where
+    H: Handle,
+{
+    type Output = H::Output;
+
+    #[expect(clippy::expect_used, reason = "the thread should not be accessed if it has been joined")]
+    fn as_join_handle(&self) -> &std::thread::JoinHandle<Self::Output> {
+        self.handle.as_ref().expect("attempted to access a dropped thread").as_join_handle()
+    }
+
+    #[expect(clippy::expect_used, reason = "the thread should not be accessed if it has been joined")]
+    fn as_join_handle_mut(&mut self) -> &mut std::thread::JoinHandle<Self::Output> {
+        self.handle.as_mut().expect("attempted to access a dropped thread").as_join_handle_mut()
+    }
+
+    #[expect(clippy::expect_used, reason = "the thread should not be accessed if it has been joined")]
+    fn into_join_handle(mut self) -> std::thread::JoinHandle<Self::Output> {
+        self.handle.take().expect("attempted to access a dropped thread").into_join_handle()
+    }
+}
+
 impl<H> Deref for Joining<H>
 where
     H: Handle,
@@ -137,6 +161,8 @@ where
     #[expect(clippy::unwrap_used, reason = "panics should be bubbled up since we can't drop with a result")]
     fn drop(&mut self) {
         let Some(mut handle) = self.handle.take() else { return };
+
+        debug!(name = %handle.thread_name(), "automatically closing thread");
 
         if let Some(inspect_handle) = self.inspect_handle {
             inspect_handle(&mut handle);

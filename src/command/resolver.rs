@@ -16,6 +16,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use tracing::{debug, error, trace, warn};
 use twilight_model::application::command::CommandOptionType;
 use twilight_model::application::interaction::application_command::{
     CommandData, CommandDataOption, CommandOptionValue,
@@ -77,6 +78,8 @@ impl<'ev> CommandOptionResolver<'ev> {
     where
         I: IntoIterator<Item = &'ev CommandDataOption>,
     {
+        trace!(command = %data.name, "created new command option resolver");
+
         Self { data, options: options.into_iter().map(|o| (&(*o.name), &o.value)).collect() }
     }
 
@@ -87,8 +90,16 @@ impl<'ev> CommandOptionResolver<'ev> {
     /// This function will return an error if the option does not exist.
     pub fn any(&'ev self, name: impl AsRef<str>) -> Result<&'ev CommandOptionValue, Error> {
         let name = name.as_ref();
+        let result = self.options.get(name).copied().ok_or_else(|| Error::MissingOption(name.into()));
 
-        self.options.get(name).copied().ok_or_else(|| Error::MissingOption(name.into()))
+        if result.is_ok() {
+            trace!(name, "resolved command option");
+        } else {
+            // Sometimes failure is intentional, so this is `debug` and not a `warn` or `error`.
+            debug!(name, "failed to resolve command option");
+        }
+
+        result
     }
 
     /// Returns a reference to the stored attachment identifier associated with the given name.
@@ -102,7 +113,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Attachment(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Attachment, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Attachment, other.kind()))
+            }
         }
     }
 
@@ -116,7 +131,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Boolean(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Boolean, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Boolean, other.kind()))
+            }
         }
     }
 
@@ -131,7 +150,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Channel(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Channel, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Channel, other.kind()))
+            }
         }
     }
 
@@ -145,7 +168,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Number(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Number, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Number, other.kind()))
+            }
         }
     }
 
@@ -159,7 +186,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Integer(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Integer, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Integer, other.kind()))
+            }
         }
     }
 
@@ -174,7 +205,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Mentionable(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Mentionable, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Mentionable, other.kind()))
+            }
         }
     }
 
@@ -189,7 +224,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::Role(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::Role, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::Role, other.kind()))
+            }
         }
     }
 
@@ -203,7 +242,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::String(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::String, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::String, other.kind()))
+            }
         }
     }
 
@@ -218,7 +261,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::User(value) => Ok(value),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::User, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::User, other.kind()))
+            }
         }
     }
 
@@ -234,7 +281,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::SubCommand(options) => Ok(Self::with_options(self.data, options)),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommand, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommand, other.kind()))
+            }
         }
     }
 
@@ -250,7 +301,11 @@ impl<'ev> CommandOptionResolver<'ev> {
 
         match self.any(name)? {
             CommandOptionValue::SubCommandGroup(options) => Ok(Self::with_options(self.data, options)),
-            other => Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommandGroup, other.kind())),
+            other => {
+                error!(name, kind = ?other.kind(), "resolved command option has an unexpected type");
+
+                Err(Error::InvalidOption(name.into(), CommandOptionType::SubCommandGroup, other.kind()))
+            }
         }
     }
 }
@@ -283,6 +338,8 @@ impl<'ev> ModalComponentResolver<'ev> {
     where
         I: IntoIterator<Item = &'ev ModalInteractionComponent>,
     {
+        trace!(id = %data.custom_id.escape_debug(), "created new modal component resolver");
+
         Self { data, components: components.into_iter().map(|component| (component.id(), component)).collect() }
     }
 
@@ -292,7 +349,15 @@ impl<'ev> ModalComponentResolver<'ev> {
     ///
     /// This function will return an error if the component does not exist.
     pub fn any(&'ev self, id: i32) -> Result<&'ev ModalInteractionComponent, Error> {
-        self.components.get(&id).copied().ok_or(Error::MissingComponent(id))
+        let result = self.components.get(&id).copied().ok_or(Error::MissingComponent(id));
+
+        if result.is_ok() {
+            trace!(id, "resolved modal component");
+        } else {
+            warn!(id, "failed to resolve modal component");
+        }
+
+        result
     }
 
     /// Returns a new [`ModalComponentResolver`] containing all components within the stored action row.
@@ -303,7 +368,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn action_row(&'ev self, id: i32) -> Result<Self, Error> {
         match self.any(id)? {
             ModalInteractionComponent::ActionRow(value) => Ok(Self::with_components(self.data, &(*value.components))),
-            other => Err(Error::InvalidComponent(id, ComponentType::ActionRow, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::ActionRow, other.kind()))
+            }
         }
     }
 
@@ -317,7 +386,11 @@ impl<'ev> ModalComponentResolver<'ev> {
             ModalInteractionComponent::Label(value) => {
                 Ok(Self::with_components(self.data, std::iter::once(&(*value.component))))
             }
-            other => Err(Error::InvalidComponent(id, ComponentType::Label, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::Label, other.kind()))
+            }
         }
     }
 
@@ -330,7 +403,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn string_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionStringSelect, Error> {
         match self.any(id)? {
             ModalInteractionComponent::StringSelect(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::TextSelectMenu, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::TextSelectMenu, other.kind()))
+            }
         }
     }
 
@@ -343,7 +420,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn text_input(&'ev self, id: i32) -> Result<&'ev ModalInteractionTextInput, Error> {
         match self.any(id)? {
             ModalInteractionComponent::TextInput(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::TextInput, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::TextInput, other.kind()))
+            }
         }
     }
 
@@ -356,7 +437,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn user_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionUserSelect, Error> {
         match self.any(id)? {
             ModalInteractionComponent::UserSelect(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::UserSelectMenu, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::UserSelectMenu, other.kind()))
+            }
         }
     }
 
@@ -369,7 +454,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn role_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionRoleSelect, Error> {
         match self.any(id)? {
             ModalInteractionComponent::RoleSelect(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::RoleSelectMenu, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::RoleSelectMenu, other.kind()))
+            }
         }
     }
 
@@ -382,7 +471,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn mentionable_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionMentionableSelect, Error> {
         match self.any(id)? {
             ModalInteractionComponent::MentionableSelect(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::MentionableSelectMenu, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::MentionableSelectMenu, other.kind()))
+            }
         }
     }
 
@@ -395,7 +488,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn channel_select(&'ev self, id: i32) -> Result<&'ev ModalInteractionChannelSelect, Error> {
         match self.any(id)? {
             ModalInteractionComponent::ChannelSelect(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::ChannelSelectMenu, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::ChannelSelectMenu, other.kind()))
+            }
         }
     }
 
@@ -408,7 +505,11 @@ impl<'ev> ModalComponentResolver<'ev> {
     pub fn file_upload(&'ev self, id: i32) -> Result<&'ev ModalInteractionFileUpload, Error> {
         match self.any(id)? {
             ModalInteractionComponent::FileUpload(value) => Ok(value),
-            other => Err(Error::InvalidComponent(id, ComponentType::FileUpload, other.kind())),
+            other => {
+                error!(id, kind = ?other.kind(), "resolved modal component has an unexpected type");
+
+                Err(Error::InvalidComponent(id, ComponentType::FileUpload, other.kind()))
+            }
         }
     }
 }
@@ -418,10 +519,18 @@ pub fn find_focused_option<'cd, I>(options: I) -> Option<(&'cd str, &'cd str, Co
 where
     I: IntoIterator<Item = &'cd CommandDataOption>,
 {
-    options.into_iter().find_map(|option| match &option.value {
+    let focused_option = options.into_iter().find_map(|option| match &option.value {
         CommandOptionValue::Focused(text, kind) => Some((&(*option.name), &(**text), *kind)),
         CommandOptionValue::SubCommand(options) => self::find_focused_option(options),
         CommandOptionValue::SubCommandGroup(commands) => self::find_focused_option(commands),
         _ => None,
-    })
+    });
+
+    if focused_option.is_some() {
+        trace!("resolved focused option");
+    } else {
+        trace!("failed to resolve focused option");
+    }
+
+    focused_option
 }

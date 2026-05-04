@@ -113,18 +113,21 @@ macro_rules! attachment_button {
                     }
                     ::std::io::Result::Err(error) => return ::anyhow::Result::Err(error.into()),
                 };
+                ::tracing::trace!("resolved file content");
 
                 let attachment = ::twilight_model::http::attachment::Attachment::from_bytes(
                     OUTPUT_FILE_NAME.to_string(),
                     file_content,
                     FILE_ID,
                 );
+                ::tracing::trace!("created message attachment");
 
                 $crate::follow_up_response!(context, struct {
                     attachments: &[attachment],
                 })
                 .await?;
                 context.complete();
+                ::tracing::debug!("completed interaction");
 
                 $crate::client::event::pass()
             }

@@ -16,6 +16,7 @@
 
 use anyhow::bail;
 use ina_localizing::localize;
+use tracing::{debug, trace};
 use twilight_model::application::command::CommandType;
 use twilight_model::application::interaction::InteractionContextType;
 use twilight_model::application::interaction::application_command::CommandData;
@@ -65,6 +66,7 @@ async fn on_command<'ap: 'ev, 'ev>(
     };
 
     let message = resolver.string("content")?;
+    trace!("resolved message content");
     let message: Box<[_]> = match resolver.integer("format").copied().unwrap_or(0) {
         1 => message.chars().map(|c| format!("0b{:b}", u32::from(c))).collect(),
         2 => message.chars().map(|c| format!("0o{:o}", u32::from(c))).collect(),
@@ -72,12 +74,15 @@ async fn on_command<'ap: 'ev, 'ev>(
         4 => message.chars().map(|c| format!("0x{:X}", u32::from(c))).collect(),
         _ => Box::new([message.to_string()]),
     };
+    trace!("formatted message content");
 
     context.api.client.create_message(channel.id).content(&message.join(" ")).await?;
+    debug!("created message");
 
     let done = localize!(async(try in locale) category::UI, "echo-done").await?;
 
     context.success_message(done, None::<&str>).await?;
+    debug!("completed interaction");
 
     crate::client::event::pass()
 }

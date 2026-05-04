@@ -22,6 +22,7 @@ use std::sync::Arc;
 use flate2::Compression;
 use flate2::read::{GzDecoder, GzEncoder};
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 use super::{DataDecode, DataEncode, DataFormat};
 
@@ -93,6 +94,8 @@ impl<F: Debug + DataFormat + 'static> DataEncode for Compress<F> {
 
         encoder.read_to_end(&mut buffer)?;
 
+        trace!(before = bytes.len(), after = buffer.len(), "deflated bytes");
+
         Ok(buffer.into())
     }
 }
@@ -105,6 +108,8 @@ impl<F: Debug + DataFormat + 'static> DataDecode for Compress<F> {
         let mut buffer = Vec::with_capacity(bytes.len() * 3);
 
         decoder.read_to_end(&mut buffer)?;
+
+        trace!(before = bytes.len(), after = buffer.len(), "inflated bytes");
 
         self.inner.decode(&buffer).map_err(Error::Decode)
     }

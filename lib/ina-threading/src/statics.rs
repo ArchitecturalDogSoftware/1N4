@@ -15,6 +15,7 @@
 // <https://www.gnu.org/licenses/>.
 
 use tokio::sync::{RwLock, RwLockMappedWriteGuard, RwLockReadGuard, RwLockWriteGuard};
+use tracing::trace;
 
 use crate::Handle;
 use crate::joining::Joining;
@@ -97,7 +98,7 @@ impl<H> Static<H> {
     /// ```
     pub const fn async_api(&self) -> AsyncStaticApi<'_, H>
     where
-        H: Send + Sync,
+        H: Handle + Send + Sync,
     {
         AsyncStaticApi { inner: &self.inner }
     }
@@ -113,7 +114,10 @@ impl<H> Static<H> {
     ///
     /// assert!(!THREAD.sync_api().is_initialized());
     /// ```
-    pub const fn sync_api(&self) -> SyncStaticApi<'_, H> {
+    pub const fn sync_api(&self) -> SyncStaticApi<'_, H>
+    where
+        H: Handle,
+    {
         SyncStaticApi { inner: &self.inner }
     }
 }
@@ -199,7 +203,7 @@ where
     /// ```
     pub const fn async_api(&self) -> AsyncStaticApi<'_, Joining<H>>
     where
-        H: Send + Sync,
+        H: Handle + Send + Sync,
     {
         AsyncStaticApi { inner: &self.inner }
     }
@@ -215,7 +219,10 @@ where
     ///
     /// assert!(!THREAD.sync_api().is_initialized());
     /// ```
-    pub const fn sync_api(&self) -> SyncStaticApi<'_, Joining<H>> {
+    pub const fn sync_api(&self) -> SyncStaticApi<'_, Joining<H>>
+    where
+        H: Handle,
+    {
         SyncStaticApi { inner: &self.inner }
     }
 }
@@ -225,7 +232,7 @@ where
 #[derive(Clone, Copy, Debug)]
 pub struct AsyncStaticApi<'sth, H>
 where
-    H: Send + Sync,
+    H: Handle + Send + Sync,
 {
     /// The inner lock.
     inner: &'sth RwLock<Option<H>>,
@@ -234,7 +241,7 @@ where
 #[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
 impl<H> AsyncStaticApi<'_, H>
 where
-    H: Send + Sync,
+    H: Handle + Send + Sync,
 {
     /// Returns whether the inner thread handle has been initialized.
     ///
@@ -281,7 +288,11 @@ where
     pub async fn initialize(&self, handle: H) {
         assert!(!self.is_initialized().await, "the thread is already initialized");
 
+        let name = handle.thread_name().to_string();
+
         *self.inner.write().await = Some(handle);
+
+        trace!(%name, "initialized static thread");
     }
 
     /// Closes the thread.
@@ -312,7 +323,12 @@ where
     ///
     /// Panics if the thread has not been initialized.
     pub async fn close(&self) {
-        self.inner.write().await.take().expect("the thread has not been initialized");
+        self.inner
+            .write()
+            .await
+            .take()
+            .inspect(|inner| trace!(name = %inner.thread_name(), "closed static thread"))
+            .expect("the thread has not been initialized");
     }
 
     /// Returns a reference to the inner thread handle.
@@ -401,20 +417,26 @@ where
     /// # }
     /// ```
     pub async fn take(&self) -> Option<H> {
-        self.inner.write().await.take()
+        self.inner.write().await.take().inspect(|inner| trace!(name = %inner.thread_name(), "unwrapped static thread"))
     }
 }
 
 /// An API for a static thread that provides its functionality through synchronous calls.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug)]
-pub struct SyncStaticApi<'sth, H> {
+pub struct SyncStaticApi<'sth, H>
+where
+    H: Handle,
+{
     /// The inner lock.
     inner: &'sth RwLock<Option<H>>,
 }
 
 #[expect(clippy::expect_used, reason = "we panic to ensure that the thread has been initialized prior to access")]
-impl<H> SyncStaticApi<'_, H> {
+impl<H> SyncStaticApi<'_, H>
+where
+    H: Handle,
+{
     /// Returns whether the inner thread handle has been initialized.
     ///
     /// # Examples
@@ -456,7 +478,11 @@ impl<H> SyncStaticApi<'_, H> {
     pub fn initialize(&self, handle: H) {
         assert!(!self.is_initialized(), "the thread is already initialized");
 
+        let name = handle.thread_name().to_string();
+
         *self.inner.blocking_write() = Some(handle);
+
+        trace!(%name, "initialized static thread");
     }
 
     /// Closes the thread.
@@ -486,7 +512,11 @@ impl<H> SyncStaticApi<'_, H> {
     ///
     /// Panics if the thread has not been initialized.
     pub fn close(&self) {
-        self.inner.blocking_write().take().expect("the thread has not been initialized");
+        self.inner
+            .blocking_write()
+            .take()
+            .inspect(|inner| trace!(name = %inner.thread_name(), "closed static thread"))
+            .expect("the thread has not been initialized");
     }
 
     /// Returns a reference to the inner thread handle.
@@ -578,6 +608,9 @@ impl<H> SyncStaticApi<'_, H> {
     /// Panics if this is called from within an asynchronous context.
     #[must_use]
     pub fn take(&self) -> Option<H> {
-        self.inner.blocking_write().take()
+        self.inner
+            .blocking_write()
+            .take()
+            .inspect(|inner| trace!(name = %inner.thread_name(), "unwrapped static thread"))
     }
 }

@@ -75,6 +75,7 @@ time = "~0.3"
 thiserror = "~2.0"
 tokio = "~1.49"
 toml = "~1.0"
+tracing = "~0.1"
 
 [lints]
 workspace = true
@@ -97,18 +98,20 @@ clap = { workspace = true, features = ["cargo", "derive", "env", "wrap_help"] }
 directories = "~6.0"
 dotenvy = { version = "~0.15", optional = true }
 ina-localizing.workspace = true
-ina-logging.workspace = true
 ina-macro.workspace = true
 ina-threading.workspace = true
 ina-storage = { workspace = true, features = ["format-compression", "format-encryption", "format-messagepack"] }
 rand = { version = "~0.10", default-features = false, features = ["thread_rng"] }
 rustls = { version = "~0.23", default-features = false, features = ["ring"] }
 serde = { workspace = true, features = ["derive"] }
+supports-color = "~3.0"
 thiserror.workspace = true
-time = { workspace = true, features = ["local-offset", "serde"] }
+time = { workspace = true, features = ["formatting", "local-offset", "macros", "serde"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = "~0.1"
 toml = { workspace = true, features = ["preserve_order"] }
+tracing.workspace = true
+tracing-subscriber = { version = "~0.3", features = ["env-filter", "local-time", "parking_lot", "time"] }
 twilight-cache-inmemory = "~0.17"
 twilight-gateway = "~0.17"
 twilight-http = "~0.17"
